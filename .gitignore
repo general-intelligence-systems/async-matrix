@@ -1,0 +1,17 @@
+# Synapse runtime artifacts
+/files/homeserver.db
+/files/homeserver.pid
+/files/media_store/
+/schemas/
+
+# Gems
+/.gem/
+
+# Nix
+/.direnv/
+result
+
+# Editor
+*.swp
+*.swo
+*~

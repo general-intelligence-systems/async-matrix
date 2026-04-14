@@ -1,0 +1,9 @@
+.gem
+.direnv
+.envrc
+.git
+flake.nix
+flake.lock
+docker
+db_data
+synapse_data
