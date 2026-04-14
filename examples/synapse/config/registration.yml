@@ -1,0 +1,22 @@
+# Matrix Application Service Registration
+# ─────────────────────────────────────────
+# Give this file to your homeserver admin.
+# In Synapse, add the path under `app_service_config_files` in homeserver.yaml.
+
+id: ruby-bot
+url: "http://bot:9292"
+
+as_token: "956a8cd58dd8420649717fade3974590641594a8f59989c2c00b1e68a427a56a"
+hs_token: "51013f109db594670d083539775bae41fdae8da9aae53df115906b957ef60464"
+
+sender_localpart: bot
+
+namespaces:
+  users:
+    - exclusive: false
+      regex: "@bot:localhost"
+  rooms: []
+  aliases: []
+
+rate_limited: false
+push_ephemeral: false
