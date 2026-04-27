@@ -197,7 +197,7 @@ bundle exec scampi
 
 ## Guides
 
-- [Matrix Events Reference](https://general-intelligence-systems.github.io/async-matrix/guides/matrix-events/) -- auto-generated documentation for every Matrix event type
+- [Matrix Events Reference](https://general-intelligence-systems.github.io/async-matrix/matrix-events/) -- auto-generated documentation for every Matrix event type
 
 ## License
 
