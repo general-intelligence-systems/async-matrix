@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+CONSOLE_LEVEL=fatal bundle exec scampi
