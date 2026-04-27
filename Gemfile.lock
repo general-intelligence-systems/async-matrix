@@ -1,3 +1,11 @@
+PATH
+  remote: .
+  specs:
+    async-matrix (0.1.0)
+      async (~> 2.0)
+      async-http (~> 0.69)
+      scampi (~> 0.1.7)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -30,10 +38,6 @@ GEM
       string-format (~> 0.2)
     async-utilization (0.3.2)
       console (~> 1.0)
-    bake (0.24.1)
-      bigdecimal
-      samovar (~> 2.1)
-    bigdecimal (4.1.2)
     colorize (1.1.0)
     colorize-extended (0.1.0)
       colorize (~> 1.1)
@@ -93,13 +97,9 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  async (~> 2.0)
-  async-http (~> 0.69)
-  bake (~> 0.24.1)
+  async-matrix!
   falcon (~> 0.47)
   logger
-  rack (~> 3.0)
-  scampi (~> 0.1.7)
 
 BUNDLED WITH
    2.6.9

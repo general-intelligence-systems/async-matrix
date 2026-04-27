@@ -4,3 +4,6 @@
 # Copyright, 2026, by General Intelligence Systems.
 
 require_relative "async/matrix"
+
+module Async
+end
