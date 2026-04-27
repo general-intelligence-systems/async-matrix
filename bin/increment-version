@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "erb"
+require_relative "../lib/async/matrix/version"
+
+USAGE = "Usage: bin/increment-version <major|minor|patch>"
+
+segment = ARGV[0]
+unless %w[major minor patch].include?(segment)
+  warn USAGE
+  exit 1
+end
+
+current = Async::Matrix::VERSION
+major, minor, patch = current.split(".").map(&:to_i)
+
+case segment
+when "major" then major += 1; minor = 0; patch = 0
+when "minor" then minor += 1; patch = 0
+when "patch" then patch += 1
+end
+
+version = "#{major}.#{minor}.#{patch}"
+
+template_path = File.expand_path("../lib/async/matrix/version.rb.erb", __dir__)
+output_path   = File.expand_path("../lib/async/matrix/version.rb", __dir__)
+
+template = ERB.new(File.read(template_path))
+result = template.result(binding)
+
+`bundle install`
+
+File.write(output_path, result)
+puts "#{current} -> #{version}"

@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/async/matrix/version"
+
+local_version = Async::Matrix::VERSION
+gem_name = "async-matrix"
+gemspec = "async-matrix.gemspec"
+
+puts "Local version: #{local_version}"
+
+remote_output = `gem specification #{gem_name} version --remote 2>&1`
+
+if $?.success?
+  remote_version = remote_output[/version: (.+)/, 1]&.strip
+  puts "Remote version: #{remote_version}"
+
+  if Gem::Version.new(local_version) <= Gem::Version.new(remote_version)
+    abort "ERROR: Local version (#{local_version}) has not been incremented past remote (#{remote_version})"
+  end
+else
+  puts "Gem not yet published remotely, proceeding with first release"
+end
+
+puts "Building #{gemspec}..."
+system("gem build #{gemspec}") || abort("ERROR: gem build failed")
+
+gem_file = "#{gem_name}-#{local_version}.gem"
+puts "Pushing #{gem_file}..."
+system("gem push #{gem_file}") || abort("ERROR: gem push failed")
+
+puts "Released #{gem_name} #{local_version}"
