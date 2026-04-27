@@ -1,7 +1,15 @@
 # Synapse runtime artifacts
-/files/homeserver.db
-/files/homeserver.pid
-/files/media_store/
+**/files/homeserver.db
+**/files/homeserver.db-shm
+**/files/homeserver.db-wal
+**/files/homeserver.pid
+**/files/media_store/
+**/files/*.signing.key
+
+# Generated TLS certificates
+**/certs/
+
+# Schemas
 /schemas/
 
 # Gems
