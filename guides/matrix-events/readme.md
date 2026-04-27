@@ -912,7 +912,7 @@ A topic is a short message detailing what is currently being discussed
 in the room.  It can also be used as a way to display extra information
 about the room, which may not be suitable for the room name. The room
 topic can also be set when creating a room using
-[`/createRoom`](client-server-api/#post_matrixclientv3createroom), either
+[`/createRoom`](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom), either
 with the `topic` key or by specifying a full event in `initial_state`.
 
 If the `topic` property is absent, null, or empty then the topic is unset. In other words,
