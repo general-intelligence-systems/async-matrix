@@ -39,6 +39,9 @@ enable_registration: true
 enable_registration_without_verification: true
 suppress_key_server_warning: true
 
+serve_server_wellknown: true
+public_baseurl: "https://localhost/"
+
 app_service_config_files:
   - /data/appservices/registration.yml
 

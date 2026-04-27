@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "yaml"
+
 module EchoBot
   class Config
     attr_reader :homeserver_url

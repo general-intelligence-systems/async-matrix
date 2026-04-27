@@ -1,4 +1,4 @@
-FROM ruby:3.4-slim
+FROM ruby:4.0
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential libssl-dev && \
@@ -6,12 +6,12 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY ../../Gemfile ../../Gemfile.lock ./
+COPY Gemfile Gemfile.lock ./
 RUN bundle install --jobs 4
 
-COPY ../../lib ./lib
-COPY . ./examples/echo_bot
+COPY lib ./lib
+COPY examples/synapse ./examples/synapse
 
 EXPOSE 9292
 
-CMD ["bundle", "exec", "falcon", "serve", "--bind", "http://0.0.0.0:9292", "--config", "examples/echo_bot/config.ru"]
+CMD ["bundle", "exec", "falcon", "serve", "--bind", "http://0.0.0.0:9292", "--config", "examples/synapse/config.ru"]
