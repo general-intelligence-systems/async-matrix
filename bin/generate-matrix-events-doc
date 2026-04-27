@@ -318,3 +318,14 @@ result = erb.result(binding)
 
 OUTPUT.write(result)
 puts "Generated #{OUTPUT.relative_path_from(ROOT)} (#{result.lines.count} lines)"
+
+# Rewrite relative Matrix spec links to absolute URLs so utopia-project's
+# static site generator (wget --mirror) doesn't try to fetch them from localhost.
+output_path = OUTPUT.to_s
+`sed -i 's|](/client-server-api|](https://spec.matrix.org/latest/client-server-api|g' #{output_path}`
+`sed -i 's|](/appendices|](https://spec.matrix.org/latest/appendices|g' #{output_path}`
+`sed -i 's|](/rooms|](https://spec.matrix.org/latest/rooms|g' #{output_path}`
+`sed -i 's|](client-server-api|](https://spec.matrix.org/latest/client-server-api|g' #{output_path}`
+`sed -i 's|](appendices|](https://spec.matrix.org/latest/appendices|g' #{output_path}`
+`sed -i 's|](rooms|](https://spec.matrix.org/latest/rooms|g' #{output_path}`
+puts "Rewrote relative Matrix spec links to absolute URLs"

@@ -7,6 +7,12 @@
 
 Async-native [Matrix](https://matrix.org) Application Service SDK for Ruby. Built on the [Socketry](https://github.com/socketry) ecosystem (`async`, `async-http`, Falcon). No threads, no callbacks -- just fibers.
 
+## Usage
+
+Please see the [project documentation](https://general-intelligence-systems.github.io/async-matrix/) for more details.
+
+  - [Matrix Events Reference](https://general-intelligence-systems.github.io/async-matrix/guides/matrix-events/index) - Auto-generated documentation for every Matrix event type.
+
 ## Install
 
 ```ruby
@@ -194,12 +200,6 @@ Tests are inline via [Scampi](https://rubygems.org/gems/scampi) -- co-located wi
 ```sh
 bundle exec scampi
 ```
-
-## Usage
-
-Please see the [project documentation](https://general-intelligence-systems.github.io/async-matrix/) for more details.
-
-  - [Matrix Events Reference](https://general-intelligence-systems.github.io/async-matrix/guides/matrix-events/index) - Auto-generated documentation for every Matrix event type.
 
 ## License
 
