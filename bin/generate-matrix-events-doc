@@ -17,8 +17,8 @@ ROOT = Pathname.new(File.expand_path("..", __dir__))
 SCHEMA_DIR = ROOT / "data" / "matrix-spec" / "event-schemas" / "schema"
 EXAMPLE_DIR = ROOT / "data" / "matrix-spec" / "event-schemas" / "examples"
 SHARED_DIR = ROOT / "data" / "matrix-spec" / "event-schemas"
-TEMPLATE = ROOT / "guides" / "matrix-events" / "README.md.erb"
-OUTPUT = ROOT / "guides" / "matrix-events" / "README.md"
+TEMPLATE = ROOT / "guides" / "matrix-events" / "readme.md.erb"
+OUTPUT = ROOT / "guides" / "matrix-events" / "readme.md"
 
 unless SCHEMA_DIR.exist?
   warn "Schema directory not found. Run bin/fetch-matrix-schemas first."
