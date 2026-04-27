@@ -1,0 +1,181 @@
+# Matrix Events Reference
+
+> **Auto-generated** from the [Matrix Specification](https://spec.matrix.org/latest/)
+> event schemas (`matrix-org/matrix-spec`). Do not edit by hand.
+>
+> Regenerate: `bin/fetch-matrix-schemas && ruby bin/generate-matrix-events-doc`
+
+## How Matrix Events Work
+
+Every event in Matrix is a JSON object with a common envelope:
+
+```json
+{
+  "type": "m.room.message",
+  "event_id": "$143273582443PhrSn:example.org",
+  "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+  "sender": "@alice:example.org",
+  "origin_server_ts": 1432735824653,
+  "content": { ... },
+  "unsigned": { "age": 1234 }
+}
+```
+
+**State events** additionally have a `state_key` field and represent persistent
+room configuration (name, topic, membership, power levels, etc.). The same
+`(type, state_key)` pair is overwritten rather than appended.
+
+**Message events** (no `state_key`) represent transient activity: messages sent,
+reactions, redactions, stickers, calls.
+
+**Ephemeral events** are not persisted and are delivered via `/sync` only
+(typing indicators, read receipts, presence).
+
+The `type` field determines what kind of event it is. For `m.room.message`
+events, the `content.msgtype` sub-field further specifies the message type
+(text, image, file, etc.).
+
+### Application Service Transaction Format
+
+An appservice receives events as HTTP `PUT` requests to
+`/_matrix/app/v1/transactions/{txnId}` with a body like:
+
+```json
+{
+  "events": [ ... array of event objects ... ]
+}
+```
+
+---
+
+## Event Type Reference
+<% groups.each do |group| %>
+
+## <%= group[:label] %>
+<% group[:events].each do |event| %>
+
+### `<%= event.event_type %>`
+
+<%= event.description %>
+
+- **Kind:** <%= event.base_kind == :state ? "State event" : event.base_kind == :room ? "Room message event" : event.base_kind == :call ? "Room message event (VoIP)" : "Basic event" %>
+<%- if event.has_content_props? %>
+
+#### Content Fields
+
+| Field | Type | Req? | Description |
+|-------|------|------|-------------|
+<%- event.content_props.each do |name, spec| -%>
+| `<%= name %>` | `<%= spec[:type] %>` | <%= spec[:required] ? "**yes**" : "no" %> | <%= spec[:description] %> |
+<%- end -%>
+<%- end -%>
+<%- if event.variants.any? -%>
+
+#### Message Types (`content.msgtype`)
+<%- event.variants.sort_by(&:variant).each do |v| -%>
+
+##### `<%= v.variant %>`
+
+<%= v.description %>
+<%- if v.has_content_props? %>
+
+| Field | Type | Req? | Description |
+|-------|------|------|-------------|
+<%- v.content_props.each do |name, spec| -%>
+| `<%= name %>` | `<%= spec[:type] %>` | <%= spec[:required] ? "**yes**" : "no" %> | <%= spec[:description] %> |
+<%- end -%>
+<%- end -%>
+<%- if v.example -%>
+
+<details><summary>Example</summary>
+
+```json
+<%= format_example_json(v.example) %>
+```
+
+</details>
+<%- end -%>
+<%- end -%>
+<%- end -%>
+<%- if event.example -%>
+
+<details><summary>Example</summary>
+
+```json
+<%= format_example_json(event.example) %>
+```
+
+</details>
+<%- end -%>
+
+---
+<%- end -%>
+<%- end -%>
+
+## Common Content Sub-Objects
+
+These are shared structures that appear inside `content` across many event types.
+
+### `m.relates_to`
+
+Used to create relationships between events (replies, edits, threads, reactions).
+
+```json
+{
+  "m.relates_to": {
+    "rel_type": "m.annotation",
+    "event_id": "$target_event_id",
+    "key": "👍"
+  }
+}
+```
+
+| `rel_type` value | Meaning |
+|------------------|---------|
+| `m.annotation` | Reaction |
+| `m.reference` | Generic reference |
+| `m.replace` | Edit / replacement |
+| `m.thread` | Thread reply |
+
+For replies (`m.in_reply_to`):
+```json
+{
+  "m.relates_to": {
+    "m.in_reply_to": {
+      "event_id": "$original_event_id"
+    }
+  }
+}
+```
+
+### `m.mentions`
+
+Intentional mentions (added in Matrix v1.7):
+
+```json
+{
+  "m.mentions": {
+    "user_ids": ["@alice:example.org"],
+    "room": false
+  }
+}
+```
+
+### Media `info` Object
+
+Shared by `m.image`, `m.video`, `m.audio`, `m.file`, and `m.sticker` content types:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mimetype` | string | MIME type (e.g. `image/png`) |
+| `size` | integer | File size in bytes |
+| `w` | integer | Width in pixels (images/video) |
+| `h` | integer | Height in pixels (images/video) |
+| `duration` | integer | Duration in milliseconds (audio/video) |
+| `thumbnail_url` | string | `mxc://` URI for thumbnail |
+| `thumbnail_info` | object | `ThumbnailInfo` with `mimetype`, `size`, `w`, `h` |
+
+---
+
+*Source: [matrix-org/matrix-spec](https://github.com/matrix-org/matrix-spec) event schemas.
+Spec version: latest (fetched at generation time).*
