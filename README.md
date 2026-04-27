@@ -2,7 +2,7 @@
 
 [![Gem Version](https://img.shields.io/gem/v/async-matrix)](https://rubygems.org/gems/async-matrix)
 [![CI](https://github.com/general-intelligence-systems/async-matrix/actions/workflows/test.yaml/badge.svg)](https://github.com/general-intelligence-systems/async-matrix/actions/workflows/test.yaml)
-[![License](https://img.shields.io/github/license/general-intelligence-systems/async-matrix)](LICENSE)
+[![License](https://img.shields.io/github/license/general-intelligence-systems/async-matrix)](https://github.com/general-intelligence-systems/async-matrix/blob/main/LICENSE)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.3-red)](https://www.ruby-lang.org)
 
 Async-native [Matrix](https://matrix.org) Application Service SDK for Ruby. Built on the [Socketry](https://github.com/socketry) ecosystem (`async`, `async-http`, Falcon). No threads, no callbacks -- just fibers.
@@ -180,7 +180,7 @@ Synapse ──PUT /transactions/{txnId}──▶ Server (Rack 3)
 
 ## Running with Docker
 
-A complete echo bot example lives in [`examples/echo_bot/`](examples/echo_bot/) with Docker Compose, Synapse, and nginx.
+A complete echo bot example lives in [`examples/echo_bot/`](https://github.com/general-intelligence-systems/async-matrix/tree/main/examples/echo_bot) with Docker Compose, Synapse, and nginx.
 
 ```sh
 cd examples/echo_bot
