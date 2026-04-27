@@ -6,6 +6,7 @@
 require "bundler/setup"
 require "json"
 require "async/http"
+require "async/matrix"
 
 module Async
 	module Matrix

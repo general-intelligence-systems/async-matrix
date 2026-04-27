@@ -7,6 +7,7 @@ require "bundler/setup"
 require "json"
 require "rack"
 require "console"
+require "async/matrix"
 
 module Async
 	module Matrix
@@ -123,9 +124,7 @@ end
 
 test do
 	require "stringio"
-	require_relative "transaction_store"
-	require_relative "dispatcher"
-	require_relative "event"
+  require "async/matrix"
 
 	describe "Async::Matrix::ApplicationService::Server" do
 		def build_server(hs_token: "secret")

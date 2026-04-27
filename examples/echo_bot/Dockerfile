@@ -1,4 +1,4 @@
-FROM ruby:4.0
+FROM ruby:3.4
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential libssl-dev && \
@@ -9,9 +9,8 @@ WORKDIR /app
 COPY Gemfile Gemfile.lock ./
 RUN bundle install --jobs 4
 
-COPY lib ./lib
-COPY examples/echo_bot ./examples/echo_bot
+COPY . .
 
 EXPOSE 9292
 
-CMD ["bundle", "exec", "falcon", "serve", "--bind", "http://0.0.0.0:9292", "--config", "examples/echo_bot/config.ru"]
+CMD ["bundle", "exec", "falcon", "serve", "--bind", "http://0.0.0.0:9292", "--config", "config.ru"]

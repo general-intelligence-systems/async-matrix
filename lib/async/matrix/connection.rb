@@ -5,6 +5,7 @@
 
 require "bundler/setup"
 require "async/http"
+require "async/matrix"
 
 module Async
 	module Matrix

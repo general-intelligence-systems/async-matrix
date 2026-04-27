@@ -4,7 +4,7 @@
 # Copyright, 2026, by General Intelligence Systems.
 
 require "bundler/setup"
-require_relative "event"
+require "async/matrix"
 
 module Async
 	module Matrix

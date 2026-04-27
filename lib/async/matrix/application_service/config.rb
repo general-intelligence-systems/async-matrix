@@ -5,7 +5,7 @@
 
 require "bundler/setup"
 require "yaml"
-require_relative "../error"
+require "async/matrix"
 
 module Async
 	module Matrix

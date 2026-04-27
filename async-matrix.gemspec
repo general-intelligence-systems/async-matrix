@@ -22,10 +22,10 @@ Gem::Specification.new do |spec|
 	spec.files = Dir["lib/**/*.rb", "LICENSE", "README.md"]
 	spec.require_paths = ["lib"]
 
-	spec.add_dependency "async", "~> 2.0"
-	spec.add_dependency "async-http", "~> 0.69"
+	spec.add_dependency "async", "~> 2.39"
+	spec.add_dependency "async-http", "~> 0.95"
   spec.add_dependency "scampi", "~> 0.1.7"
 
-  spec.add_development_dependency "falcon", "~> 0.47"
+  spec.add_development_dependency "falcon", "~> 0.55"
   spec.add_development_dependency "logger"
 end

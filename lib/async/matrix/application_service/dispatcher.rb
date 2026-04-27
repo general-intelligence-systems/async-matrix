@@ -5,7 +5,7 @@
 
 require "bundler/setup"
 require "console"
-require_relative "transaction"
+require "async/matrix"
 
 module Async
 	module Matrix

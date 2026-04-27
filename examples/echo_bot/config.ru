@@ -3,7 +3,7 @@
 # Echo Bot — Rack entry point
 # Run with: falcon serve --bind http://0.0.0.0:9292
 
-require_relative "../../lib/async/matrix"
+require "async/matrix"
 require_relative "handlers/invite"
 require_relative "handlers/message"
 

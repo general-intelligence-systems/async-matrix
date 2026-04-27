@@ -6,6 +6,7 @@
 require "bundler/setup"
 require "async"
 require "async/condition"
+require "async/matrix"
 
 module Async
 	module Matrix

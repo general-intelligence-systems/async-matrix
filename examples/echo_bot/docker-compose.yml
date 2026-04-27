@@ -2,14 +2,12 @@ include:
   - path: ../synapse/docker-compose.yml
 
 services:
-  # ── Echo Bot (Appservice) ───────────────────────────────
   bot:
     build:
-      context: ../..
-      dockerfile: examples/echo_bot/Dockerfile
+      context: .
     restart: unless-stopped
     environment:
-      APPSERVICE_CONFIG: examples/echo_bot/config/appservice.yml
+      APPSERVICE_CONFIG: config/appservice.yml
     depends_on:
       synapse:
         condition: service_healthy

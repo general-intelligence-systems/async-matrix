@@ -5,12 +5,11 @@
 
 require "bundler/setup"
 require "async/http/internet"
+require "async/matrix"
 require "json"
 require "erb"
 require "console"
 require "securerandom"
-require_relative "error"
-require_relative "application_service/error_response"
 
 module Async
 	module Matrix
@@ -150,8 +149,6 @@ module Async
 end
 
 test do
-	require_relative "version"
-
 	describe "Async::Matrix::Client" do
 		it "sets authorization header from config" do
 			config = Struct.new(:homeserver_url, :as_token, :bot_mxid).new(
