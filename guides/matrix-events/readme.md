@@ -246,13 +246,13 @@ This is the first event in a room and cannot be changed. It acts as the root of 
 room version 11 the event `sender` should be used instead. |
 | `m.federate` | `boolean` | no | Whether users on other servers can join this room. Defaults to `true` if key does not exist. |
 | `room_version` | `string` | no | The version of the room. Defaults to `"1"` if the key does not exist. |
-| `type` | `string` | no | Optional [room type](/client-server-api/#types) to denote a room's intended function outside of traditional
-conversation. Unspecified room types are possible using [Namespaced Identifiers](/appendices/#common-namespaced-identifier-grammar). |
+| `type` | `string` | no | Optional [room type](https://spec.matrix.org/latest/client-server-api/#types) to denote a room's intended function outside of traditional
+conversation. Unspecified room types are possible using [Namespaced Identifiers](https://spec.matrix.org/latest/appendices/#common-namespaced-identifier-grammar). |
 | `predecessor` | `object` | no | A reference to the room this room replaces, if the previous room was upgraded. Contains: `room_id` (string): The ID of the old room.; `event_id` (string): The event ID of the last known event in the old room, if known. If not set, clients SHOULD search for the `m.room.tombstone` state event to navigate to
 when directing the user to the old room (potentially after joining the room, if requested
 by the user).. |
 | `additional_creators` | `array` | no | Starting with room version 12, the other user IDs to consider as creators for the room in
-addition to the `sender` of this event. Each string MUST be a valid [user ID](/appendices#user-identifiers)
+addition to the `sender` of this event. Each string MUST be a valid [user ID](https://spec.matrix.org/latest/appendices#user-identifiers)
 for the room version. When not present or empty, the `sender` of the event is the only creator. In room versions 1 through 11, this field serves no purpose and is not validated. Clients
 SHOULD NOT attempt to parse or understand this field in these room versions. **Note**: Because `creator` was removed in room version 11, the field is not used to determine
 which user(s) are room creators in room version 12 and beyond either. |
@@ -384,14 +384,14 @@ A room may have one of the following designations:
   in order to join.
 * `knock` - a user can request an invite to the room. They can be allowed (invited)
   or denied (kicked/banned) access. Otherwise, users need to be invited in. Only
-  available in rooms [which support knocking](/rooms/#feature-matrix).
+  available in rooms [which support knocking](https://spec.matrix.org/latest/rooms/#feature-matrix).
 * `restricted` - anyone able to satisfy at least one of the allow conditions is
   able to join the room without prior action. Otherwise, an invite is required.
-  Only available in rooms [which support the join rule](/rooms/#feature-matrix).
+  Only available in rooms [which support the join rule](https://spec.matrix.org/latest/rooms/#feature-matrix).
 * `knock_restricted` - a user can request an invite using the same functions offered
   by the `knock` join rule, or can attempt to join having satisfied an allow condition
   per the `restricted` join rule. Only available in rooms
-  [which support the join rule](/rooms/#feature-matrix).
+  [which support the join rule](https://spec.matrix.org/latest/rooms/#feature-matrix).
 * `private` - reserved without implementation. No significant meaning.
 
 - **Kind:** State event
@@ -447,11 +447,11 @@ The following membership states are specified:
   participate in the room until they join.
 
 The `third_party_invite` property will be set if this invite is an `invite` event and is the
-successor of an [`m.room.third_party_invite`](/client-server-api/#mroomthird_party_invite) event,
+successor of an [`m.room.third_party_invite`](https://spec.matrix.org/latest/client-server-api/#mroomthird_party_invite) event,
 and absent otherwise.
 
 This event may also include an `invite_room_state` key inside the event's `unsigned` data.
-If present, this contains an array of [stripped state events](/client-server-api/#stripped-state)
+If present, this contains an array of [stripped state events](https://spec.matrix.org/latest/client-server-api/#stripped-state)
 to assist the receiver in identifying the room.
 
 The user for which a membership applies is represented by the `state_key`. Under some conditions,
@@ -482,10 +482,10 @@ as `leave`.
 | `displayname` | `string | null` | no | The display name for this user, if any. |
 | `membership` | `string` | **yes** | The membership state of the user. One of: `invite`, `join`, `knock`, `leave`, `ban`. |
 | `is_direct` | `boolean` | no | Flag indicating if the room containing this event was created with the intention of being
-a direct chat. See [Direct Messaging](/client-server-api/#direct-messaging). |
+a direct chat. See [Direct Messaging](https://spec.matrix.org/latest/client-server-api/#direct-messaging). |
 | `join_authorised_via_users_server` | `string` | no | Usually found on `join` events, this field is used to denote which homeserver (through
 representation of a user with sufficient power level) authorised the user's join. More
-information about this field can be found in the [Restricted Rooms Specification](/client-server-api/#restricted-rooms). Client and server implementations should be aware of the [signing implications](/rooms/v8/#authorization-rules)
+information about this field can be found in the [Restricted Rooms Specification](https://spec.matrix.org/latest/client-server-api/#restricted-rooms). Client and server implementations should be aware of the [signing implications](https://spec.matrix.org/latest/rooms/v8/#authorization-rules)
 of including this field in further events: in particular, the event must be signed by the
 server which owns the user ID in the field. When copying the membership event's `content`
 (for profile updates and similar) it is therefore encouraged to exclude this field in the
@@ -498,7 +498,7 @@ but can't make it that day. Clients are not recommended to show this reason to u
 the potential for spam and abuse. Hiding the reason behind a button or other component is
 recommended. |
 | `third_party_invite` | `object` | no | A third-party invite, if this `m.room.member` is the successor to an
-[`m.room.third_party_invite`](/client-server-api/#mroomthird_party_invite)
+[`m.room.third_party_invite`](https://spec.matrix.org/latest/client-server-api/#mroomthird_party_invite)
 event. Contains: `display_name` (string): A name which can be displayed to represent the user instead of their
 third-party identifier; `signed` (object): . |
 
@@ -596,7 +596,7 @@ This event is used to "pin" particular events in a room for other participants t
 
 ### `m.room.policy`
 
-A [Policy Server](/client-server-api/#policy-servers) configuration. If invalid
+A [Policy Server](https://spec.matrix.org/latest/client-server-api/#policy-servers) configuration. If invalid
 or not set, the room does not use a Policy Server.
 
 - **Kind:** State event
@@ -662,7 +662,7 @@ for `kick` and `ban` default to 50 if they are not specified in the
 `m.room.power_levels` event, or if the room contains no
 `m.room.power_levels` event. `invite` defaults to 0 in either case.
 Other membership values are handled during event authorization. See
-the authorization rules in [room versions](/rooms) for further details.
+the authorization rules in [room versions](https://spec.matrix.org/latest/rooms) for further details.
 
 For redactions of a user's own events, the required power level is
 determined by the `m.room.redaction` event power level, as per `events`
@@ -674,7 +674,7 @@ event, or if the room contains no `m.room.power_levels` event.
 **Note:**
 
 The allowed range for power level values is `[-(2**53)+1, (2**53)-1]`,
-as required by the [Canonical JSON specification](/appendices/#canonical-json).
+as required by the [Canonical JSON specification](https://spec.matrix.org/latest/appendices/#canonical-json).
 
 - **Kind:** State event
 
@@ -684,8 +684,8 @@ as required by the [Canonical JSON specification](/appendices/#canonical-json).
 | Field | Type | Req? | Description |
 |-------|------|------|-------------|
 | `ban` | `integer` | no | The level required to ban a user. Defaults to 50 if unspecified. |
-| `events` | `object` | no | The level required to send specific event types. This is a mapping from event type to power level required. Though not a default, when the server sends the initial power levels event during [room creation](/client-server-api#creation)
-in [room versions](/rooms) 12 and higher, the `m.room.tombstone` event MUST be explicitly defined and given
+| `events` | `object` | no | The level required to send specific event types. This is a mapping from event type to power level required. Though not a default, when the server sends the initial power levels event during [room creation](https://spec.matrix.org/latest/client-server-api#creation)
+in [room versions](https://spec.matrix.org/latest/rooms) 12 and higher, the `m.room.tombstone` event MUST be explicitly defined and given
 a power level higher than `state_default`. For example, power level 150. Clients may override this using the
 described `power_level_content_override` field. |
 | `events_default` | `integer` | no | The default level required to send message events. Can be
@@ -695,9 +695,9 @@ overridden by the `events` key.  Defaults to 0 if unspecified. |
 | `redact` | `integer` | no | The level required to redact an event sent by another user. Defaults to 50 if unspecified. |
 | `state_default` | `integer` | no | The default level required to send state events. Can be overridden
 by the `events` key. Defaults to 50 if unspecified. |
-| `users` | `object` | no | The power levels for specific users. This is a mapping from `user_id` to power level for that user. **Note**: In [room versions](/rooms) 12 and higher it is not permitted to specify the room creators here. |
+| `users` | `object` | no | The power levels for specific users. This is a mapping from `user_id` to power level for that user. **Note**: In [room versions](https://spec.matrix.org/latest/rooms) 12 and higher it is not permitted to specify the room creators here. |
 | `users_default` | `integer` | no | The power level for users in the room whose `user_id` is not mentioned in the `users` key. Defaults to 0 if
-unspecified. **Note**: In [room versions](/rooms) 1 through 11, when there is no `m.room.power_levels`
+unspecified. **Note**: In [room versions](https://spec.matrix.org/latest/rooms) 1 through 11, when there is no `m.room.power_levels`
 event in the room, the room creator has a power level of 100, and all other users have a
 power level of 0. **Note**: In room versions 12 and higher, room creators have infinite power level regardless
 of the existence of `m.room.power_levels` in the room. When `m.room.power_levels` is not
@@ -746,7 +746,7 @@ in the room, including those that are denied, are expected to uphold the
 server ACL. Servers that do not uphold the ACLs MUST be added to the denied hosts
 list in order for the ACLs to remain effective.
 
-The `allow` and `deny` lists are lists of [glob-style patterns](/appendices#glob-style-matching).
+The `allow` and `deny` lists are lists of [glob-style patterns](https://spec.matrix.org/latest/appendices#glob-style-matching).
 When comparing against the server ACLs, the suspect server's port
 number must not be considered. Therefore `evil.com`, `evil.com:8448`, and
 `evil.com:1234` would all match rules that apply to `evil.com`, for example.
@@ -794,10 +794,10 @@ deny. Defaults to `true` if missing or otherwise not a boolean. This is strongly
 with IP literal names are strongly discouraged in order to require
 legitimate homeservers to be backed by a valid registered domain name. |
 | `allow` | `array` | no | The server names to allow in the room, excluding any port information.
-Each entry is interpreted as a [glob-style pattern](/appendices#glob-style-matching). **This defaults to an empty list when not provided, effectively disallowing
+Each entry is interpreted as a [glob-style pattern](https://spec.matrix.org/latest/appendices#glob-style-matching). **This defaults to an empty list when not provided, effectively disallowing
 every server.** |
 | `deny` | `array` | no | The server names to disallow in the room, excluding any port information.
-Each entry is interpreted as a [glob-style pattern](/appendices#glob-style-matching). This defaults to an empty list when not provided. |
+Each entry is interpreted as a [glob-style pattern](https://spec.matrix.org/latest/appendices#glob-style-matching). This defaults to an empty list when not provided. |
 
 <details><summary>Example</summary>
 
@@ -845,7 +845,7 @@ matrix ID and the third-party ID. |
 validate whether the key has been revoked. The URL must return a JSON
 object containing a boolean property named 'valid'. |
 | `public_key` | `string` | **yes** | An Ed25519 key with which the token must be signed (though a signature
-from any entry in `public_keys` is also sufficient). The key is encoded using [Unpadded Base64](/appendices/#unpadded-base64),
+from any entry in `public_keys` is also sufficient). The key is encoded using [Unpadded Base64](https://spec.matrix.org/latest/appendices/#unpadded-base64),
 using the standard or URL-safe alphabets. This exists for backwards compatibility. |
 | `public_keys` | `array` | no | Keys with which the token may be signed. |
 
@@ -971,7 +971,7 @@ representation in `m.topic` if any exists. |
 Indicates a reaction to a previous event.
 
 Has no defined `content` properties of its own. Its only purpose is to hold an
-[`m.relates_to`](/client-server-api/#definition-mrelates_to) property.
+[`m.relates_to`](https://spec.matrix.org/latest/client-server-api/#definition-mrelates_to) property.
 
 Since they contain no content other than `m.relates_to`, `m.reaction` events
 are normally not encrypted, as there would be no benefit in doing so.
@@ -1041,11 +1041,11 @@ is required if `format` is specified. |
 | `filename` | `string` | no | The original filename of the uploaded file. |
 | `info` | `object` | no | Metadata for the audio clip referred to in `url`. Contains: `duration` (integer): The duration of the audio in milliseconds.; `mimetype` (string): The mimetype of the audio e.g. `audio/aac`.; `size` (integer): The size of the audio clip in bytes.. |
 | `msgtype` | `string` | **yes** |  One of: `m.audio`. |
-| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](/client-server-api/#matrix-content-mxc-uris))
+| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris))
 to the audio clip. |
 | `file` | `object` | no | Required if the file is encrypted. Information on the encrypted
 file, as specified in
-[End-to-end encryption](/client-server-api/#sending-encrypted-attachments). |
+[End-to-end encryption](https://spec.matrix.org/latest/client-server-api/#sending-encrypted-attachments). |
 
 <details><summary>Example</summary>
 
@@ -1114,14 +1114,14 @@ is required if `format` is specified. |
 | `filename` | `string` | no | The original filename of the uploaded file. |
 | `info` | `object` | no | Information about the file referred to in `url`. Contains: `mimetype` (string): The mimetype of the file e.g. `application/msword`.; `size` (integer): The size of the file in bytes.; `thumbnail_url` (string): The URL to the thumbnail of the file. Only present if the
 thumbnail is unencrypted.; `thumbnail_file` (object): Information on the encrypted thumbnail file, as specified in
-[End-to-end encryption](/client-server-api/#sending-encrypted-attachments).
+[End-to-end encryption](https://spec.matrix.org/latest/client-server-api/#sending-encrypted-attachments).
 Only present if the thumbnail is encrypted.; `thumbnail_info` (object): Metadata about the image referred to in `thumbnail_url`.. |
 | `msgtype` | `string` | **yes** |  One of: `m.file`. |
-| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](/client-server-api/#matrix-content-mxc-uris))
+| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris))
 to the file. |
 | `file` | `object` | no | Required if the file is encrypted. Information on the encrypted
 file, as specified in
-[End-to-end encryption](/client-server-api/#sending-encrypted-attachments). |
+[End-to-end encryption](https://spec.matrix.org/latest/client-server-api/#sending-encrypted-attachments). |
 
 <details><summary>Example</summary>
 
@@ -1160,11 +1160,11 @@ is required if `format` is specified. |
 | `filename` | `string` | no | The original filename of the uploaded file. |
 | `info` | `object` | no | Metadata about the image referred to in `url`. |
 | `msgtype` | `string` | **yes** |  One of: `m.image`. |
-| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](/client-server-api/#matrix-content-mxc-uris))
+| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris))
 to the image. |
 | `file` | `object` | no | Required if the file is encrypted. Information on the encrypted
 file, as specified in
-[End-to-end encryption](/client-server-api/#sending-encrypted-attachments). |
+[End-to-end encryption](https://spec.matrix.org/latest/client-server-api/#sending-encrypted-attachments). |
 
 <details><summary>Example</summary>
 
@@ -1190,7 +1190,7 @@ file, as specified in
 
 ##### `m.key.verification.request`
 
-Requests a key verification in a room.  When requesting a key verification using to-device messaging, an event with type [`m.key.verification.request`](/client-server-api/#mkeyverificationrequest) should be used.
+Requests a key verification in a room.  When requesting a key verification using to-device messaging, an event with type [`m.key.verification.request`](https://spec.matrix.org/latest/client-server-api/#mkeyverificationrequest) should be used.
 
 
 | Field | Type | Req? | Description |
@@ -1255,7 +1255,7 @@ This message represents a real-world location.
 | `msgtype` | `string` | **yes** |  One of: `m.location`. |
 | `info` | `object` | no |  Contains: `thumbnail_url` (string): The URL to a thumbnail of the location being represented.
 Only present if the thumbnail is unencrypted.; `thumbnail_file` (object): Information on the encrypted thumbnail file, as specified in
-[End-to-end encryption](/client-server-api/#sending-encrypted-attachments).
+[End-to-end encryption](https://spec.matrix.org/latest/client-server-api/#sending-encrypted-attachments).
 Only present if the thumbnail is encrypted.; `thumbnail_info` (object): Metadata about the image referred to in `thumbnail_url`.. |
 
 <details><summary>Example</summary>
@@ -1389,16 +1389,16 @@ is specified. Currently only `org.matrix.custom.html` is supported. |
 | `formatted_body` | `string` | no | The formatted version of the `body`, when it acts as a caption. This
 is required if `format` is specified. |
 | `filename` | `string` | no | The original filename of the uploaded file. |
-| `info` | `object` | no | Metadata about the video clip referred to in `url`. Contains: `duration` (integer): The duration of the video in milliseconds.; `h` (integer): The height of the video in pixels.; `w` (integer): The width of the video in pixels.; `mimetype` (string): The mimetype of the video e.g. `video/mp4`.; `size` (integer): The size of the video in bytes.; `thumbnail_url` (string): The URL (typically [`mxc://` URI](/client-server-api/#matrix-content-mxc-uris)) to an image thumbnail of
+| `info` | `object` | no | Metadata about the video clip referred to in `url`. Contains: `duration` (integer): The duration of the video in milliseconds.; `h` (integer): The height of the video in pixels.; `w` (integer): The width of the video in pixels.; `mimetype` (string): The mimetype of the video e.g. `video/mp4`.; `size` (integer): The size of the video in bytes.; `thumbnail_url` (string): The URL (typically [`mxc://` URI](https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris)) to an image thumbnail of
 the video clip. Only present if the thumbnail is unencrypted.; `thumbnail_file` (object): Information on the encrypted thumbnail file, as specified in
-[End-to-end encryption](/client-server-api/#sending-encrypted-attachments).
+[End-to-end encryption](https://spec.matrix.org/latest/client-server-api/#sending-encrypted-attachments).
 Only present if the thumbnail is encrypted.; `thumbnail_info` (object): Metadata about the image referred to in `thumbnail_url`.. |
 | `msgtype` | `string` | **yes** |  One of: `m.video`. |
-| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](/client-server-api/#matrix-content-mxc-uris))
+| `url` | `string` | no | Required if the file is unencrypted. The URL (typically [`mxc://` URI](https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris))
 to the video clip. |
 | `file` | `object` | no | Required if the file is encrypted. Information on the encrypted
 file, as specified in
-[End-to-end encryption](/client-server-api/#sending-encrypted-attachments). |
+[End-to-end encryption](https://spec.matrix.org/latest/client-server-api/#sending-encrypted-attachments). |
 
 <details><summary>Example</summary>
 
@@ -1633,7 +1633,7 @@ Informs the client of the list of users currently typing.
 
 ### `m.space.child`
 
-Defines the relationship of a child room to a space-room. Has no effect in rooms which are not [spaces](/client-server-api/#spaces).
+Defines the relationship of a child room to a space-room. Has no effect in rooms which are not [spaces](https://spec.matrix.org/latest/client-server-api/#spaces).
 
 - **Kind:** State event
 
@@ -1642,11 +1642,11 @@ Defines the relationship of a child room to a space-room. Has no effect in rooms
 
 | Field | Type | Req? | Description |
 |-------|------|------|-------------|
-| `via` | `array` | **yes** | A list of servers to try and join through. See also: [Routing](/appendices/#routing). When not present or invalid, the child room is not considered to be part of the space. |
+| `via` | `array` | **yes** | A list of servers to try and join through. See also: [Routing](https://spec.matrix.org/latest/appendices/#routing). When not present or invalid, the child room is not considered to be part of the space. |
 | `order` | `string` | no | Optional string to define ordering among space children. These are lexicographically
 compared against other children's `order`, if present. Must consist of ASCII characters within the range `\x20` (space) and `\x7E` (`~`),
 inclusive. Must not exceed 50 characters. `order` values with the wrong type, or otherwise invalid contents, are to be treated
-as though the `order` key was not provided. See [Ordering of children within a space](/client-server-api/#ordering-of-children-within-a-space) for information on how the ordering works. |
+as though the `order` key was not provided. See [Ordering of children within a space](https://spec.matrix.org/latest/client-server-api/#ordering-of-children-within-a-space) for information on how the ordering works. |
 | `suggested` | `boolean` | no | Optional (default `false`) flag to denote whether the child is "suggested" or of interest
 to members of the space. This is primarily intended as a rendering hint for clients to
 display the room differently, such as eagerly rendering them in the room list. |
@@ -1684,7 +1684,7 @@ Defines the relationship of a room to a parent space-room.
 
 | Field | Type | Req? | Description |
 |-------|------|------|-------------|
-| `via` | `array` | **yes** | A list of servers to try and join through. See also: [Routing](/appendices/#routing). When not present or invalid, the room is not considered to be part of the parent space. |
+| `via` | `array` | **yes** | A list of servers to try and join through. See also: [Routing](https://spec.matrix.org/latest/appendices/#routing). When not present or invalid, the room is not considered to be part of the parent space. |
 | `canonical` | `boolean` | no | Optional (default `false`) flag to denote this parent is the primary parent for the room. When multiple `canonical` parents are found, the lowest parent when ordering by room ID
 lexicographically by Unicode code-points should be used. |
 
@@ -2680,8 +2680,8 @@ Lets clients maintain a list of recently used emoji.
 
 This event type is used when sending encrypted events. It can be used either
 within a room (in which case it will have all of the normal properties in
-[Room events](/client-server-api/#room-event-format)), or
-as a [to-device](/client-server-api/#send-to-device-messaging) event.
+[Room events](https://spec.matrix.org/latest/client-server-api/#room-event-format)), or
+as a [to-device](https://spec.matrix.org/latest/client-server-api/#send-to-device-messaging) event.
 
 - **Kind:** Basic event
 
@@ -2696,16 +2696,16 @@ present. One of: `m.olm.v1.curve25519-aes-sha2`, `m.megolm.v1.aes-sha2`. |
 | `ciphertext` | `object` | **yes** | The encrypted content of the event. Either the encrypted payload
 itself, in the case of a Megolm event, or a map from the recipient
 Curve25519 identity key to ciphertext information, in the case of an
-Olm event. For more details, see [Messaging Algorithms](/client-server-api/#messaging-algorithms). |
+Olm event. For more details, see [Messaging Algorithms](https://spec.matrix.org/latest/client-server-api/#messaging-algorithms). |
 | `sender_key` | `string` | no | The Curve25519 key of the sender. Required (not deprecated) if not using Megolm. **Deprecated**: This field provides no additional security or privacy benefit
 for Megolm messages and must not be read from if the encrypted event is using
 Megolm. It should still be included on outgoing messages, however must not be
-used to find the corresponding session. See [`m.megolm.v1.aes-sha2`](/client-server-api/#mmegolmv1aes-sha2)
+used to find the corresponding session. See [`m.megolm.v1.aes-sha2`](https://spec.matrix.org/latest/client-server-api/#mmegolmv1aes-sha2)
 for more information. |
 | `device_id` | `string` | no | The ID of the sending device. **Deprecated**: This field provides no additional security or privacy benefit
 for Megolm messages and must not be read from if the encrypted event is using
 Megolm. It should still be included on outgoing messages, however must not be
-used to find the corresponding session. See [`m.megolm.v1.aes-sha2`](/client-server-api/#mmegolmv1aes-sha2)
+used to find the corresponding session. See [`m.megolm.v1.aes-sha2`](https://spec.matrix.org/latest/client-server-api/#mmegolmv1aes-sha2)
 for more information. |
 | `session_id` | `string` | no | The ID of the session used to encrypt the message. Required with
 Megolm. |
@@ -3014,7 +3014,7 @@ the verification methods indicated in the
 
 Requests a key verification using to-device messaging.  When requesting a key
 verification in a room, a `m.room.message` should be used, with
-[`m.key.verification.request`](/client-server-api/#mroommessagemkeyverificationrequest)
+[`m.key.verification.request`](https://spec.matrix.org/latest/client-server-api/#mroommessagemkeyverificationrequest)
 as msgtype.
 
 - **Kind:** Basic event
@@ -3057,7 +3057,7 @@ the message should be ignored by the receiver. |
 
 ### `m.key.verification.start`
 
-Begins a key verification process. Typically sent as a [to-device](/client-server-api/#send-to-device-messaging) event. The `method`
+Begins a key verification process. Typically sent as a [to-device](https://spec.matrix.org/latest/client-server-api/#send-to-device-messaging) event. The `method`
 field determines the type of verification. The fields in the event will differ depending
 on the `method`. This definition includes fields that are in common among all variants.
 
@@ -3181,7 +3181,7 @@ understands. Must include at least `decimal`. Optionally can include
 ### `m.dummy`
 
 This event type is used to indicate new Olm sessions for end-to-end encryption.
-Typically it is encrypted as an `m.room.encrypted` event, then sent as a [to-device](/client-server-api/#send-to-device-messaging)
+Typically it is encrypted as an `m.room.encrypted` event, then sent as a [to-device](https://spec.matrix.org/latest/client-server-api/#send-to-device-messaging)
 event.
 
 The event does not have any content associated with it. The sending client is expected
@@ -3209,8 +3209,8 @@ in the original sending client receiving keys over the newly established session
 ### `m.forwarded_room_key`
 
 This event type is used to forward keys for end-to-end encryption.
-It is encrypted as an `m.room.encrypted` event using [Olm](/client-server-api/#molmv1curve25519-aes-sha2),
-then sent as a [to-device](/client-server-api/#send-to-device-messaging) event.
+It is encrypted as an `m.room.encrypted` event using [Olm](https://spec.matrix.org/latest/client-server-api/#molmv1curve25519-aes-sha2),
+then sent as a [to-device](https://spec.matrix.org/latest/client-server-api/#send-to-device-messaging) event.
 
 - **Kind:** Basic event
 
@@ -3235,7 +3235,7 @@ C, this field is empty between A and B, and contains A's Curve25519 key between
 B and C. |
 | `withheld` | `object` | no | Indicates that the key cannot be used to decrypt all the messages
 from the session because a portion of the session was withheld as
-described in [Reporting that decryption keys are withheld](/client-server-api/#reporting-that-decryption-keys-are-withheld). This
+described in [Reporting that decryption keys are withheld](https://spec.matrix.org/latest/client-server-api/#reporting-that-decryption-keys-are-withheld). This
 object must include the `code` and `reason` properties from the
 `m.room_key.withheld` message that was received by the sender of
 this message. |
@@ -3297,8 +3297,8 @@ to disable key backup. |
 ### `m.room_key`
 
 This event type is used to exchange keys for end-to-end encryption.
-It is encrypted as an `m.room.encrypted` event using [Olm](/client-server-api/#molmv1curve25519-aes-sha2),
-then sent as a [to-device](/client-server-api/#send-to-device-messaging) event.
+It is encrypted as an `m.room.encrypted` event using [Olm](https://spec.matrix.org/latest/client-server-api/#molmv1curve25519-aes-sha2),
+then sent as a [to-device](https://spec.matrix.org/latest/client-server-api/#send-to-device-messaging) event.
 
 - **Kind:** Basic event
 
@@ -3409,7 +3409,7 @@ client should only use this string if it does not understand the
 ### `m.room_key_request`
 
 This event type is used to request keys for end-to-end encryption. It is sent as an
-unencrypted [to-device](/client-server-api/#send-to-device-messaging) event.
+unencrypted [to-device](https://spec.matrix.org/latest/client-server-api/#send-to-device-messaging) event.
 
 - **Kind:** Basic event
 
@@ -3423,7 +3423,7 @@ unencrypted [to-device](/client-server-api/#send-to-device-messaging) event.
 with.; `room_id` (string): The room where the key is used.; `sender_key` (string): The Curve25519 key of the device which initiated the session originally. **Deprecated**: This field provides no additional security or privacy benefit
 and must not be read from. It should still be included on outgoing messages
 (if the event for which keys are being requested for *also* has a `sender_key`),
-however must not be used to find the corresponding session. See [`m.megolm.v1.aes-sha2`](/client-server-api/#mmegolmv1aes-sha2)
+however must not be used to find the corresponding session. See [`m.megolm.v1.aes-sha2`](https://spec.matrix.org/latest/client-server-api/#mmegolmv1aes-sha2)
 for more information.; `session_id` (string): The ID of the session that the key is for.. |
 | `action` | `string` | **yes** |  One of: `request`, `request_cancellation`. |
 | `requesting_device_id` | `string` | **yes** | ID of the device requesting the key. |
@@ -3479,7 +3479,7 @@ request. |
 
 Sent by a client to share a secret with another device, in response to an
 `m.secret.request` event. It must be encrypted as an `m.room.encrypted` event
-using [Olm](/client-server-api/#molmv1curve25519-aes-sha2), then sent as a
+using [Olm](https://spec.matrix.org/latest/client-server-api/#molmv1curve25519-aes-sha2), then sent as a
 to-device event.
 
 The `request_id` must match the ID previously given in an `m.secret.request`
