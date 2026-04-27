@@ -7,8 +7,8 @@ require "async/http"
 require "scampi"
 
 module Async
-	module Matrix
-	end
+  module Matrix
+  end
 end
 
 Dir.glob("#{__dir__}/matrix/**/*.rb").sort.each do |path|

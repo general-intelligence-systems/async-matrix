@@ -8,15 +8,15 @@ require "async/http"
 require "async/matrix"
 
 module Async
-	module Matrix
-		module Connection
-			include Async::HTTP::Protocol::HTTP2::Connection
-		end
-	end
+  module Matrix
+    module Connection
+      include Async::HTTP::Protocol::HTTP2::Connection
+    end
+  end
 end
 
 test do
-	it "includes Async::HTTP::Protocol::HTTP2::Connection" do
-		Async::Matrix::Connection.ancestors.should.include Async::HTTP::Protocol::HTTP2::Connection
-	end
+  it "includes Async::HTTP::Protocol::HTTP2::Connection" do
+    Async::Matrix::Connection.ancestors.should.include Async::HTTP::Protocol::HTTP2::Connection
+  end
 end

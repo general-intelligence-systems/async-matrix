@@ -8,14 +8,14 @@ require "async/http"
 require "async/matrix"
 
 module Async
-	module Matrix
-		class Stream < Async::HTTP::Protocol::HTTP2::Stream
-		end
-	end
+  module Matrix
+    class Stream < Async::HTTP::Protocol::HTTP2::Stream
+    end
+  end
 end
 
 test do
-	it "inherits from Async::HTTP::Protocol::HTTP2::Stream" do
-		Async::Matrix::Stream.ancestors.should.include Async::HTTP::Protocol::HTTP2::Stream
-	end
+  it "inherits from Async::HTTP::Protocol::HTTP2::Stream" do
+    Async::Matrix::Stream.ancestors.should.include Async::HTTP::Protocol::HTTP2::Stream
+  end
 end

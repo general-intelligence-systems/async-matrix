@@ -4,7 +4,7 @@
 # Copyright, 2026, by General Intelligence Systems.
 
 module Async
-	module Matrix
+  module Matrix
     VERSION = "0.1.3"
-	end
+  end
 end
