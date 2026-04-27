@@ -22,12 +22,13 @@ module EchoBot
 			end
 
 			def call(event)
-				return if event.sender == client.config.bot_mxid
-				return unless event.content&.msgtype == "m.text"
-				return unless event.content.body && !event.content.body.empty?
+        if event.content&.msgtype == "m.text" &&
+				   event.content.body && !event.content.body.empty? &&
+				   event.sender != client.config.bot_mxid
 
 				Console.info(self) {
-					"Message from #{event.sender} in #{event.room_id}: #{event.content.body[0..100]}"
+          "Message from #{event.sender} in #{event.room_id}: " \
+          "#{event.content.body[0..100]}"
 				}
 
 				client.send_notice(event.room_id, "Echo: #{event.content.body}")

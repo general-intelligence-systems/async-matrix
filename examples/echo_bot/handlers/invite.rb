@@ -21,8 +21,8 @@ module EchoBot
 			end
 
 			def call(event)
-				return unless event.content&.membership == "invite"
-				return unless event.state_key == client.config.bot_mxid
+				if event.content&.membership == "invite" &&
+				   event.state_key == client.config.bot_mxid
 
 				Console.info(self) {
 					"Invited to #{event.room_id} by #{event.sender} — joining"
