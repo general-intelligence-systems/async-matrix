@@ -21,14 +21,15 @@ module EchoBot
 			end
 
 			def call(event)
-				if event.content&.membership == "invite" &&
-				   event.state_key == client.config.bot_mxid
+			if event.content&.membership == "invite" &&
+			   event.state_key == client.config.bot_mxid
 
 				Console.info(self) {
 					"Invited to #{event.room_id} by #{event.sender} — joining"
 				}
 
 				client.join_room(event.room_id)
+			end
 			rescue => e
 				Console.error(self) {
 					"Failed to join #{event.room_id}: #{e.message}"

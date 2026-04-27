@@ -8,7 +8,7 @@ module Async
 	end
 end
 
-Dir.glob("#{__dir__}/brute/**/*.rb").sort.each do |path|
+Dir.glob("#{__dir__}/matrix/**/*.rb").sort.each do |path|
   require path
 end
 

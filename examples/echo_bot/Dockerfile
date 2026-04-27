@@ -1,12 +1,11 @@
 FROM ruby:3.4
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY Gemfile ./
+COPY Gemfile Gemfile.lock ./
 RUN bundle install --jobs 4
 
 COPY . .
