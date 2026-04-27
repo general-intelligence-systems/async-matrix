@@ -22,9 +22,9 @@ GEM
       traces (~> 0.10)
     async-http-cache (0.4.6)
       async-http (~> 0.56)
-    async-matrix (0.1.0)
-      async (~> 2.0)
-      async-http (~> 0.69)
+    async-matrix (0.1.1)
+      async (~> 2.39)
+      async-http (~> 0.95)
       scampi (~> 0.1.7)
     async-pool (0.11.2)
       async (>= 2.0)
@@ -92,7 +92,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  async-matrix (~> 0.1.0)
+  async-matrix (~> 0.1)
   falcon (~> 0.55.3)
 
 BUNDLED WITH

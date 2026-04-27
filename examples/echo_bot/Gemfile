@@ -2,6 +2,5 @@
 
 source "https://rubygems.org"
 
-
 gem "falcon", "~> 0.55.3"
-gem "async-matrix", "~> 0.1.0"
+gem "async-matrix", "~> 0.1"
