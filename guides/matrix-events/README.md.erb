@@ -48,6 +48,21 @@ An appservice receives events as HTTP `PUT` requests to
 
 ---
 
+## Table of Contents
+<% groups.each do |group| %>
+- **[<%= group[:label] %>](#<%= anchor_for(group[:label]) %>)**
+<%- group[:events].each do |event| -%>
+  - [`<%= event.event_type %>`](#<%= anchor_for(event.event_type) %>)
+<%- if event.variants.any? -%>
+<%- event.variants.sort_by(&:variant).each do |v| -%>
+    - [`<%= v.variant %>`](#<%= anchor_for(v.variant) %>)
+<%- end -%>
+<%- end -%>
+<%- end -%>
+<%- end %>
+
+---
+
 ## Event Type Reference
 <% groups.each do |group| %>
 

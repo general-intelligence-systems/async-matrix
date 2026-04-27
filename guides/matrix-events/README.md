@@ -48,6 +48,105 @@ An appservice receives events as HTTP `PUT` requests to
 
 ---
 
+## Table of Contents
+
+- **[Room State Events](#room-state-events)**
+  - [`m.room.avatar`](#mroomavatar)
+  - [`m.room.canonical_alias`](#mroomcanonicalalias)
+  - [`m.room.create`](#mroomcreate)
+  - [`m.room.encryption`](#mroomencryption)
+  - [`m.room.guest_access`](#mroomguestaccess)
+  - [`m.room.history_visibility`](#mroomhistoryvisibility)
+  - [`m.room.join_rules`](#mroomjoinrules)
+  - [`m.room.member`](#mroommember)
+  - [`m.room.name`](#mroomname)
+  - [`m.room.pinned_events`](#mroompinnedevents)
+  - [`m.room.policy`](#mroompolicy)
+  - [`m.room.power_levels`](#mroompowerlevels)
+  - [`m.room.server_acl`](#mroomserveracl)
+  - [`m.room.third_party_invite`](#mroomthirdpartyinvite)
+  - [`m.room.tombstone`](#mroomtombstone)
+  - [`m.room.topic`](#mroomtopic)
+
+- **[Room Message Events](#room-message-events)**
+  - [`m.reaction`](#mreaction)
+  - [`m.room.message`](#mroommessage)
+    - [`m.audio`](#maudio)
+    - [`m.emote`](#memote)
+    - [`m.file`](#mfile)
+    - [`m.image`](#mimage)
+    - [`m.key.verification.request`](#mkeyverificationrequest)
+    - [`m.location`](#mlocation)
+    - [`m.notice`](#mnotice)
+    - [`m.server_notice`](#mservernotice)
+    - [`m.text`](#mtext)
+    - [`m.video`](#mvideo)
+  - [`m.room.redaction`](#mroomredaction)
+  - [`m.sticker`](#msticker)
+
+- **[Ephemeral Events](#ephemeral-events)**
+  - [`m.presence`](#mpresence)
+  - [`m.receipt`](#mreceipt)
+  - [`m.typing`](#mtyping)
+
+- **[Space Events](#space-events)**
+  - [`m.space.child`](#mspacechild)
+  - [`m.space.parent`](#mspaceparent)
+
+- **[VoIP Events](#voip-events)**
+  - [`m.call.answer`](#mcallanswer)
+  - [`m.call.candidates`](#mcallcandidates)
+  - [`m.call.hangup`](#mcallhangup)
+  - [`m.call.invite`](#mcallinvite)
+  - [`m.call.negotiate`](#mcallnegotiate)
+  - [`m.call.reject`](#mcallreject)
+  - [`m.call.sdp_stream_metadata_changed`](#mcallsdpstreammetadatachanged)
+  - [`m.call.select_answer`](#mcallselectanswer)
+
+- **[Moderation Policy Events](#moderation-policy-events)**
+  - [`m.policy.rule.room`](#mpolicyruleroom)
+  - [`m.policy.rule.server`](#mpolicyruleserver)
+  - [`m.policy.rule.user`](#mpolicyruleuser)
+
+- **[Account Data & Other Events](#account-data-other-events)**
+  - [`m.accepted_terms`](#macceptedterms)
+  - [`m.direct`](#mdirect)
+  - [`m.fully_read`](#mfullyread)
+  - [`m.identity_server`](#midentityserver)
+  - [`m.ignored_user_list`](#mignoreduserlist)
+  - [`m.invite_permission_config`](#minvitepermissionconfig)
+  - [`m.marked_unread`](#mmarkedunread)
+  - [`m.push_rules`](#mpushrules)
+  - [`m.recent_emoji`](#mrecentemoji)
+  - [`m.room.encrypted`](#mroomencrypted)
+  - [`m.tag`](#mtag)
+
+- **[Key Verification Events](#key-verification-events)**
+  - [`m.key.verification.accept`](#mkeyverificationaccept)
+  - [`m.key.verification.cancel`](#mkeyverificationcancel)
+  - [`m.key.verification.done`](#mkeyverificationdone)
+  - [`m.key.verification.key`](#mkeyverificationkey)
+  - [`m.key.verification.m.relates_to`](#mkeyverificationmrelatesto)
+  - [`m.key.verification.mac`](#mkeyverificationmac)
+  - [`m.key.verification.ready`](#mkeyverificationready)
+  - [`m.key.verification.request`](#mkeyverificationrequest)
+  - [`m.key.verification.start`](#mkeyverificationstart)
+    - [`m.reciprocate.v1`](#mreciprocatev1)
+    - [`m.sas.v1`](#msasv1)
+
+- **[E2E & Key Management Events](#e2e-key-management-events)**
+  - [`m.dummy`](#mdummy)
+  - [`m.forwarded_room_key`](#mforwardedroomkey)
+  - [`m.key_backup`](#mkeybackup)
+  - [`m.room_key`](#mroomkey)
+  - [`m.room_key.withheld`](#mroomkeywithheld)
+  - [`m.room_key_request`](#mroomkeyrequest)
+  - [`m.secret.request`](#msecretrequest)
+  - [`m.secret.send`](#msecretsend)
+
+
+---
+
 ## Event Type Reference
 
 
