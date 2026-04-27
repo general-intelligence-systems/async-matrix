@@ -195,6 +195,10 @@ Tests are inline via [Scampi](https://rubygems.org/gems/scampi) -- co-located wi
 bundle exec scampi
 ```
 
+## Guides
+
+- [Matrix Events Reference](guides/matrix-events/) -- auto-generated documentation for every Matrix event type
+
 ## License
 
 Apache 2.0
