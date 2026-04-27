@@ -17,20 +17,6 @@ services:
       retries: 10
       start_period: 30s
 
-  # ── Echo Bot (Appservice) ───────────────────────────────
-  bot:
-    build:
-      context: ../..
-      dockerfile: examples/synapse/Dockerfile
-    restart: unless-stopped
-    environment:
-      APPSERVICE_CONFIG: examples/synapse/config/appservice.yml
-    depends_on:
-      synapse:
-        condition: service_healthy
-    ports:
-      - 9292:9292
-
   # ── FluffyChat Web Client ─────────────────────────────────
   fluffychat:
     image: ghcr.io/etkecc/fluffychat-web:v2.5.1

@@ -99,37 +99,37 @@ module EchoBot
 
     private
 
-    def internet
-      @internet ||= Async::HTTP::Internet.new
-    end
-
-    def request(method, path, body = nil)
-      url = "#{@base}#{path}"
-      json_body = body ? JSON.generate(body) : nil
-
-      Matrix.logger.debug { "#{method} #{path}" }
-
-      response = internet.call(method, url, @headers, json_body)
-      status   = response.status
-      payload  = response.read
-
-      unless (200..299).cover?(status)
-        parsed = Matrix::ApplicationService::Models::ErrorResponse.new(
-          begin; JSON.parse(payload); rescue; {} end
-        )
-        Matrix.logger.error { "Matrix API #{status}: #{parsed.errcode} — #{parsed.error}" }
-        raise Matrix::Errors::Homeserver.new(
-          parsed.errcode || "UNKNOWN",
-          parsed.error || payload.to_s[0..200],
-          status: status
-        )
+      def internet
+        @internet ||= Async::HTTP::Internet.new
       end
 
-      payload && !payload.empty? ? JSON.parse(payload) : {}
-    end
+      def request(method, path, body = nil)
+        url = "#{@base}#{path}"
+        json_body = body ? JSON.generate(body) : nil
 
-    def encode(value)
-      ERB::Util.url_encode(value)
-    end
+        Matrix.logger.debug { "#{method} #{path}" }
+
+        response = internet.call(method, url, @headers, json_body)
+        status   = response.status
+        payload  = response.read
+
+        unless (200..299).cover?(status)
+          parsed = Matrix::ApplicationService::Models::ErrorResponse.new(
+            begin; JSON.parse(payload); rescue; {} end
+          )
+          Matrix.logger.error { "Matrix API #{status}: #{parsed.errcode} — #{parsed.error}" }
+          raise Matrix::Errors::Homeserver.new(
+            parsed.errcode || "UNKNOWN",
+            parsed.error || payload.to_s[0..200],
+            status: status
+          )
+        end
+
+        payload && !payload.empty? ? JSON.parse(payload) : {}
+      end
+
+      def encode(value)
+        ERB::Util.url_encode(value)
+      end
   end
 end

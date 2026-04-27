@@ -1,23 +1,36 @@
-# Echo Bot Demo
+# Synapse Development Stack
 
-A complete local development stack running an echo bot appservice against a Synapse homeserver, with FluffyChat as the web client.
+A local development stack providing a Synapse homeserver with FluffyChat as the web client, fronted by an nginx reverse proxy with self-signed HTTPS.
+
+This directory provides the **infrastructure only**. To run an appservice bot against it, see [`examples/echo_bot/`](../echo_bot/).
 
 ## Services
 
 | Service | Description | URL |
 |---------|-------------|-----|
 | Synapse | Matrix homeserver | `https://localhost` (via proxy) |
-| Bot | Echo bot appservice | `localhost:9292` (internal) |
 | FluffyChat | Matrix web client | `https://localhost` |
 | Proxy | nginx reverse proxy (HTTPS) | `https://localhost` |
 
-## Quick Start
+## Quick Start (with Echo Bot)
+
+From the `examples/echo_bot/` directory:
 
 ```bash
+cd examples/echo_bot
 docker compose up -d
 ```
 
-First run will pull images and build the bot (~2 minutes). Subsequent starts are fast.
+This uses Docker Compose `include` to pull in the Synapse stack defined here, plus the echo bot service.
+
+## Quick Start (infrastructure only)
+
+```bash
+cd examples/synapse
+docker compose up -d
+```
+
+This starts Synapse, FluffyChat, and the proxy without any bot.
 
 ## Register a Test User
 
@@ -36,39 +49,26 @@ docker compose exec synapse register_new_matrix_user \
    - **Username:** `testuser`
    - **Password:** `testpass`
 
-## Test the Echo Bot
-
-1. Create a new room (tap the `+` button)
-2. Invite `@bot:localhost` to the room
-3. Send any text message
-4. The bot auto-joins and echoes your message back as a notice prefixed with `Echo:`
-
-## Watch Bot Logs
-
-```bash
-docker compose logs -f bot
-```
-
 ## Architecture
 
 ```
 Browser (https://localhost)
-    │
-    ▼
-┌─────────┐
-│  nginx  │ :443 (HTTPS, self-signed)
-└────┬────┘
-     │
-     ├── /              → FluffyChat (static web app)
-     ├── /_matrix       → Synapse :8008
-     └── /.well-known   → Synapse :8008
-                              │
-                              │ pushes transactions to
-                              ▼
-                         Bot :9292
-                              │
-                              │ sends messages via
-                              ▼
+    |
+    v
++---------+
+|  nginx  | :443 (HTTPS, self-signed)
++----+----+
+     |
+     +-- /              -> FluffyChat (static web app)
+     +-- /_matrix       -> Synapse :8008
+     +-- /.well-known   -> Synapse :8008
+                              |
+                              | pushes transactions to
+                              v
+                         Bot :9292 (from echo_bot/)
+                              |
+                              | sends messages via
+                              v
                          Synapse :8008
 ```
 
