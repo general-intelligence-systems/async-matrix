@@ -1,0 +1,244 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Generates MATRIX_EVENTS.md from the YAML schemas and examples fetched
+# from the matrix-org/matrix-spec repo, using an ERB template.
+#
+# Usage: bin/generate-matrix-events-doc
+#
+# Prerequisites: run bin/fetch-matrix-schemas first
+
+require "yaml"
+require "json"
+require "erb"
+require "pathname"
+
+ROOT = Pathname.new(File.expand_path("..", __dir__))
+SCHEMA_DIR = ROOT / "data" / "matrix-spec" / "event-schemas" / "schema"
+EXAMPLE_DIR = ROOT / "data" / "matrix-spec" / "event-schemas" / "examples"
+SHARED_DIR = ROOT / "data" / "matrix-spec" / "event-schemas"
+TEMPLATE = ROOT / "MATRIX_EVENTS.md.erb"
+OUTPUT = ROOT / "MATRIX_EVENTS.md"
+
+unless SCHEMA_DIR.exist?
+  warn "Schema directory not found. Run bin/fetch-matrix-schemas first."
+  exit 1
+end
+
+# ── Schema loading ──────────────────────────────────────────────────
+
+# Represents a single parsed event schema
+EventSchema = Struct.new(
+  :file,          # filename without .yaml
+  :event_type,    # e.g. "m.room.message"
+  :variant,       # e.g. "m.text" (from $-separated filename), or nil
+  :title,         # schema title
+  :description,   # schema description
+  :is_state,      # bool - references state_event base
+  :content_props, # Hash of property name => {description:, type:, required:, enum:}
+  :required,      # Array of required content field names
+  :example,       # parsed example hash, or nil
+  keyword_init: true
+)
+
+def load_yaml(path)
+  YAML.safe_load(path.read, permitted_classes: [Symbol]) || {}
+rescue => e
+  warn "Failed to load #{path}: #{e.message}"
+  {}
+end
+
+def load_json(path)
+  JSON.parse(path.read)
+rescue => e
+  warn "Failed to load #{path}: #{e.message}"
+  {}
+end
+
+# Resolve $ref for content properties (one level deep only)
+def resolve_ref(ref_path, base_dir)
+  resolved = base_dir / ref_path
+  # Try relative to schema dir
+  resolved = SCHEMA_DIR / ref_path unless resolved.exist?
+  # Try shared dir
+  resolved = SHARED_DIR / ref_path.sub("../", "") unless resolved.exist?
+  return {} unless resolved.exist?
+  load_yaml(resolved)
+end
+
+# Extract content properties from a schema hash, resolving one level of $ref
+def extract_content_props(schema)
+  content = schema.dig("properties", "content") || {}
+
+  # If content itself is a $ref, resolve it
+  if content["$ref"]
+    content = resolve_ref(content["$ref"], SCHEMA_DIR)
+  end
+
+  props = content["properties"] || {}
+  required = content["required"] || []
+
+  fields = {}
+  props.each do |name, spec|
+    next if name == "m.relates_to" && spec.is_a?(Hash) && spec["$ref"]
+
+    type_val = spec["type"]
+    type_str = case type_val
+               when Array then type_val.join(" | ")
+               when nil then "object"
+               else type_val.to_s
+               end
+
+    fields[name] = {
+      description: (spec["description"] || "").gsub(/\s+/, " ").strip,
+      type: type_str,
+      required: required.include?(name),
+      enum: spec["enum"],
+      format: spec["format"]
+    }
+  end
+
+  # Handle m.relates_to specially if present
+  if props["m.relates_to"]
+    rt = props["m.relates_to"]
+    sub_props = rt["properties"] || {}
+    desc_parts = [(rt["description"] || "").strip]
+    sub_props.each do |k, v|
+      desc_parts << "`#{k}`: #{(v["description"] || v.to_s).gsub(/\s+/, " ").strip}"
+    end
+    fields["m.relates_to"] = {
+      description: desc_parts.join(" "),
+      type: "object",
+      required: required.include?("m.relates_to"),
+      enum: nil
+    }
+  end
+
+  [fields, required]
+end
+
+def find_example(file_stem)
+  # Try YAML first, then JSON
+  yaml_path = EXAMPLE_DIR / "#{file_stem}.yaml"
+  json_path = EXAMPLE_DIR / "#{file_stem}.json"
+  if yaml_path.exist?
+    data = load_yaml(yaml_path)
+    # Remove $ref keys from examples (they're meta-references to core event JSON)
+    data.delete("$ref")
+    data
+  elsif json_path.exist?
+    data = load_json(json_path)
+    data.delete("$ref")
+    data
+  end
+end
+
+def is_state_event?(schema)
+  all_of = schema["allOf"] || []
+  all_of.any? { |entry| entry["$ref"]&.include?("state_event") }
+end
+
+# ── Load all schemas ────────────────────────────────────────────────
+
+schemas = []
+
+SCHEMA_DIR.glob("m.*.yaml").each do |path|
+  next if path.to_s.include?("core-event-schema")
+  next if path.to_s.include?("components")
+
+  file_stem = path.basename(".yaml").to_s
+  schema = load_yaml(path)
+
+  # Parse event_type and variant from filename
+  # e.g. "m.room.message$m.text" => event_type="m.room.message", variant="m.text"
+  parts = file_stem.split("$", 2)
+  event_type = parts[0]
+  variant = parts[1]
+
+  # Get the concrete type from the schema enum if available
+  type_enum = schema.dig("properties", "type", "enum")
+  event_type = type_enum.first if type_enum&.any?
+
+  content_props, required = extract_content_props(schema)
+
+  example = find_example(file_stem)
+
+  schemas << EventSchema.new(
+    file: file_stem,
+    event_type: event_type,
+    variant: variant,
+    title: schema["title"],
+    description: (schema["description"] || "").strip,
+    is_state: is_state_event?(schema),
+    content_props: content_props,
+    required: required,
+    example: example
+  )
+end
+
+# ── Organize into categories ────────────────────────────────────────
+
+# Group: primary events (no variant) vs msgtype variants
+primary_events = schemas.reject(&:variant).sort_by(&:event_type)
+msgtype_variants = schemas.select { |s| s.event_type == "m.room.message" && s.variant && !s.variant.include?("key.verification") && s.variant != "m.server_notice" }
+                         .sort_by(&:variant)
+
+# Categories for primary events
+CATEGORIES = {
+  "Room State Events" => %w[
+    m.room.create m.room.member m.room.name m.room.topic m.room.avatar
+    m.room.canonical_alias m.room.join_rules m.room.power_levels
+    m.room.history_visibility m.room.guest_access m.room.encryption
+    m.room.server_acl m.room.pinned_events m.room.tombstone
+    m.room.third_party_invite m.room.policy
+  ],
+  "Room Message Events" => %w[
+    m.room.message m.room.redaction m.reaction m.sticker m.room.encrypted
+  ],
+  "Ephemeral Events" => %w[
+    m.typing m.receipt m.presence
+  ],
+  "Space Events" => %w[
+    m.space.child m.space.parent
+  ],
+  "VoIP Events" => %w[
+    m.call.invite m.call.answer m.call.candidates m.call.hangup
+    m.call.negotiate m.call.reject m.call.select_answer
+    m.call.sdp_stream_metadata_changed
+  ],
+  "Moderation Policy Events" => %w[
+    m.policy.rule.user m.policy.rule.room m.policy.rule.server
+  ],
+  "Account Data Events" => %w[
+    m.direct m.ignored_user_list m.fully_read m.tag m.push_rules
+    m.identity_server m.accepted_terms m.marked_unread m.recent_emoji
+    m.invite_permission_config
+  ],
+  "Key Verification Events" => %w[
+    m.key.verification.request m.key.verification.ready m.key.verification.start
+    m.key.verification.accept m.key.verification.key m.key.verification.mac
+    m.key.verification.done m.key.verification.cancel
+  ],
+  "E2E Key Events" => %w[
+    m.room_key m.room_key_request m.room_key.withheld m.forwarded_room_key
+    m.secret.request m.secret.send m.dummy m.key_backup
+  ]
+}.freeze
+
+def events_for_category(category_types, all_events)
+  category_types.filter_map { |t| all_events.find { |e| e.event_type == t } }
+end
+
+# ── Render ──────────────────────────────────────────────────────────
+
+def format_example_json(example)
+  return nil unless example
+  JSON.pretty_generate(example)
+end
+
+template_source = TEMPLATE.read
+erb = ERB.new(template_source, trim_mode: "-")
+result = erb.result(binding)
+
+OUTPUT.write(result)
+puts "Generated #{OUTPUT.relative_path_from(ROOT)} (#{result.lines.count} lines)"

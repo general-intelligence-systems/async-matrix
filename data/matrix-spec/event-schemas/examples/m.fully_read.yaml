@@ -1,0 +1,7 @@
+{
+  "$ref": "core/event.json",
+  "type": "m.fully_read",
+  "content": {
+    "event_id": "$someplace:example.org"
+  }
+}

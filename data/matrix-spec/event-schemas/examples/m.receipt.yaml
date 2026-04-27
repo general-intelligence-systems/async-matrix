@@ -1,0 +1,18 @@
+{
+  "$ref": "core/room_edu.json",
+  "type": "m.receipt",
+  "content": {
+    "$1435641916114394fHBLK:matrix.org": {
+      "m.read": {
+        "@erikj:jki.re": {
+          "ts": 1436451550453
+        }
+      },
+      "m.read.private": {
+        "@self:example.org": {
+          "ts": 1661384801651
+        }
+      }
+    }
+  }
+}

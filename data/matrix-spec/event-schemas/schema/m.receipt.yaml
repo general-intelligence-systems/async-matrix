@@ -1,0 +1,65 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+
+type: object
+title: Receipt Event
+description: Informs the client of new receipts.
+x-changedInMatrixVersion:
+    "1.4": |
+        Added `m.read.private` receipts to the event's `content`.
+allOf:
+    - $ref: "core-event-schema/event.yaml"
+properties:
+    content:
+        type: object
+        description: |-
+            The mapping of event ID to a collection of receipts for this
+            event ID. The event ID is the ID of the event being acknowledged
+            and *not* an ID for the receipt itself.
+        patternProperties:
+            "^\\$":
+                type: object
+                x-pattern-format: "mx-event-id"
+                title: Event Receipts
+                description: |-
+                    The collection of receipts for this event ID.
+                properties:
+                    "m.read":
+                        type: object
+                        description: |-
+                            A collection of users who have sent `m.read` receipts for
+                            this event. The string key is the user ID the receipt 
+                            belongs to.
+                        patternProperties:
+                            "^@": &receiptUserMap
+                                type: object
+                                title: Receipt
+                                description: |-
+                                    The mapping of user ID to receipt. The user ID is the
+                                    entity who sent this receipt.
+                                x-pattern-format: "mx-user-id"
+                                properties:
+                                    ts:
+                                        type: integer
+                                        format: int64
+                                        description: The timestamp the receipt was sent at.
+                                    thread_id:
+                                        type: string
+                                        x-addedInMatrixVersion: "1.4"
+                                        description: |-
+                                            The root thread event's ID (or `main`) for which
+                                            thread this receipt is intended to be under. If
+                                            not specified, the read receipt is *unthreaded*
+                                            (default).
+                    "m.read.private":
+                        type: object
+                        description: |-
+                            Similar to `m.read`, the users who have sent `m.read.private`
+                            receipts for this event. Due to the nature of private read
+                            receipts, this should only ever have the current user's ID.
+                        patternProperties:
+                            "^@": *receiptUserMap
+        additionalProperties: false
+    type:
+        type: string
+        enum: ["m.receipt", "m.receipt.private"]
+required: ["type", "content"]

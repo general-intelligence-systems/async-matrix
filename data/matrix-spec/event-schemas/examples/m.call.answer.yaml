@@ -1,0 +1,21 @@
+{
+  "$ref": "core/room_event.json",
+  "type": "m.call.answer",
+  "content": {
+    "version" : "1",
+    "party_id": "67890",
+    "call_id": "12345",
+    "answer": {
+      "type" : "answer",
+      "sdp" : "v=0\r\no=- 6584580628695956864 2 IN IP4 127.0.0.1[...]"
+    },
+    "sdp_stream_metadata": {
+        "271828182845": {
+            "purpose": "m.screenshare"
+        },
+        "314159265358": {
+            "purpose": "m.usermedia"
+        }
+    }
+  }
+}

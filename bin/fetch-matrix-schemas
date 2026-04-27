@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fetches Matrix event schemas and examples from the official matrix-org/matrix-spec repo.
+# Outputs to data/matrix-spec/event-schemas/{schema,examples}/
+
+REPO="https://github.com/matrix-org/matrix-spec.git"
+BRANCH="main"
+TARGET_DIR="data/matrix-spec/event-schemas"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+TMP_DIR=$(mktemp -d)
+
+cleanup() { rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
+
+echo "Cloning matrix-org/matrix-spec (shallow)..."
+git clone --depth 1 --branch "$BRANCH" --filter=blob:none --sparse "$REPO" "$TMP_DIR/matrix-spec" 2>&1
+
+cd "$TMP_DIR/matrix-spec"
+git sparse-checkout set data/event-schemas 2>&1
+
+echo "Copying schemas to $TARGET_DIR..."
+rm -rf "$ROOT_DIR/$TARGET_DIR"
+mkdir -p "$ROOT_DIR/$TARGET_DIR"
+cp -r data/event-schemas/schema "$ROOT_DIR/$TARGET_DIR/schema"
+cp -r data/event-schemas/examples "$ROOT_DIR/$TARGET_DIR/examples"
+# Copy shared schema files that live at the event-schemas root (e.g. moderation_policy_rule.yaml)
+cp data/event-schemas/*.yaml "$ROOT_DIR/$TARGET_DIR/" 2>/dev/null || true
+
+# Count what we got
+SCHEMA_COUNT=$(find "$ROOT_DIR/$TARGET_DIR/schema" -name '*.yaml' | wc -l)
+EXAMPLE_COUNT=$(find "$ROOT_DIR/$TARGET_DIR/examples" -name '*.yaml' -o -name '*.json' | wc -l)
+
+echo "Done. Fetched $SCHEMA_COUNT schemas and $EXAMPLE_COUNT examples."

@@ -1,0 +1,30 @@
+---
+$schema: https://json-schema.org/draft/2020-12/schema
+
+allOf:
+  - $ref: core-event-schema/event.yaml
+description: |-
+  A map of users which are considered ignored is kept in `account_data`
+  in an event type of `m.ignored_user_list`.
+properties:
+  content:
+    type: object
+    properties:
+      ignored_users:
+        type: object
+        description: |-
+          The map of users to ignore. This is a mapping of user ID to empty
+          object.
+        patternProperties:
+          "^@":
+            type: "object"
+            description: "An empty object for future enhancement"
+            x-pattern-format: "mx-user-id"
+    required:
+      - ignored_users
+  type:
+    enum:
+      - m.ignored_user_list
+    type: string
+title: Ignored User List
+type: object

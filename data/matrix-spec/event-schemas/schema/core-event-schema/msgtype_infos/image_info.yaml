@@ -1,0 +1,52 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+
+description: Metadata about an image.
+properties:
+  h:
+    description: |-
+      The intended display height of the image in pixels. This may
+      differ from the intrinsic dimensions of the image file.
+    type: integer
+  w:
+    description: |-
+      The intended display width of the image in pixels. This may
+      differ from the intrinsic dimensions of the image file.
+    type: integer
+  mimetype:
+    description: The mimetype of the image, e.g. `image/jpeg`.
+    type: string
+  size:
+    description: Size of the image in bytes.
+    type: integer
+  thumbnail_url:
+    description: |-
+      The URL (typically [`mxc://` URI](/client-server-api/#matrix-content-mxc-uris)) to a thumbnail of the image.
+      Only present if the thumbnail is unencrypted.
+    type: string
+  thumbnail_file:
+    description: |-
+      Information on the encrypted thumbnail file, as specified in
+      [End-to-end encryption](/client-server-api/#sending-encrypted-attachments).
+      Only present if the thumbnail is encrypted.
+    title: EncryptedFile
+    type: object
+  thumbnail_info:
+    allOf:
+      - $ref: thumbnail_info.yaml
+    description: Metadata about the image referred to in `thumbnail_url`.
+  is_animated:
+    x-addedInMatrixVersion: "1.18"
+    description: |-
+      If this flag is `true`, the original image SHOULD be assumed to be
+      animated. If this flag is `false`, the original image SHOULD be assumed to
+      NOT be animated.
+
+      If a sending client is unable to determine whether an image is animated,
+      it SHOULD leave the flag unset.
+
+      Receiving clients MAY use this flag to optimize whether to download the
+      original image rather than a thumbnail if it is animated, but they SHOULD
+      NOT trust this flag.
+    type: boolean
+title: ImageInfo
+type: object

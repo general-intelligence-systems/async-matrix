@@ -1,0 +1,16 @@
+{
+  "$ref": "core/room_event.json",
+  "type": "m.room.message",
+  "content": {
+    "body": "filename.jpg",
+    "info": {
+        "h": 398,
+        "w": 394,
+        "mimetype": "image/jpeg",
+        "size": 31037,
+        "is_animated": false
+    },
+    "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
+    "msgtype": "m.image"
+  }
+}

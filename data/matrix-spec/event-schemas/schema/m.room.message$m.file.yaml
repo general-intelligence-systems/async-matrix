@@ -1,0 +1,85 @@
+---
+$schema: https://json-schema.org/draft/2020-12/schema
+
+allOf:
+  - $ref: core-event-schema/room_event.yaml
+description: This message represents a generic file.
+properties:
+  content:
+    properties:
+      body:
+        description: |-
+          If `filename` is not set or the value of both properties are
+          identical, this is the filename of the original upload. Otherwise,
+          this is a caption for the file.
+        type: string
+        x-changedInMatrixVersion:
+          "1.10": This property can act as a caption for the file.
+      format:
+        description: |-
+          The format used in the `formatted_body`. This is required if `formatted_body`
+          is specified. Currently only `org.matrix.custom.html` is supported.
+        type: string
+        x-addedInMatrixVersion: "1.10"
+      formatted_body:
+        description: |-
+          The formatted version of the `body`, when it acts as a caption. This
+          is required if `format` is specified.
+        type: string
+        x-addedInMatrixVersion: "1.10"
+      filename:
+        description: The original filename of the uploaded file.
+        type: string
+      info:
+        description: Information about the file referred to in `url`.
+        properties:
+          mimetype:
+            description: The mimetype of the file e.g. `application/msword`.
+            type: string
+          size:
+            description: The size of the file in bytes.
+            type: integer
+          thumbnail_url:
+            description: |-
+              The URL to the thumbnail of the file. Only present if the
+              thumbnail is unencrypted.
+            type: string
+          thumbnail_file:
+            description: |-
+              Information on the encrypted thumbnail file, as specified in
+              [End-to-end encryption](/client-server-api/#sending-encrypted-attachments).
+              Only present if the thumbnail is encrypted.
+            title: EncryptedFile
+            type: object
+          thumbnail_info:
+            allOf:
+              - $ref: core-event-schema/msgtype_infos/thumbnail_info.yaml
+            description: Metadata about the image referred to in `thumbnail_url`.
+        title: FileInfo
+        type: object
+      msgtype:
+        enum:
+          - m.file
+        type: string
+      url:
+        description: |-
+          Required if the file is unencrypted. The URL (typically [`mxc://` URI](/client-server-api/#matrix-content-mxc-uris))
+          to the file.
+        type: string
+      file:
+        description: |-
+          Required if the file is encrypted. Information on the encrypted
+          file, as specified in
+          [End-to-end encryption](/client-server-api/#sending-encrypted-attachments).
+        title: EncryptedFile
+        type: object
+    required:
+      - msgtype
+      - body
+    type: object
+  type:
+    enum:
+      - m.room.message
+    type: string
+title: FileMessage
+type: object

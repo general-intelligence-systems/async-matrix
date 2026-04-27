@@ -1,0 +1,16 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+
+description: The basic set of fields all events must have.
+properties:
+  content:
+    description: The fields in this object will vary depending on the type of event.
+      When interacting with the REST API, this is the HTTP body.
+    type: object
+  type:
+    description: The type of event, as defined by [the event type specification](/client-server-api/#types-of-room-events).
+    type: string
+required:
+  - type
+  - content
+title: Event
+type: object
