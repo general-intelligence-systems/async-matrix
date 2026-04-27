@@ -195,9 +195,11 @@ Tests are inline via [Scampi](https://rubygems.org/gems/scampi) -- co-located wi
 bundle exec scampi
 ```
 
-## Guides
+## Usage
 
-- [Matrix Events Reference](https://general-intelligence-systems.github.io/async-matrix/guides/matrix-events/index) -- auto-generated documentation for every Matrix event type
+Please see the [project documentation](https://general-intelligence-systems.github.io/async-matrix/) for more details.
+
+  - [Matrix Events Reference](https://general-intelligence-systems.github.io/async-matrix/guides/matrix-events/index) - Auto-generated documentation for every Matrix event type.
 
 ## License
 

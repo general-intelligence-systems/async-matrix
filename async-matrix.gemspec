@@ -18,6 +18,7 @@ Gem::Specification.new do |spec|
 
 	spec.metadata["homepage_uri"] = spec.homepage
 	spec.metadata["source_code_uri"] = spec.homepage
+	spec.metadata["documentation_uri"] = "https://general-intelligence-systems.github.io/async-matrix/"
 
 	spec.files = Dir["lib/**/*.rb", "LICENSE", "README.md"]
 	spec.require_paths = ["lib"]
