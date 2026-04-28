@@ -25,11 +25,13 @@ Gem::Specification.new do |spec|
 
 	spec.add_dependency "async", "~> 2.39"
 	spec.add_dependency "async-http", "~> 0.95"
+	spec.add_dependency "async-websocket", "~> 0.30"
 	spec.add_dependency "json_schemer", "~> 2.0"
   spec.add_dependency "scampi", "~> 0.1.7"
+  spec.add_dependency "sequel", "~> 5.0"
   spec.add_dependency "string_builder", "~> 1.2"
-  spec.add_dependency "async-websocket", "~> 0.30"
 
   spec.add_development_dependency "falcon", "~> 0.55"
   spec.add_development_dependency "logger"
+  spec.add_development_dependency "sqlite3"
 end

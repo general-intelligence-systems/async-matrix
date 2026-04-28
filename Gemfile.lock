@@ -7,6 +7,7 @@ PATH
       async-websocket (~> 0.30)
       json_schemer (~> 2.0)
       scampi (~> 0.1.7)
+      sequel (~> 5.0)
       string_builder (~> 1.2)
 
 GEM
@@ -186,7 +187,10 @@ GEM
       mapping (~> 1.0)
     scampi (0.1.7)
       colorize-extended
+    sequel (5.103.0)
+      bigdecimal
     simpleidn (0.2.3)
+    sqlite3 (2.9.3-x86_64-linux-gnu)
     string-format (0.2.0)
     string_builder (1.2.4)
     stringio (3.2.0)
@@ -222,7 +226,6 @@ GEM
     xrb (0.11.2)
 
 PLATFORMS
-  ruby
   x86_64-linux
 
 DEPENDENCIES
@@ -232,6 +235,7 @@ DEPENDENCIES
   bake-releases
   falcon (~> 0.55)
   logger
+  sqlite3
   utopia-project
 
 BUNDLED WITH
