@@ -34,22 +34,13 @@ config = Config.new(
 
 client = Client.new(config)
 
-# --- Brute Agent ---------------------------------------------------
-#
-# Full coding agent with all tools (file read/write/patch, shell,
-# search, fetch, todos, delegation). Model is configurable via the
-# BRUTE_MODEL environment variable.
-#
 agent = Brute::Agent.new(
   provider: Brute.provider,
   model:    ENV.fetch("BRUTE_MODEL", "claude-sonnet-4-20250514"),
-  tools:    Brute::Tools::ALL,
+  tools:    [],
 ) do
   use Brute::Middleware::EventHandler, handler_class: Brute::Events::TerminalOutput
   use Brute::Middleware::SystemPrompt
-  use Brute::Middleware::ToolResultLoop
-  use Brute::Middleware::MaxIterations
-  use Brute::Middleware::ToolCall
   run Brute::Middleware::LLMCall.new
 end
 
