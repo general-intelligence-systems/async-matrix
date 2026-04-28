@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "backfill.json",
+  "description": "Message backfill settings. Maps to mautrix bridgev2/bridgeconfig.BackfillConfig.",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable message backfilling from the remote network."
+    },
+    "max_initial_messages": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 50,
+      "description": "Maximum number of messages to backfill in a newly created portal."
+    },
+    "max_catchup_messages": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 500,
+      "description": "Maximum number of messages to backfill when catching up on missed messages."
+    },
+    "unread_hours_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 720,
+      "description": "Number of hours of unread messages before switching to catchup backfill."
+    },
+    "threads": {
+      "$ref": "#/$defs/BackfillThreadsConfig"
+    },
+    "queue": {
+      "$ref": "#/$defs/BackfillQueueConfig"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "BackfillThreadsConfig": {
+      "type": "object",
+      "properties": {
+        "max_initial_messages": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 20,
+          "description": "Maximum number of messages to backfill in a thread."
+        }
+      },
+      "additionalProperties": false
+    },
+    "BackfillQueueConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the backfill queue for processing large backfills in batches."
+        },
+        "manual": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require manual triggering of queued backfills."
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 100,
+          "description": "Number of messages per backfill batch."
+        },
+        "batch_delay": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 20,
+          "description": "Delay in seconds between backfill batches."
+        },
+        "max_batches": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Maximum number of batches to process. 0 means unlimited."
+        },
+        "max_batches_override": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" },
+          "description": "Per-portal overrides for max_batches, keyed by portal name."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

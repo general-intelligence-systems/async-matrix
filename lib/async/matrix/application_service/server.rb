@@ -28,10 +28,24 @@ module Async
         RESP_BAD_JSON   = [400, CONTENT_JSON, ['{"errcode":"M_BAD_JSON"}']].freeze
         RESP_BAD_METHOD = [405, CONTENT_JSON, ['{"errcode":"M_UNRECOGNIZED"}']].freeze
 
-        def initialize(hs_token:, dispatcher:)
+        def initialize(hs_token:, dispatcher: Dispatcher.new)
           @hs_token   = hs_token
           @dispatcher = dispatcher
           @txn_store  = TransactionStore.new
+        end
+
+        # Register a Bot or a plain handler on the internal dispatcher.
+        #
+        # Accepts either:
+        #   - A Bot (responds to #handlers) — registers all its handlers
+        #   - A plain handler (responds to #event_types and #call)
+        #
+        def register(handler)
+          if handler.respond_to?(:handlers)
+            handler.handlers.each { |h| @dispatcher.register(h) }
+          else
+            @dispatcher.register(handler)
+          end
         end
 
         def call(env)
@@ -102,31 +116,29 @@ module Async
               Console.debug(self) { "Duplicate transaction #{txn_id} — skipping" }
               [200, CONTENT_JSON, EMPTY_BODY]
             else
-              body = parse_json(request)
+              parse_json(request).then do |body|
+                if body
+                  Console.info(self) {
+                    event_count = (body["events"] || []).size
+                    "Transaction #{txn_id}: #{event_count} event(s)"
+                  }
 
-              if body
-                Console.info(self) {
-                  event_count = (body["events"] || []).size
-                  "Transaction #{txn_id}: #{event_count} event(s)"
-                }
+                  @dispatcher.dispatch_transaction(body)
+                  @txn_store.mark_seen(txn_id)
 
-                @dispatcher.dispatch_transaction(body)
-                @txn_store.mark_seen(txn_id)
-
-                [200, CONTENT_JSON, EMPTY_BODY]
-              else
-                RESP_BAD_JSON
+                  [200, CONTENT_JSON, EMPTY_BODY]
+                else
+                  RESP_BAD_JSON
+                end
               end
             end
           end
 
           def parse_json(request)
-            raw = request.body&.read
-
-            if raw.nil? || raw.empty?
-              nil
-            else
-              JSON.parse(raw)
+            request.body&.read.then do |raw|
+              if raw && !raw.empty?
+                JSON.parse(raw)
+              end
             end
           rescue JSON::ParserError => e
             Console.error(self) { "Bad JSON in transaction: #{e.message}" }
@@ -240,6 +252,51 @@ test do
       server = build_server
       status, _, _ = server.call(env("GET", "/unknown"))
       status.should == 404
+    end
+
+    # --- Default dispatcher + register ---
+
+    it "creates a default dispatcher when none is provided" do
+      server = Async::Matrix::ApplicationService::Server.new(hs_token: "secret")
+      status, _, _ = server.call(env("POST", "/_matrix/app/v1/ping"))
+      status.should == 200
+    end
+
+    it "registers a plain handler via register" do
+      server = Async::Matrix::ApplicationService::Server.new(hs_token: "secret")
+
+      received = []
+      handler = Object.new
+      handler.define_singleton_method(:event_types) { ["m.room.message"] }
+      handler.define_singleton_method(:call) { |e| received << e }
+
+      server.register(handler)
+
+      server.call(env("PUT", "/_matrix/app/v1/transactions/txn_reg",
+        headers: {"authorization" => "Bearer secret"},
+        body: '{"events":[{"type":"m.room.message","content":{"body":"hi"}}]}'))
+
+      received.length.should == 1
+    end
+
+    it "registers a bot (object with #handlers) via register" do
+      server = Async::Matrix::ApplicationService::Server.new(hs_token: "secret")
+
+      received = []
+      handler = Object.new
+      handler.define_singleton_method(:event_types) { ["m.room.message"] }
+      handler.define_singleton_method(:call) { |e| received << e }
+
+      bot = Object.new
+      bot.define_singleton_method(:handlers) { [handler] }
+
+      server.register(bot)
+
+      server.call(env("PUT", "/_matrix/app/v1/transactions/txn_bot",
+        headers: {"authorization" => "Bearer secret"},
+        body: '{"events":[{"type":"m.room.message","content":{"body":"hi"}}]}'))
+
+      received.length.should == 1
     end
   end
 end

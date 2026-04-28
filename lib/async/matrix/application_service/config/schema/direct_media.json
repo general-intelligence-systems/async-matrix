@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "direct_media.json",
+  "description": "Direct media access settings. Maps to mautrix bridgev2/bridgeconfig.DirectMediaConfig.",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable direct media access via federation-style media endpoints."
+    },
+    "media_id_prefix": {
+      "type": "string",
+      "description": "Prefix for generated media IDs."
+    },
+    "server_name": {
+      "type": "string",
+      "description": "Server name for the media proxy (inlined from mediaproxy.BasicConfig)."
+    },
+    "server_key": {
+      "type": "string",
+      "description": "Signing key for federation. Set to 'generate' for auto-generation."
+    },
+    "well_known_response": {
+      "type": ["string", "null"],
+      "description": "Custom .well-known response for the media server."
+    },
+    "allow_proxy": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow proxying media through the homeserver if direct download fails."
+    }
+  },
+  "additionalProperties": false
+}

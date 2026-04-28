@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.json",
+  "title": "Mautrix Bridge Configuration",
+  "description": "Root configuration schema for mautrix bridgev2-compatible bridges. Maps to mautrix bridgev2/bridgeconfig.Config.",
+  "type": "object",
+  "properties": {
+    "network": {
+      "type": "object",
+      "description": "Bridge-specific network configuration. Opaque to the framework — validated by each bridge implementation."
+    },
+    "homeserver": {
+      "$ref": "homeserver.json"
+    },
+    "appservice": {
+      "$ref": "appservice.json"
+    },
+    "bridge": {
+      "$ref": "bridge.json"
+    },
+    "database": {
+      "$ref": "database.json"
+    },
+    "matrix": {
+      "$ref": "matrix.json"
+    },
+    "encryption": {
+      "$ref": "encryption.json"
+    },
+    "backfill": {
+      "$ref": "backfill.json"
+    },
+    "analytics": {
+      "$ref": "analytics.json"
+    },
+    "provisioning": {
+      "$ref": "provisioning.json"
+    },
+    "public_media": {
+      "$ref": "public_media.json"
+    },
+    "direct_media": {
+      "$ref": "direct_media.json"
+    },
+    "double_puppet": {
+      "$ref": "double_puppet.json"
+    },
+    "management_room_texts": {
+      "$ref": "management_room_texts.json"
+    },
+    "logging": {
+      "$ref": "logging.json"
+    },
+    "env_config_prefix": {
+      "type": "string",
+      "description": "Prefix for environment variable overrides (e.g. 'MAUTRIX_SIGNAL')."
+    }
+  },
+  "required": ["homeserver", "appservice"],
+  "additionalProperties": false
+}

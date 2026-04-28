@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "matrix.json",
+  "description": "Matrix protocol behavior settings. Maps to mautrix bridgev2/bridgeconfig.MatrixConfig.",
+  "type": "object",
+  "properties": {
+    "message_status_events": {
+      "type": "boolean",
+      "default": false,
+      "description": "Send message status events (MSC3381) for bridge message processing."
+    },
+    "delivery_receipts": {
+      "type": "boolean",
+      "default": false,
+      "description": "Send delivery receipts after successfully bridging a message."
+    },
+    "message_error_notices": {
+      "type": "boolean",
+      "default": true,
+      "description": "Send error notices to the room when a message fails to bridge."
+    },
+    "sync_direct_chat_list": {
+      "type": "boolean",
+      "default": false,
+      "description": "Sync the m.direct account data event with bridged DM rooms."
+    },
+    "federate_rooms": {
+      "type": "boolean",
+      "default": true,
+      "description": "Allow portal rooms to federate."
+    },
+    "upload_file_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 5242880,
+      "description": "Maximum file size in bytes to upload directly (default 5 MiB)."
+    },
+    "ghost_extra_profile_info": {
+      "type": "boolean",
+      "default": false,
+      "description": "Set extra profile info (e.g. identifiers) on ghost users."
+    }
+  },
+  "additionalProperties": false
+}

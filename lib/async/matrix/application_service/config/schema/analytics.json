@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analytics.json",
+  "description": "Analytics/telemetry settings. Maps to mautrix bridgev2/bridgeconfig.AnalyticsConfig.",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Analytics token for the telemetry backend."
+    },
+    "url": {
+      "type": "string",
+      "description": "URL of the analytics/telemetry endpoint."
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User ID to associate with analytics events."
+    }
+  },
+  "additionalProperties": false
+}

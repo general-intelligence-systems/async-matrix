@@ -20,11 +20,12 @@ Gem::Specification.new do |spec|
 	spec.metadata["source_code_uri"] = spec.homepage
 	spec.metadata["documentation_uri"] = "https://general-intelligence-systems.github.io/async-matrix/"
 
-	spec.files = Dir["lib/**/*.rb", "LICENSE", "README.md"]
+	spec.files = Dir["lib/**/*.rb", "lib/**/*.json", "LICENSE", "README.md"]
 	spec.require_paths = ["lib"]
 
 	spec.add_dependency "async", "~> 2.39"
 	spec.add_dependency "async-http", "~> 0.95"
+	spec.add_dependency "json_schemer", "~> 2.0"
   spec.add_dependency "scampi", "~> 0.1.7"
 
   spec.add_development_dependency "falcon", "~> 0.55"

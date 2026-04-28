@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bridge.json",
+  "description": "Core bridge behavior settings. Maps to mautrix bridgev2/bridgeconfig.BridgeConfig.",
+  "type": "object",
+  "properties": {
+    "command_prefix": {
+      "type": "string",
+      "description": "Prefix for bridge commands in the management room."
+    },
+    "personal_filtering_spaces": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable personal filtering spaces for portal rooms."
+    },
+    "private_chat_portal_meta": {
+      "type": "boolean",
+      "default": false,
+      "description": "Set portal room metadata (name/avatar) in private chats."
+    },
+    "async_events": {
+      "type": "boolean",
+      "default": false,
+      "description": "Process Matrix events asynchronously."
+    },
+    "split_portals": {
+      "type": "boolean",
+      "default": false,
+      "description": "Create separate portal rooms per user login."
+    },
+    "resend_bridge_info": {
+      "type": "boolean",
+      "default": false,
+      "description": "Resend bridge info state events on startup."
+    },
+    "no_bridge_info_state_key": {
+      "type": "boolean",
+      "default": false,
+      "description": "Don't include the bridge info state key in portal rooms."
+    },
+    "bridge_status_notices": {
+      "type": "string",
+      "default": "",
+      "description": "Control bridge status notices behavior."
+    },
+    "unknown_error_auto_reconnect": {
+      "type": "string",
+      "default": "",
+      "description": "Duration to wait before auto-reconnecting after an unknown error (Go duration, e.g. '1m')."
+    },
+    "unknown_error_max_auto_reconnects": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Maximum number of auto-reconnect attempts after unknown errors."
+    },
+    "bridge_matrix_leave": {
+      "type": "boolean",
+      "default": false,
+      "description": "Bridge Matrix leave events to the remote network."
+    },
+    "bridge_notices": {
+      "type": "boolean",
+      "default": false,
+      "description": "Bridge m.notice messages to the remote network."
+    },
+    "tag_only_on_create": {
+      "type": "boolean",
+      "default": false,
+      "description": "Only set room tags when creating a portal, not on updates."
+    },
+    "only_bridge_tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Only bridge rooms with these tags."
+    },
+    "mute_only_on_create": {
+      "type": "boolean",
+      "default": false,
+      "description": "Only set mute status when creating a portal, not on updates."
+    },
+    "deduplicate_matrix_messages": {
+      "type": "boolean",
+      "default": false,
+      "description": "Deduplicate Matrix messages before bridging to avoid double-sends."
+    },
+    "cross_room_replies": {
+      "type": "boolean",
+      "default": false,
+      "description": "Support replies across different portal rooms."
+    },
+    "outgoing_message_re_id": {
+      "type": "boolean",
+      "default": false,
+      "description": "Re-identify outgoing messages with the remote network ID."
+    },
+    "revert_failed_state_changes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Revert Matrix state changes that failed to bridge."
+    },
+    "kick_matrix_users": {
+      "type": "boolean",
+      "default": false,
+      "description": "Kick Matrix users from portal rooms when they are removed on the remote network."
+    },
+    "enable_send_state_requests": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable handling send-state requests."
+    },
+    "phone_numbers_in_profile": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include phone numbers in ghost user profiles."
+    },
+    "cleanup_on_logout": {
+      "$ref": "#/$defs/CleanupOnLogouts"
+    },
+    "relay": {
+      "$ref": "relay.json"
+    },
+    "portal_create_filter": {
+      "$ref": "#/$defs/PortalCreateFilter"
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "permissions.json"
+      },
+      "description": "User/server permission map. Keys are '*' (wildcard), 'example.com' (server), or '@user:example.com' (user)."
+    },
+    "backfill": {
+      "$ref": "backfill.json"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "CleanupAction": {
+      "type": "string",
+      "enum": ["", "nothing", "kick", "unbridge", "delete"],
+      "description": "Action to take on portal rooms during cleanup."
+    },
+    "CleanupOnLogout": {
+      "type": "object",
+      "properties": {
+        "private": { "$ref": "#/$defs/CleanupAction" },
+        "relayed": { "$ref": "#/$defs/CleanupAction" },
+        "shared_no_users": { "$ref": "#/$defs/CleanupAction" },
+        "shared_has_users": { "$ref": "#/$defs/CleanupAction" }
+      },
+      "additionalProperties": false
+    },
+    "CleanupOnLogouts": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable cleanup of portal rooms on logout."
+        },
+        "manual": {
+          "$ref": "#/$defs/CleanupOnLogout",
+          "description": "Cleanup behavior when a user manually logs out."
+        },
+        "bad_credentials": {
+          "$ref": "#/$defs/CleanupOnLogout",
+          "description": "Cleanup behavior when credentials become invalid."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PortalCreateFilter": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["allow", "deny", ""],
+          "default": "",
+          "description": "Filter mode: 'allow' only allows listed items, 'deny' blocks listed items."
+        },
+        "list": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "receiver": { "type": "string" }
+                },
+                "required": ["id"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "description": "Portal IDs to allow/deny. Each item is a portal ID string or an object with id and optional receiver."
+        },
+        "always_deny_from_login": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "User login IDs that are always denied portal creation."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

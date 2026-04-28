@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "permissions.json",
+  "description": "Permission level definition. Maps to mautrix bridgev2/bridgeconfig.Permissions. Used as values in the bridge.permissions map.",
+  "oneOf": [
+    {
+      "type": "string",
+      "enum": ["block", "relay", "commands", "user", "admin"],
+      "description": "Named permission preset."
+    },
+    {
+      "type": "object",
+      "properties": {
+        "send_events": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow bridging events from the remote network to Matrix."
+        },
+        "commands": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow using bridge commands."
+        },
+        "login": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow logging into the bridge."
+        },
+        "double_puppet": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow enabling double-puppeting."
+        },
+        "admin": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow bridge administration commands."
+        },
+        "manage_relay": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow managing relay mode."
+        },
+        "max_logins": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Maximum number of simultaneous logins. 0 means unlimited."
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

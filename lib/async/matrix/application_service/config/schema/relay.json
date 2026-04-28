@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "relay.json",
+  "description": "Relay mode settings. Maps to mautrix bridgev2/bridgeconfig.RelayConfig.",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable relay mode for bridging messages from non-logged-in users."
+    },
+    "admin_only": {
+      "type": "boolean",
+      "default": false,
+      "description": "Only allow admins to enable relay mode in a room."
+    },
+    "prefer_default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Prefer default relays over room-specific relays."
+    },
+    "allow_bridge": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow relayed bridging of messages."
+    },
+    "default_relays": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Default user login IDs to use for relaying."
+    },
+    "message_formats": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Go text/template strings for formatting relayed messages, keyed by message type (e.g. 'm.text')."
+    },
+    "displayname_format": {
+      "type": "string",
+      "description": "Go text/template string for formatting relayed displaynames."
+    }
+  },
+  "additionalProperties": false
+}

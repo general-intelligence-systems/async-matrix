@@ -27,30 +27,33 @@ module Async
           end
         end
 
-        def dispatch(event)
-          type     = event.type
-          handlers = @handlers[type]
-
-          if handlers.empty?
-            Console.debug(self) { "No handler for event type: #{type}" }
-          else
-            handlers.each do |handler|
-              handler.call(event)
-            rescue => e
-              Console.error(self) { "Handler #{handler.class.name} raised #{e.class}: #{e.message}" }
-            end
+        def dispatch_transaction(body)
+          Transaction.new(body).then do |txn|
+            txn.events.each    { |event| dispatch(event) }
+            txn.ephemeral.each { |event| dispatch(event) }
           end
         end
 
-        def dispatch_transaction(body)
-          txn = Transaction.new(body)
-          txn.events.each    { |event| dispatch(event) }
-          txn.ephemeral.each { |event| dispatch(event) }
-        end
+          def dispatch(event)
+            type     = event.type
+            handlers = @handlers[type]
 
-        def handler_count
-          @handlers.values.flatten.size
-        end
+            if handlers.empty?
+              Console.debug(self) { "No handler for event type: #{type}" }
+            else
+              handlers.each do |handler|
+                begin
+                  handler.call(event)
+                rescue => e
+                  Console.error(self) { "Handler #{handler.class.name} raised #{e.class}: #{e.message}" }
+                end
+              end
+            end
+          end
+
+          def handler_count
+            @handlers.values.flatten.size
+          end
       end
     end
   end

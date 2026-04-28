@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "double_puppet.json",
+  "description": "Double-puppeting settings. Maps to mautrix bridgev2/bridgeconfig.DoublePuppetConfig.",
+  "type": "object",
+  "properties": {
+    "servers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Map of server name to homeserver URL for double-puppeting."
+    },
+    "allow_discovery": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow discovering double-puppet homeservers via .well-known."
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Map of server name to shared secret for automatic double-puppet login."
+    }
+  },
+  "additionalProperties": false
+}

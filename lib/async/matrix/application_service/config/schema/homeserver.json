@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "homeserver.json",
+  "description": "Homeserver connection settings. Maps to mautrix bridgev2/bridgeconfig.HomeserverConfig.",
+  "type": "object",
+  "properties": {
+    "address": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The URL of the homeserver's client-server API (e.g. http://synapse:8008)."
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The server_name of the homeserver (e.g. example.com)."
+    },
+    "async_media": {
+      "type": "boolean",
+      "default": false,
+      "description": "Does the homeserver support asynchronous media uploads (MSC2246)?"
+    },
+    "public_address": {
+      "type": "string",
+      "description": "Public-facing base URL if the homeserver's API is behind a reverse proxy."
+    },
+    "software": {
+      "type": "string",
+      "enum": ["standard", "asmux", "hungry"],
+      "default": "standard",
+      "description": "The type of homeserver software (standard, asmux, or hungry)."
+    },
+    "status_endpoint": {
+      "type": "string",
+      "description": "URL to push bridge status updates to."
+    },
+    "message_send_checkpoint_endpoint": {
+      "type": "string",
+      "description": "URL to push message send checkpoints to."
+    },
+    "websocket": {
+      "type": "boolean",
+      "default": false,
+      "description": "Use websocket appservice transactions instead of HTTP."
+    },
+    "websocket_proxy": {
+      "type": "string",
+      "description": "HTTP proxy URL for the websocket connection."
+    },
+    "ping_interval_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Interval in seconds between websocket pings. 0 disables."
+    }
+  },
+  "required": ["address", "domain"],
+  "additionalProperties": false
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "management_room_texts.json",
+  "description": "Management room message templates. Maps to mautrix bridgev2/bridgeconfig.ManagementRoomTexts.",
+  "type": "object",
+  "properties": {
+    "welcome": {
+      "type": "string",
+      "description": "Welcome message sent when a user opens the management room."
+    },
+    "welcome_connected": {
+      "type": "string",
+      "description": "Welcome message variant for users who are already connected."
+    },
+    "welcome_unconnected": {
+      "type": "string",
+      "description": "Welcome message variant for users who are not yet connected."
+    },
+    "additional_help": {
+      "type": "string",
+      "description": "Additional help text appended to the help command output."
+    }
+  },
+  "additionalProperties": false
+}

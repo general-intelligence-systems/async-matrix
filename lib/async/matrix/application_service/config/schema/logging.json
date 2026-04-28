@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "logging.json",
+  "description": "Logging configuration. Maps to go.mau.fi/zeroconfig.Config (zerolog-based). Kept permissive since the full zeroconfig schema is external.",
+  "type": "object",
+  "properties": {
+    "min_level": {
+      "type": "string",
+      "enum": ["trace", "debug", "info", "warn", "error", "fatal"],
+      "default": "debug",
+      "description": "Minimum log level."
+    },
+    "writers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Writer type (e.g. 'stdout', 'file')."
+          },
+          "format": {
+            "type": "string",
+            "enum": ["pretty-colored", "pretty", "json"],
+            "description": "Log output format."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Log file path (for file writer type)."
+          },
+          "max_size": {
+            "type": "integer",
+            "description": "Maximum log file size in bytes before rotation."
+          },
+          "max_backups": {
+            "type": "integer",
+            "description": "Maximum number of old log files to keep."
+          },
+          "compress": {
+            "type": "boolean",
+            "description": "Compress rotated log files."
+          }
+        },
+        "additionalProperties": true
+      },
+      "description": "Log output writers."
+    }
+  },
+  "additionalProperties": true
+}

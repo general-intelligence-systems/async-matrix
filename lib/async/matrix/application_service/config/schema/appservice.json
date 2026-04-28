@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "appservice.json",
+  "description": "Application service registration and network settings. Maps to mautrix bridgev2/bridgeconfig.AppserviceConfig.",
+  "type": "object",
+  "properties": {
+    "address": {
+      "type": "string",
+      "description": "The full public address of the appservice (e.g. http://bridge:29318)."
+    },
+    "public_address": {
+      "type": "string",
+      "description": "Public-facing address if different from address."
+    },
+    "hostname": {
+      "type": "string",
+      "default": "0.0.0.0",
+      "description": "Hostname to bind the appservice listener to."
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 29318,
+      "description": "Port to bind the appservice listener to."
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique appservice ID, used in the registration file."
+    },
+    "bot": {
+      "$ref": "#/$defs/BotUserConfig"
+    },
+    "as_token": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Appservice token used to authenticate requests to the homeserver."
+    },
+    "hs_token": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Homeserver token used to authenticate requests from the homeserver."
+    },
+    "ephemeral_events": {
+      "type": "boolean",
+      "default": false,
+      "description": "Receive ephemeral events (typing, receipts) via appservice transactions."
+    },
+    "async_transactions": {
+      "type": "boolean",
+      "default": false,
+      "description": "Send transaction responses before processing (Hungry-specific)."
+    },
+    "username_template": {
+      "type": "string",
+      "description": "Go text/template for generating ghost user localparts. Receives the remote username as {{.}}."
+    }
+  },
+  "required": ["as_token", "hs_token"],
+  "additionalProperties": false,
+  "$defs": {
+    "BotUserConfig": {
+      "description": "Configuration for the appservice bot user. Maps to mautrix BotUserConfig.",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Localpart of the bot user (e.g. 'bot' for @bot:example.com)."
+        },
+        "displayname": {
+          "type": "string",
+          "description": "Display name to set for the bot user."
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Avatar mxc:// URI for the bot user. Set to 'remove' to remove the avatar."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

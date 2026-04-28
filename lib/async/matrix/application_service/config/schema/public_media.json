@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "public_media.json",
+  "description": "Public media proxy settings. Maps to mautrix bridgev2/bridgeconfig.PublicMediaConfig.",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable the public media proxy."
+    },
+    "signing_key": {
+      "type": "string",
+      "description": "Signing key for public media URLs. Set to 'generate' for auto-generation."
+    },
+    "expiry": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Expiry time for public media URLs in seconds. 0 means no expiry."
+    },
+    "hash_length": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 32,
+      "description": "Length of the hash in public media URLs."
+    },
+    "path_prefix": {
+      "type": "string",
+      "description": "URL path prefix for the public media endpoint."
+    },
+    "use_database": {
+      "type": "boolean",
+      "default": false,
+      "description": "Store public media URL mappings in the database."
+    }
+  },
+  "additionalProperties": false
+}

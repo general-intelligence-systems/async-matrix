@@ -29,9 +29,9 @@ module Async
 
       def initialize(config)
         @config  = config
-        @base    = config.homeserver_url
+        @base    = config.homeserver.address
         @headers = [
-          ["authorization", "Bearer #{config.as_token}"],
+          ["authorization", "Bearer #{config.appservice.as_token}"],
           ["content-type",  "application/json"],
           ["user-agent",    "AsyncMatrix/#{Async::Matrix::VERSION}"]
         ]
@@ -112,85 +112,77 @@ module Async
 
       private
 
-        def internet
-          @internet ||= Async::HTTP::Internet.new
+      def internet
+        @internet ||= Async::HTTP::Internet.new
+      end
+
+      def request(method, path, body = nil)
+        url = "#{@base}#{path}"
+        json_body = body ? JSON.generate(body) : nil
+
+        Console.debug(self) { "#{method} #{path}" }
+
+        response = internet.call(method, url, @headers, json_body)
+        status   = response.status
+        payload  = response.read
+
+        unless (200..299).cover?(status)
+          parsed = ApplicationService::ErrorResponse.new(
+            begin; JSON.parse(payload); rescue; {} end
+          )
+          Console.error(self) { "Matrix API #{status}: #{parsed.errcode} — #{parsed.error}" }
+          raise HomeserverError.new(
+            parsed.errcode || "UNKNOWN",
+            parsed.error || payload.to_s[0..200],
+            status: status
+          )
         end
 
-        def request(method, path, body = nil)
-          url = "#{@base}#{path}"
-          json_body = body ? JSON.generate(body) : nil
+        payload && !payload.empty? ? JSON.parse(payload) : {}
+      end
 
-          Console.debug(self) { "#{method} #{path}" }
-
-          response = internet.call(method, url, @headers, json_body)
-          status   = response.status
-          payload  = response.read
-
-          unless (200..299).cover?(status)
-            parsed = ApplicationService::ErrorResponse.new(
-              begin; JSON.parse(payload); rescue; {} end
-            )
-            Console.error(self) { "Matrix API #{status}: #{parsed.errcode} — #{parsed.error}" }
-            raise HomeserverError.new(
-              parsed.errcode || "UNKNOWN",
-              parsed.error || payload.to_s[0..200],
-              status: status
-            )
-          end
-
-          payload && !payload.empty? ? JSON.parse(payload) : {}
-        end
-
-        def encode(value)
-          ERB::Util.url_encode(value)
-        end
+      def encode(value)
+        ERB::Util.url_encode(value)
+      end
     end
   end
 end
 
 test do
   describe "Async::Matrix::Client" do
+    def make_config
+      Async::Matrix::ApplicationService::Config.new({
+        "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
+        "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
+      })
+    end
+
     it "sets authorization header from config" do
-      config = Struct.new(:homeserver_url, :as_token, :bot_mxid).new(
-        "http://localhost:8008", "test_token", "@bot:localhost"
-      )
-      client = Async::Matrix::Client.new(config)
-      client.config.as_token.should == "test_token"
+      client = Async::Matrix::Client.new(make_config)
+      client.config.appservice.as_token.should == "test_token"
     end
 
     it "responds to messaging methods" do
-      config = Struct.new(:homeserver_url, :as_token, :bot_mxid).new(
-        "http://localhost:8008", "token", "@bot:localhost"
-      )
-      client = Async::Matrix::Client.new(config)
+      client = Async::Matrix::Client.new(make_config)
       client.should.respond_to :send_text
       client.should.respond_to :send_html
       client.should.respond_to :send_notice
     end
 
     it "responds to room action methods" do
-      config = Struct.new(:homeserver_url, :as_token, :bot_mxid).new(
-        "http://localhost:8008", "token", "@bot:localhost"
-      )
-      client = Async::Matrix::Client.new(config)
+      client = Async::Matrix::Client.new(make_config)
       client.should.respond_to :join_room
       client.should.respond_to :leave_room
     end
 
     it "responds to profile and verification methods" do
-      config = Struct.new(:homeserver_url, :as_token, :bot_mxid).new(
-        "http://localhost:8008", "token", "@bot:localhost"
-      )
-      client = Async::Matrix::Client.new(config)
+      client = Async::Matrix::Client.new(make_config)
       client.should.respond_to :set_display_name
       client.should.respond_to :whoami
     end
 
     it "can be closed without error" do
-      config = Struct.new(:homeserver_url, :as_token, :bot_mxid).new(
-        "http://localhost:8008", "token", "@bot:localhost"
-      )
-      client = Async::Matrix::Client.new(config)
+      client = Async::Matrix::Client.new(make_config)
       lambda { client.close }.should.not.raise
     end
   end

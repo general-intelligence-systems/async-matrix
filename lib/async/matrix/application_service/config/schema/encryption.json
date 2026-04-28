@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "encryption.json",
+  "description": "End-to-end encryption settings. Maps to mautrix bridgev2/bridgeconfig.EncryptionConfig.",
+  "type": "object",
+  "properties": {
+    "allow": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow encryption in portal rooms."
+    },
+    "default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable encryption in new portal rooms by default."
+    },
+    "require": {
+      "type": "boolean",
+      "default": false,
+      "description": "Require encryption — drop messages in unencrypted rooms."
+    },
+    "appservice": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable appservice-level encryption (MSC3202)."
+    },
+    "msc4190": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable device management via MSC4190."
+    },
+    "msc4392": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable MSC4392 support."
+    },
+    "self_sign": {
+      "type": "boolean",
+      "default": false,
+      "description": "Self-sign the bridge device's keys."
+    },
+    "plaintext_mentions": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include plaintext mentions alongside encrypted content."
+    },
+    "pickle_key": {
+      "type": "string",
+      "description": "Key for pickling Olm sessions. Set to 'generate' for auto-generation."
+    },
+    "allow_key_sharing": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow sharing Megolm keys with verified devices on request."
+    },
+    "delete_keys": {
+      "$ref": "#/$defs/DeleteKeys"
+    },
+    "verification_levels": {
+      "$ref": "#/$defs/VerificationLevels"
+    },
+    "rotation": {
+      "$ref": "#/$defs/Rotation"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "DeleteKeys": {
+      "description": "Key deletion policy settings.",
+      "type": "object",
+      "properties": {
+        "delete_outbound_on_ack": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delete outbound sessions after all devices have acknowledged."
+        },
+        "dont_store_outbound": {
+          "type": "boolean",
+          "default": false,
+          "description": "Don't store outbound sessions at all."
+        },
+        "ratchet_on_decrypt": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ratchet inbound sessions forward after decrypting a message."
+        },
+        "delete_fully_used_on_decrypt": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delete inbound sessions that have been fully used after decryption."
+        },
+        "delete_prev_on_new_session": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delete previous inbound session when a new one is received."
+        },
+        "delete_on_device_delete": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delete keys associated with a device when that device is deleted."
+        },
+        "periodically_delete_expired": {
+          "type": "boolean",
+          "default": false,
+          "description": "Periodically delete expired inbound sessions."
+        },
+        "delete_outdated_inbound": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delete outdated inbound sessions."
+        }
+      },
+      "additionalProperties": false
+    },
+    "VerificationLevels": {
+      "description": "Minimum verification trust levels for various operations.",
+      "type": "object",
+      "properties": {
+        "receive": {
+          "type": "string",
+          "description": "Minimum trust level for receiving messages."
+        },
+        "send": {
+          "type": "string",
+          "description": "Minimum trust level for sending messages."
+        },
+        "share": {
+          "type": "string",
+          "description": "Minimum trust level for sharing keys."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Rotation": {
+      "description": "Megolm session rotation settings.",
+      "type": "object",
+      "properties": {
+        "enable_custom": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable custom rotation settings (otherwise use server defaults)."
+        },
+        "milliseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 604800000,
+          "description": "Rotate sessions after this many milliseconds."
+        },
+        "messages": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 100,
+          "description": "Rotate sessions after this many messages."
+        },
+        "disable_device_change_key_rotation": {
+          "type": "boolean",
+          "default": false,
+          "description": "Don't rotate keys when a device list changes."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

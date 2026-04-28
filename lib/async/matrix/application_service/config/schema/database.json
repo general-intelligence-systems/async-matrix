@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "database.json",
+  "description": "Database connection settings. Maps to go.mau.fi/util/dbutil.Config.",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["sqlite3-fk-wal", "postgres"],
+      "description": "Database engine type. 'sqlite3-fk-wal' is SQLite with foreign keys and WAL mode."
+    },
+    "uri": {
+      "type": "string",
+      "description": "Database connection URI (e.g. file:bridge.db?_txlock=immediate or postgres://...)."
+    },
+    "max_open_conns": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 5,
+      "description": "Maximum number of open database connections."
+    },
+    "max_idle_conns": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 1,
+      "description": "Maximum number of idle database connections."
+    },
+    "max_conn_idle_time": {
+      "type": "string",
+      "description": "Maximum time a connection can be idle (Go duration, e.g. '30m')."
+    },
+    "max_conn_lifetime": {
+      "type": "string",
+      "description": "Maximum lifetime of a connection (Go duration, e.g. '1h')."
+    }
+  },
+  "additionalProperties": false
+}

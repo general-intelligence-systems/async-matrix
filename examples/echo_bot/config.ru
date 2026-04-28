@@ -13,17 +13,20 @@ config = Async::Matrix::ApplicationService::Config.load(config_path)
 
 client = Async::Matrix::Client.new(config)
 
-dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
-dispatcher.register(EchoBot::Handlers::Invite.new(client))
-dispatcher.register(EchoBot::Handlers::Message.new(client))
+dispatcher =
+  Async::Matrix::ApplicationService::Dispatcher.new.tap do |d|
+    d.register(EchoBot::Handlers::Invite.new(client))
+    d.register(EchoBot::Handlers::Message.new(client))
+  end
 
 Console.info(self) { "Handlers registered: #{dispatcher.handler_count}" }
 Console.info(self) { "Bot MXID: #{config.bot_mxid}" }
-Console.info(self) { "Homeserver: #{config.homeserver_url}" }
+Console.info(self) { "Homeserver: #{config.homeserver.address}" }
 
-app = Async::Matrix::ApplicationService::Server.new(
-	hs_token:   config.hs_token,
-	dispatcher: dispatcher
-)
+app =
+  Async::Matrix::ApplicationService::Server.new(
+    hs_token:   config.appservice.hs_token,
+    dispatcher: dispatcher
+  )
 
 run app

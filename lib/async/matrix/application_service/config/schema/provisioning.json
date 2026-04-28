@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "provisioning.json",
+  "description": "Provisioning API settings. Maps to mautrix bridgev2/bridgeconfig.ProvisioningConfig.",
+  "type": "object",
+  "properties": {
+    "shared_secret": {
+      "type": "string",
+      "description": "Shared secret for provisioning API authentication. Set to 'generate' for auto-generation."
+    },
+    "debug_endpoints": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable debug/profiling endpoints on the provisioning API."
+    },
+    "enable_session_transfers": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable transferring login sessions between devices."
+    }
+  },
+  "additionalProperties": false
+}
