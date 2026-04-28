@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fetches Matrix event schemas and examples from the official matrix-org/matrix-spec repo.
-# Outputs to data/matrix-spec/event-schemas/{schema,examples}/
+# Fetches Matrix event schemas, examples, and API definitions from the official
+# matrix-org/matrix-spec repo. Outputs to data/matrix-spec/.
+#
+# Event schemas use $ref to reference:
+#   1. Other event schemas (core-event-schema/, components/) -- relative paths within event-schemas/schema/
+#   2. API definitions (../../api/client-server/definitions/) -- used by m.tag, m.push_rules, m.recent_emoji
+#
+# Both trees are fetched so all $ref paths resolve correctly.
 
 REPO="https://github.com/matrix-org/matrix-spec.git"
 BRANCH="main"
-TARGET_DIR="data/matrix-spec/event-schemas"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DATA_DIR="$ROOT_DIR/data/matrix-spec"
 TMP_DIR=$(mktemp -d)
 
 cleanup() { rm -rf "$TMP_DIR"; }
@@ -18,18 +24,28 @@ echo "Cloning matrix-org/matrix-spec (shallow)..."
 git clone --depth 1 --branch "$BRANCH" --filter=blob:none --sparse "$REPO" "$TMP_DIR/matrix-spec" 2>&1
 
 cd "$TMP_DIR/matrix-spec"
-git sparse-checkout set data/event-schemas 2>&1
+git sparse-checkout set data/event-schemas data/api/client-server/definitions 2>&1
 
-echo "Copying schemas to $TARGET_DIR..."
-rm -rf "$ROOT_DIR/$TARGET_DIR"
-mkdir -p "$ROOT_DIR/$TARGET_DIR"
-cp -r data/event-schemas/schema "$ROOT_DIR/$TARGET_DIR/schema"
-cp -r data/event-schemas/examples "$ROOT_DIR/$TARGET_DIR/examples"
-# Copy shared schema files that live at the event-schemas root (e.g. moderation_policy_rule.yaml)
-cp data/event-schemas/*.yaml "$ROOT_DIR/$TARGET_DIR/" 2>/dev/null || true
+# --- Event schemas ---
+EVENT_DIR="$DATA_DIR/event-schemas"
+echo "Copying event schemas..."
+rm -rf "$EVENT_DIR"
+mkdir -p "$EVENT_DIR"
+cp -r data/event-schemas/schema "$EVENT_DIR/schema"
+cp -r data/event-schemas/examples "$EVENT_DIR/examples"
+# Shared schema files at the event-schemas root (e.g. moderation_policy_rule.yaml)
+cp data/event-schemas/*.yaml "$EVENT_DIR/" 2>/dev/null || true
 
-# Count what we got
-SCHEMA_COUNT=$(find "$ROOT_DIR/$TARGET_DIR/schema" -name '*.yaml' | wc -l)
-EXAMPLE_COUNT=$(find "$ROOT_DIR/$TARGET_DIR/examples" -name '*.yaml' -o -name '*.json' | wc -l)
+# --- API definitions (needed for $ref resolution from m.tag, m.push_rules, m.recent_emoji) ---
+API_DIR="$DATA_DIR/api/client-server/definitions"
+echo "Copying API definitions..."
+rm -rf "$API_DIR"
+mkdir -p "$API_DIR"
+cp -r data/api/client-server/definitions/* "$API_DIR/"
 
-echo "Done. Fetched $SCHEMA_COUNT schemas and $EXAMPLE_COUNT examples."
+# --- Summary ---
+SCHEMA_COUNT=$(find "$EVENT_DIR/schema" -name '*.yaml' -o -name '*.json' | wc -l)
+EXAMPLE_COUNT=$(find "$EVENT_DIR/examples" -name '*.yaml' -o -name '*.json' | wc -l)
+DEF_COUNT=$(find "$API_DIR" -name '*.yaml' -o -name '*.json' | wc -l)
+
+echo "Done. Fetched $SCHEMA_COUNT event schemas, $EXAMPLE_COUNT examples, and $DEF_COUNT API definitions."

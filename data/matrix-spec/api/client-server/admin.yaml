@@ -1,0 +1,512 @@
+# Copyright 2016 OpenMarket Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+openapi: 3.1.0
+info:
+  title: Matrix Client-Server Administration API
+  version: 1.0.0
+paths:
+  "/v3/admin/whois/{userId}":
+    get:
+      summary: Gets information about a particular user.
+      description: |-
+        Gets information about a particular user.
+
+        This API may be restricted to only be called by the user being looked
+        up, or by a server admin. Server-local administrator privileges are not
+        specified in this document.
+      operationId: getWhoIs
+      security:
+        - accessTokenQuery: []
+        - accessTokenBearer: []
+      parameters:
+        - in: path
+          name: userId
+          description: The user to look up.
+          required: true
+          example: "@peter:rabbit.rocks"
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The lookup was successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                    description: The Matrix user ID of the user.
+                  devices:
+                    type: object
+                    description: Each key is an identifier for one of the user's devices.
+                    additionalProperties:
+                      type: object
+                      title: DeviceInfo
+                      properties:
+                        sessions:
+                          type: array
+                          description: A user's sessions (i.e. what they did with an access token from one
+                            login).
+                          items:
+                            type: object
+                            title: SessionInfo
+                            properties:
+                              connections:
+                                type: array
+                                description: Information particular connections in the session.
+                                items:
+                                  type: object
+                                  title: ConnectionInfo
+                                  properties:
+                                    ip:
+                                      type: string
+                                      description: Most recently seen IP address of the session.
+                                    last_seen:
+                                      type: integer
+                                      format: int64
+                                      description: Unix timestamp that the session was last active.
+                                    user_agent:
+                                      type: string
+                                      description: User agent string last seen in the session.
+              examples:
+                response:
+                  value: {
+                    "user_id": "@peter:rabbit.rocks",
+                    "devices": {
+                      "teapot": {
+                        "sessions": [
+                          {
+                            "connections": [
+                              {
+                                "ip": "127.0.0.1",
+                                "last_seen": 1411996332123,
+                                "user_agent": "curl/7.31.0-DEV"
+                              },
+                              {
+                                "ip": "10.0.0.2",
+                                "last_seen": 1411996332123,
+                                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+      tags:
+        - Server administration
+  "/v1/admin/suspend/{userId}":
+    get:
+      summary: Gets information about the suspended status of a particular user.
+      x-addedInMatrixVersion: "1.18"
+      description: |-
+        Gets information about the suspended status of a particular server-local user.
+
+        The user calling this endpoint MUST be a server admin.
+
+        In order to prevent user enumeration, servers MUST ensure that authorization is checked
+        prior to trying to do account lookups.
+      operationId: getAdminSuspendUser
+      security:
+        - accessTokenQuery: []
+        - accessTokenBearer: []
+      parameters:
+        - in: path
+          name: userId
+          description: The user to look up.
+          required: true
+          example: "@peter:rabbit.rocks"
+          schema:
+            type: string
+            format: mx-user-id
+            pattern: "^@"
+
+      responses:
+        "200":
+          description: The lookup was successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suspended:
+                    type: boolean
+                    description: Whether the target account is suspended.
+                    example: true
+                required:
+                  - suspended
+              examples:
+                response:
+                  value: {
+                    "suspended": true,
+                  }
+        "400":
+          description: |-
+            The user ID does not belong to the local server. The errcode is `M_INVALID_PARAM`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_INVALID_PARAM",
+                    "error": "User does not belong to the local server."
+                  }
+        "403":
+          description: |-
+            The requesting user is not a server administrator, or the target user is another
+            administrator. The errcode is `M_FORBIDDEN`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_FORBIDDEN",
+                    "error": "Requesting user is not a server administrator."
+                  }
+        "404":
+          description: |-
+            The user ID is not found, or is deactivated. The errcode is `M_NOT_FOUND`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_NOT_FOUND",
+                    "error": "User not found."
+                  }
+      tags:
+        - Server administration
+    put:
+      summary: Set the suspended status of a particular user.
+      x-addedInMatrixVersion: "1.18"
+      description: |-
+        Sets the suspended status of a particular server-local user.
+
+        The user calling this endpoint MUST be a server admin. The client SHOULD check that the user
+        is allowed to suspend other users at the [`GET /capabilities`](/client-server-api/#get_matrixclientv3capabilities)
+        endpoint prior to using this endpoint.
+
+        In order to prevent user enumeration, servers MUST ensure that authorization is checked
+        prior to trying to do account lookups.
+      operationId: setAdminSuspendUser
+      security:
+        - accessTokenQuery: []
+        - accessTokenBearer: []
+      parameters:
+        - in: path
+          name: userId
+          description: The user to change the suspended status of.
+          required: true
+          example: "@peter:rabbit.rocks"
+          schema:
+            type: string
+            format: mx-user-id
+            pattern: "^@"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                suspended:
+                  type: boolean
+                  description: Whether to suspend the target account.
+                  example: true
+              required:
+                - suspended
+            examples:
+                request:
+                  value: {
+                    "suspended": true,
+                  }
+        required: true
+
+      responses:
+        "200":
+          description: The action was successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suspended:
+                    type: boolean
+                    description: Whether the target account is suspended.
+                    example: true
+                required:
+                  - suspended
+              examples:
+                response:
+                  value: {
+                    "suspended": true,
+                  }
+        "400":
+          description: |-
+            The user ID does not belong to the local server. The errcode is `M_INVALID_PARAM`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_INVALID_PARAM",
+                    "error": "User does not belong to the local server."
+                  }
+        "403":
+          description: |-
+            The requesting user is not a server administrator, is trying to suspend their own
+            account, or the target user is another administrator. The errcode is `M_FORBIDDEN`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_FORBIDDEN",
+                    "error": "Requesting user is not a server administrator."
+                  }
+        "404":
+          description: |-
+            The user ID is not found, or is deactivated. The errcode is `M_NOT_FOUND`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_NOT_FOUND",
+                    "error": "User not found."
+                  }
+      tags:
+        - Server administration
+  "/v1/admin/lock/{userId}":
+    get:
+      summary: Gets information about the locked status of a particular user.
+      x-addedInMatrixVersion: "1.18"
+      description: |-
+        Gets information about the locked status of a particular server-local user.
+
+        The user calling this endpoint MUST be a server admin.
+
+        In order to prevent user enumeration, servers MUST ensure that authorization is checked
+        prior to trying to do account lookups.
+      operationId: getAdminLockUser
+      security:
+        - accessTokenQuery: []
+        - accessTokenBearer: []
+      parameters:
+        - in: path
+          name: userId
+          description: The user to look up.
+          required: true
+          example: "@peter:rabbit.rocks"
+          schema:
+            type: string
+            format: mx-user-id
+            pattern: "^@"
+
+      responses:
+        "200":
+          description: The lookup was successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  locked:
+                    type: boolean
+                    description: Whether the target account is locked.
+                required:
+                  - locked
+              examples:
+                response:
+                  value: {
+                    "locked": true,
+                  }
+        "400":
+          description: |-
+            The user ID does not belong to the local server. The errcode is `M_INVALID_PARAM`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_INVALID_PARAM",
+                    "error": "User does not belong to the local server."
+                  }
+        "403":
+          description: |-
+            The requesting user is not a server administrator, or the target user is another
+            administrator. The errcode is `M_FORBIDDEN`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_FORBIDDEN",
+                    "error": "Requesting user is not a server administrator."
+                  }
+        "404":
+          description: |-
+            The user ID is not found, or is deactivated. The errcode is `M_NOT_FOUND`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_NOT_FOUND",
+                    "error": "User not found."
+                  }
+      tags:
+        - Server administration
+    put:
+      summary: Set the locked status of a particular user.
+      x-addedInMatrixVersion: "1.18"
+      description: |-
+        Sets the locked status of a particular server-local user.
+
+        The user calling this endpoint MUST be a server admin. The client SHOULD check that the user
+        is allowed to lock other users at the [`GET /capabilities`](/client-server-api/#get_matrixclientv3capabilities)
+        endpoint prior to using this endpoint.
+
+        In order to prevent user enumeration, servers MUST ensure that authorization is checked
+        prior to trying to do account lookups.
+      operationId: setAdminLockUser
+      security:
+        - accessTokenQuery: []
+        - accessTokenBearer: []
+      parameters:
+        - in: path
+          name: userId
+          description: The user to change the locked status of.
+          required: true
+          example: "@peter:rabbit.rocks"
+          schema:
+            type: string
+            format: mx-user-id
+            pattern: "^@"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                locked:
+                  type: boolean
+                  description: Whether to lock the target account.
+                  example: true
+              required:
+                - locked
+            examples:
+                request:
+                  value: {
+                    "locked": true,
+                  }
+        required: true
+
+      responses:
+        "200":
+          description: The action was successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  locked:
+                    type: boolean
+                    description: Whether the target account is locked.
+                    example: true
+                required:
+                  - locked
+              examples:
+                response:
+                  value: {
+                    "locked": true,
+                  }
+        "400":
+          description: |-
+            The user ID does not belong to the local server. The errcode is `M_INVALID_PARAM`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_INVALID_PARAM",
+                    "error": "User does not belong to the local server."
+                  }
+        "403":
+          description: |-
+            The requesting user is not a server administrator, is trying to lock their own
+            account, or the target user is another administrator. The errcode is `M_FORBIDDEN`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_FORBIDDEN",
+                    "error": "Requesting user is not a server administrator."
+                  }
+        "404":
+          description: |-
+            The user ID is not found, or is deactivated. The errcode is `M_NOT_FOUND`.
+          content:
+            application/json:
+              schema:
+                $ref: definitions/errors/error.yaml
+              examples:
+                response:
+                  value: {
+                    "errcode": "M_NOT_FOUND",
+                    "error": "User not found."
+                  }
+      tags:
+        - Server administration
+servers:
+  - url: "{protocol}://{hostname}{basePath}"
+    variables:
+      protocol:
+        enum:
+          - http
+          - https
+        default: https
+      hostname:
+        default: localhost:8008
+      basePath:
+        default: /_matrix/client
+components:
+  securitySchemes:
+    accessTokenQuery:
+      $ref: definitions/security.yaml#/accessTokenQuery
+    accessTokenBearer:
+      $ref: definitions/security.yaml#/accessTokenBearer

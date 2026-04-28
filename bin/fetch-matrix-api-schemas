@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fetches Matrix Client-Server API OpenAPI schemas from the official matrix-org/matrix-spec repo.
+# Outputs to data/matrix-spec/api/client-server/ (including definitions/)
+
+REPO="https://github.com/matrix-org/matrix-spec.git"
+BRANCH="main"
+TARGET_DIR="data/matrix-spec/api/client-server"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+TMP_DIR=$(mktemp -d)
+
+cleanup() { rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
+
+echo "Cloning matrix-org/matrix-spec (shallow)..."
+git clone --depth 1 --branch "$BRANCH" --filter=blob:none --sparse "$REPO" "$TMP_DIR/matrix-spec" 2>&1
+
+cd "$TMP_DIR/matrix-spec"
+git sparse-checkout set data/api/client-server 2>&1
+
+echo "Copying API schemas to $TARGET_DIR..."
+rm -rf "$ROOT_DIR/$TARGET_DIR"
+mkdir -p "$ROOT_DIR/$TARGET_DIR"
+cp -r data/api/client-server/* "$ROOT_DIR/$TARGET_DIR/"
+
+# Count what we got
+ENDPOINT_COUNT=$(find "$ROOT_DIR/$TARGET_DIR" -maxdepth 1 -name '*.yaml' | wc -l)
+DEFINITION_COUNT=$(find "$ROOT_DIR/$TARGET_DIR/definitions" -name '*.yaml' 2>/dev/null | wc -l)
+
+echo "Done. Fetched $ENDPOINT_COUNT endpoint schemas and $DEFINITION_COUNT definition schemas."

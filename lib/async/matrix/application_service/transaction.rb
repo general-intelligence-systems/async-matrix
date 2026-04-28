@@ -13,8 +13,8 @@ module Async
         attr_reader :events, :ephemeral
 
         def initialize(data)
-          @events    = (data["events"] || []).map { |e| Event.new(e) }
-          @ephemeral = (data["de.sorunome.msc2409.ephemeral"] || data["ephemeral"] || []).map { |e| Event.new(e) }
+          @events    = (data["events"] || []).map { |e| Schema.parse(e) }
+          @ephemeral = (data["de.sorunome.msc2409.ephemeral"] || data["ephemeral"] || []).map { |e| Schema.parse(e) }
         end
       end
     end

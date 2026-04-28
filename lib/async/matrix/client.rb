@@ -85,6 +85,22 @@ module Async
         get("#{CLIENT_PREFIX}/account/whoami")
       end
 
+      # ── Full API (runtime-generated from OpenAPI schemas) ─────
+
+      # Returns a Gateway that provides method-chained access to every
+      # Matrix Client-Server API endpoint. Chains are validated against
+      # the official OpenAPI path tree and terminated by .get(), .post(),
+      # .put(), or .delete().
+      #
+      #   client.api.account.whoami.get
+      #   client.api.createRoom.post(name: "Pub")
+      #   client.api.rooms("!room:ex.com").ban.post(user_id: "@bad:ex.com")
+      #   client.api.rooms("!room:ex.com").messages.get(dir: "b", limit: 10)
+      #
+      def api
+        Api::Gateway.new(self)
+      end
+
       # ── Low-level HTTP ─────────────────────────────────────────
 
       def send_message_event(room_id, event_type, content)

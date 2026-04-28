@@ -21,6 +21,7 @@ module Async
     class BadJsonError < Error; end
     class AuthError < Error; end
     class HomeserverError < Error; end
+    class InvalidEndpointError < Error; end
   end
 end
 

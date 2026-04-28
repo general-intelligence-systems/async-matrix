@@ -6,6 +6,7 @@ PATH
       async-http (~> 0.95)
       json_schemer (~> 2.0)
       scampi (~> 0.1.7)
+      string_builder (~> 1.2)
 
 GEM
   remote: https://rubygems.org/
@@ -179,6 +180,7 @@ GEM
       colorize-extended
     simpleidn (0.2.3)
     string-format (0.2.0)
+    string_builder (1.2.4)
     stringio (3.2.0)
     thread-local (1.1.0)
     timeout (0.6.1)
