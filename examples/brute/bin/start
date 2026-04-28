@@ -8,7 +8,7 @@ cd "$BOT_DIR"
 
 BIND="${APPSERVICE_BIND:-http://0.0.0.0:9292}"
 
-echo "Starting Lindsey & Dave..."
+echo "Starting Brute Agent Bot..."
 echo "  Bind: $BIND"
 echo ""
 

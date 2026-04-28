@@ -6,8 +6,6 @@ services:
     build:
       context: .
     restart: unless-stopped
-    environment:
-      APPSERVICE_CONFIG: config/appservice.yml
     depends_on:
       synapse:
         condition: service_healthy

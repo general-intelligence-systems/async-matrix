@@ -3,7 +3,5 @@
 source "https://rubygems.org"
 
 gem "falcon", "~> 0.55.3"
-gem "async-matrix", "~> 0.1"
-
-
+gem "async-matrix", "~> 1.0"
 gem "scampi", "~> 0.1.7"

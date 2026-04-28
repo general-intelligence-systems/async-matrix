@@ -6,6 +6,8 @@ services:
     build:
       context: .
     restart: unless-stopped
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     depends_on:
       synapse:
         condition: service_healthy

@@ -7,11 +7,9 @@ BOT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$BOT_DIR"
 
 BIND="${APPSERVICE_BIND:-http://0.0.0.0:9292}"
-export APPSERVICE_CONFIG="${APPSERVICE_CONFIG:-$BOT_DIR/config/appservice.yml}"
 
 echo "Starting Echo Bot..."
-echo "  Config: $APPSERVICE_CONFIG"
-echo "  Bind:   $BIND"
+echo "  Bind: $BIND"
 echo ""
 
 exec bundle exec falcon serve --bind "$BIND" --config config.ru
