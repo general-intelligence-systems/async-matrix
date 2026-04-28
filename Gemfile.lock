@@ -4,6 +4,7 @@ PATH
     async-matrix (1.0.0)
       async (~> 2.39)
       async-http (~> 0.95)
+      async-websocket (~> 0.30)
       json_schemer (~> 2.0)
       scampi (~> 0.1.7)
       string_builder (~> 1.2)
@@ -46,6 +47,11 @@ GEM
       string-format (~> 0.2)
     async-utilization (0.3.2)
       console (~> 1.0)
+    async-websocket (0.30.0)
+      async-http (~> 0.76)
+      protocol-http (~> 0.34)
+      protocol-rack (~> 0.7)
+      protocol-websocket (~> 0.17)
     bake (0.24.1)
       bigdecimal
       samovar (~> 2.1)
@@ -153,6 +159,8 @@ GEM
       protocol-http (~> 0.58)
       rack (>= 1.0)
     protocol-url (0.4.0)
+    protocol-websocket (0.21.0)
+      protocol-http (~> 0.2)
     psych (5.3.1)
       date
       stringio

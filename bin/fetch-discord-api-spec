@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fetches the official Discord HTTP API OpenAPI spec from
+# discord/discord-api-spec on GitHub. Outputs to data/discord-api-spec/.
+
+REPO="https://github.com/discord/discord-api-spec.git"
+BRANCH="main"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DATA_DIR="$ROOT_DIR/data/discord-api-spec"
+TMP_DIR=$(mktemp -d)
+
+cleanup() { rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
+
+echo "Cloning discord/discord-api-spec (shallow)..."
+git clone --depth 1 --branch "$BRANCH" "$REPO" "$TMP_DIR/discord-api-spec" 2>&1
+
+echo "Copying OpenAPI spec..."
+mkdir -p "$DATA_DIR"
+cp "$TMP_DIR/discord-api-spec/specs/openapi.json" "$DATA_DIR/openapi.json"
+
+# --- Summary ---
+SIZE=$(wc -c < "$DATA_DIR/openapi.json" | tr -d ' ')
+PATHS=$(python3 -c "import json; print(len(json.load(open('$DATA_DIR/openapi.json'))['paths']))" 2>/dev/null || echo "?")
+
+echo "Done. Fetched openapi.json (${SIZE} bytes, ${PATHS} paths)."

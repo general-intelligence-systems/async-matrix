@@ -75,6 +75,13 @@ module Async
           execute("DELETE", query: kwargs, max_retries: max_retries)
         end
 
+        def patch(body = nil, **kwargs)
+          content_type = kwargs.delete(:content_type)
+          max_retries  = kwargs.delete(:max_retries)
+          query        = _extract_query_params(kwargs)
+          execute("PATCH", body: body || kwargs, content_type: content_type, max_retries: max_retries, query: query)
+        end
+
         # ── Chain inspection ───────────────────────────────────────
 
         def to_s
@@ -153,6 +160,8 @@ module Async
               @client.put(path, body || {}, **retry_opts)
             when "DELETE"
               @client.request("DELETE", path, nil, **retry_opts)
+            when "PATCH"
+              @client.request("PATCH", path, body || {}, **retry_opts)
             end
           end
         end
