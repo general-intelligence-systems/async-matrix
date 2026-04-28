@@ -29,7 +29,8 @@ output_path   = File.expand_path("../lib/async/matrix/version.rb", __dir__)
 template = ERB.new(File.read(template_path))
 result = template.result(binding)
 
+File.write(output_path, result)
+
 `bundle install`
 
-File.write(output_path, result)
 puts "#{current} -> #{version}"
