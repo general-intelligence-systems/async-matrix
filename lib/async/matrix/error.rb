@@ -22,6 +22,7 @@ module Async
     class AuthError < Error; end
     class HomeserverError < Error; end
     class InvalidEndpointError < Error; end
+    class ResponseTooLargeError < Error; end
   end
 end
 
@@ -61,5 +62,9 @@ test do
 
   it "HomeserverError inherits from Error" do
     Async::Matrix::HomeserverError.new("M_UNKNOWN", "upstream").should.be.kind_of Async::Matrix::Error
+  end
+
+  it "ResponseTooLargeError inherits from Error" do
+    Async::Matrix::ResponseTooLargeError.new("M_TOO_LARGE", "too big").should.be.kind_of Async::Matrix::Error
   end
 end

@@ -82,23 +82,23 @@ test do
         super([])
       end
 
-      def get(path)
-        calls << [:get, path]
+      def get(path, max_retries: nil)
+        calls << [:get, path, {max_retries: max_retries}]
         {"stub" => true}
       end
 
-      def post(path, body = {})
-        calls << [:post, path, body]
+      def post(path, body = {}, max_retries: nil)
+        calls << [:post, path, body, {max_retries: max_retries}]
         {"stub" => true}
       end
 
-      def put(path, body = {})
-        calls << [:put, path, body]
+      def put(path, body = {}, max_retries: nil)
+        calls << [:put, path, body, {max_retries: max_retries}]
         {"stub" => true}
       end
 
-      def request(method, path, body = nil)
-        calls << [method.downcase.to_sym, path, body]
+      def request(method, path, body = nil, max_retries: nil)
+        calls << [method.downcase.to_sym, path, body, {max_retries: max_retries}]
         {"stub" => true}
       end
     end
