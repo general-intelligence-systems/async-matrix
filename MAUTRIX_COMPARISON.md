@@ -296,13 +296,25 @@
 | Feature                              | Ruby                    | Go                                |
 | ------------------------------------ | ----------------------- | --------------------------------- |
 | Connection pooling                   | YES (async-http)        | YES                               |
-| Automatic retries                    | NO                      | YES (configurable backoff)        |
+| Automatic retries                    | PARTIAL (connection-level) | YES (connection + status-code backoff) |
 | Rate limit handling (429)            | NO                      | YES (Retry-After parsing)         |
 | Gateway error retries (502/503/504)  | NO                      | YES                               |
 | Response size limits                 | NO                      | YES (512 MiB default)             |
 | Request/response hooks               | NO                      | YES                               |
 | Streaming responses                  | NO                      | YES                               |
 | WebSocket client                     | NO                      | YES                               |
+
+> **Retry semantics in async-http:** `Async::HTTP::Client` provides built-in
+> connection-level retries for idempotent requests (GET, HEAD, PUT, DELETE, OPTIONS,
+> TRACE), configurable via the `retries:` constructor argument (default: 3, set to 0
+> to disable). As of async-http v0.95.0, `Protocol::HTTP::RefusedError` enables safe
+> retry of *even non-idempotent* requests when the server provably never processed
+> them (HTTP/2 `REFUSED_STREAM`, `GOAWAY`, write failures before any bytes were sent).
+>
+> What async-http does **not** cover is application-level retry on HTTP error status
+> codes (429 rate limits with `Retry-After`, 502/503/504 gateway errors) with
+> exponential backoff and jitter. That remains the gap vs. mautrix/go and needs to be
+> implemented in the SDK layer.
 
 ---
 
@@ -362,7 +374,7 @@ These are table-stakes features that any production bridge SDK needs:
 | -------------------------------- | --------------- | ------ | ----- |
 | Typed event content structs      | Medium          | **DONE** (schema-driven) | 76 event types validated via official YAML schemas + `Schema.parse` |
 | Media upload / download          | Medium          | **DONE** | `client.api.upload.post(...)`, `client.api.download(...)` via full API |
-| HTTP retry / rate-limit handling | Small           | TODO   | Retry-After, exponential backoff, 429/502/503/504 |
+| Status-code retry / rate-limit   | Small           | TODO   | 429 Retry-After + 502/503/504 backoff (connection-level retries already provided by async-http) |
 | Sync client (`/sync`)            | Large           | **DONE** (endpoint) | `client.api.sync.get(...)` -- syncer/store still needed |
 | Message pagination (`/messages`) | Small           | **DONE** | `client.api.rooms(id).messages.get(dir: "b", limit: 10)` |
 | Account data (global + per-room) | Small           | **DONE** | `client.api.user(uid).account_data(type).put(...)` |

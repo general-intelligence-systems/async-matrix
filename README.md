@@ -19,66 +19,43 @@ Please see the [project documentation](https://general-intelligence-systems.gith
 gem "async-matrix"
 ```
 
-## Echo Bot in 25 Lines
+## Quick Start
 
 ```ruby
 # config.ru
 require "async/matrix"
 
-config     = Async::Matrix::ApplicationService::Config.load("config/appservice.yml")
-client     = Async::Matrix::Client.new(config)
-dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
+config = Async::Matrix::ApplicationService::Config.load("config/appservice.yml")
+client = Async::Matrix::Client.new(config)
 
-# Auto-join when invited
-invite = Object.new
-invite.define_singleton_method(:event_types) { ["m.room.member"] }
-invite.define_singleton_method(:call) { |event|
-  next unless event.content&.membership == "invite"
-  next unless event.state_key == client.config.bot_mxid
-  client.join_room(event.room_id)
-}
+bot = Async::Matrix::ApplicationService::Bot.new(client) do
+  on "m.room.member" do |event|
+    join_room(event.room_id) if event.content.membership == "invite"
+  end
 
-# Echo messages back as notices
-echo = Object.new
-echo.define_singleton_method(:event_types) { ["m.room.message"] }
-echo.define_singleton_method(:call) { |event|
-  next unless event.content&.msgtype == "m.text"
-  next unless event.sender != client.config.bot_mxid
-  client.send_notice(event.room_id, "Echo: #{event.content.body}")
-}
+  on "m.room.message", msgtype: "m.text", not_from: :self do |event|
+    send_notice event.room_id, "Echo: #{event.content.body}"
+  end
+end
 
-dispatcher.register(invite)
-dispatcher.register(echo)
+server = Async::Matrix::ApplicationService::Server.new(hs_token: config.appservice.hs_token)
+server.register(bot)
 
-run Async::Matrix::ApplicationService::Server.new(
-  hs_token: config.hs_token, dispatcher: dispatcher
-)
+run server
 ```
 
 ```sh
 falcon serve --bind http://0.0.0.0:9292
 ```
 
+A complete working example with Docker Compose and Synapse lives in [`examples/echo_bot/`](https://github.com/general-intelligence-systems/async-matrix/tree/main/examples/echo_bot).
+
 ## Handlers
 
-Any object that responds to `#event_types` and `#call(event)`. That's it.
+Any object that responds to `#event_types` and `#call(event)` is a handler. Use this when you need more control than the Bot DSL provides.
 
 ```ruby
-class Invite
-  def initialize(client) = @client = client
-
-  def event_types = ["m.room.member"]
-
-  def call(event)
-    return unless event.content&.membership == "invite"
-    return unless event.state_key == @client.config.bot_mxid
-    @client.join_room(event.room_id)
-  end
-end
-```
-
-```ruby
-class Message
+class Echo
   def initialize(client) = @client = client
 
   def event_types = ["m.room.message"]
@@ -89,117 +66,65 @@ class Message
     @client.send_notice(event.room_id, "Echo: #{event.content.body}")
   end
 end
+
+server.register(Echo.new(client))
 ```
 
-Register them:
+Dispatch is fault-tolerant -- one handler raising won't take down the rest.
+
+## Client
 
 ```ruby
-dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
-dispatcher.register(Invite.new(client))
-dispatcher.register(Message.new(client))
-```
-
-Fault-tolerant -- one handler blowing up won't take down the rest.
-
-## Client API
-
-```ruby
-client = Async::Matrix::Client.new(config)
-
 client.send_text(room_id, "Hello world")
 client.send_html(room_id, "<b>bold</b>")
 client.send_notice(room_id, "Bot says hi")
 client.join_room(room_id)
 client.leave_room(room_id)
 client.set_display_name("My Bot")
-client.whoami  # => {"user_id" => "@bot:example.com"}
+client.whoami
 ```
 
-All methods are fiber-safe with automatic connection pooling via `Async::HTTP::Internet`.
-
-## Well-Known Discovery
+For anything beyond the convenience methods, `client.api` provides method-chained access to the full Matrix Client-Server API, validated at runtime against the official OpenAPI specs:
 
 ```ruby
-Async do
-  endpoint = Async::Matrix::Endpoint.discover("example.com")
-  # Resolves /.well-known/matrix/client, falls back to https://example.com
-end
+client.api.createRoom.post(name: "Pub")
+client.api.rooms("!room:ex.com").messages.get(dir: "b", limit: 10)
 ```
+
+All methods are fiber-safe with automatic connection pooling.
 
 ## Configuration
 
-### `appservice.yml` -- runtime config
+Create `config/appservice.yml` for your bot:
 
 ```yaml
 homeserver:
-  url: "http://synapse:8008"
+  address: "http://synapse:8008"
   domain: "localhost"
 
 appservice:
   as_token: "your-appservice-token"
   hs_token: "your-homeserver-token"
-  bot_mxid: "@bot:localhost"
-
-server:
-  bind: "http://0.0.0.0:9292"
+  bot:
+    username: "bot"
 ```
 
-### `registration.yml` -- give this to your homeserver admin
+You'll also need a [`registration.yml`](https://spec.matrix.org/latest/application-service-api/#registration) registered with your homeserver. See the [echo bot example](https://github.com/general-intelligence-systems/async-matrix/tree/main/examples/echo_bot) for a working template.
 
-```yaml
-id: ruby-bot
-url: "http://bot:9292"
-as_token: "your-appservice-token"  # must match appservice.yml
-hs_token: "your-homeserver-token"  # must match appservice.yml
-sender_localpart: bot
-namespaces:
-  users:
-    - exclusive: false
-      regex: "@bot:localhost"
-  rooms: []
-  aliases: []
-rate_limited: false
-push_ephemeral: false
-```
-
-Override the config path with `APPSERVICE_CONFIG`:
+Override the config path at runtime:
 
 ```sh
 APPSERVICE_CONFIG=/etc/bot/appservice.yml falcon serve
 ```
 
-## Architecture
+## Built With
 
-```
-Synapse ──PUT /transactions/{txnId}──▶ Server (Rack 3)
-                                          │
-                                     Dispatcher
-                                      ┌───┴───┐
-                                  Handler   Handler
-                                      │
-                              Client ──PUT /rooms/.../send──▶ Synapse
-```
-
-- **Server** authenticates the `hs_token` (timing-safe), deduplicates transactions
-- **Dispatcher** routes events by type, catches handler errors
-- **Client** authenticates with `as_token`, pools connections
-
-## Running with Docker
-
-A complete echo bot example lives in [`examples/echo_bot/`](https://github.com/general-intelligence-systems/async-matrix/tree/main/examples/echo_bot) with Docker Compose, Synapse, and nginx.
-
-```sh
-cd examples/echo_bot
-docker compose up -d --build
-```
-
-## Testing
-
-Tests are inline via [Scampi](https://rubygems.org/gems/scampi) -- co-located with the code they test.
-
-```sh
-bundle exec scampi
-```
+- [async](https://github.com/socketry/async) -- fiber-based concurrency framework
+- [async-http](https://github.com/socketry/async-http) -- HTTP client/server with connection pooling
+- [falcon](https://github.com/socketry/falcon) -- async Rack-compatible web server
+- [json_schemer](https://github.com/davishmcclurg/json_schemer) -- JSON Schema validation
+- [scampi](https://github.com/general-intelligence-systems/scampi) -- inline co-located test framework
+- [string_builder](https://github.com/general-intelligence-systems/string_builder) -- method-chain string builder
 
 ## License
 
