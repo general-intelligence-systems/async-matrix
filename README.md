@@ -1,5 +1,7 @@
 # async-matrix
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/general-intelligence-systems/async-matrix)
+
 [![Gem Version](https://img.shields.io/gem/v/async-matrix)](https://rubygems.org/gems/async-matrix)
 [![CI](https://github.com/general-intelligence-systems/async-matrix/actions/workflows/test.yaml/badge.svg)](https://github.com/general-intelligence-systems/async-matrix/actions/workflows/test.yaml)
 [![License](https://img.shields.io/github/license/general-intelligence-systems/async-matrix)](https://github.com/general-intelligence-systems/async-matrix/blob/main/LICENSE)
