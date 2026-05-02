@@ -44,7 +44,7 @@ server.register(bot)
 run server
 ```
 
-```sh
+```bash
 falcon serve --bind http://0.0.0.0:9292
 ```
 
@@ -113,7 +113,7 @@ You'll also need a [`registration.yml`](https://spec.matrix.org/latest/applicati
 
 Override the config path at runtime:
 
-```sh
+```bash
 APPSERVICE_CONFIG=/etc/bot/appservice.yml falcon serve
 ```
 

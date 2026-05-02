@@ -64,7 +64,7 @@ Requires Ruby >= 3.3. Uses Nix flake for dev environment (`.envrc` + `flake.nix`
 
 ### Run tests
 
-```sh
+```bash
 bin/test
 # or directly:
 CONSOLE_LEVEL=fatal bundle exec scampi
@@ -74,7 +74,7 @@ Tests use **scampi** (inline co-located test framework). There is no `test/` or 
 
 To run a single file's tests, use scampi's file filter:
 
-```sh
+```bash
 CONSOLE_LEVEL=fatal bundle exec scampi lib/async/matrix/client.rb
 ```
 
@@ -84,27 +84,27 @@ No `.rubocop.yml` exists yet. One needs to be created per the Ruby repos section
 
 ### Build gem
 
-```sh
+```bash
 bundle exec bake gem:build
 ```
 
 ### Release
 
-```sh
+```bash
 bin/release-gem        # compares local vs remote version, builds & pushes
 bin/increment-version  # bumps major/minor/patch via ERB template
 ```
 
 ### Fetch upstream Matrix schemas
 
-```sh
+```bash
 bin/fetch-matrix-schemas      # event type schemas -> data/
 bin/fetch-matrix-api-schemas  # Client-Server OpenAPI specs -> data/
 ```
 
 ### Serve locally
 
-```sh
+```bash
 falcon serve --bind http://0.0.0.0:9292
 ```
 
