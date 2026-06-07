@@ -119,8 +119,8 @@ module Async
               parse_json(request).then do |body|
                 if body
                   Console.info(self) {
-                    event_count = (body["events"] || []).size
-                    "Transaction #{txn_id}: #{event_count} event(s)"
+                    events = body["events"] || []
+                    "Transaction #{txn_id}: #{events.size} event(s) — #{JSON.generate(events)}"
                   }
 
                   @dispatcher.dispatch_transaction(body)
