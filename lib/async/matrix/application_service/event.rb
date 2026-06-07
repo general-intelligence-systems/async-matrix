@@ -32,15 +32,12 @@ module Async
 					@membership = data["membership"]
 				end
 
-				# Direct hash access for any content field.
-				def [](key)
-					@data[key.to_s]
-				end
+				def to_h = @data
+        def to_s = @body.to_s
+        def to_str = to_s
 
-				# Returns the raw content hash.
-				def to_h
-					@data
-				end
+				# Direct hash access for any content field.
+				def [](key) = @data[key.to_s]
 
 				# Dynamic access to any content field present in the raw data.
 				def method_missing(name, *args)
@@ -86,15 +83,11 @@ module Async
 				end
 
 				# The JSONSchemer::Schema for this event's type, or nil if unknown.
-				def schema
-					Schema[@type]
-				end
+				def schema = Schema[@type]
 
 				# Validate this event against its schema.
 				# Returns true if valid or if no schema exists (lenient).
-				def valid?
-					Schema.valid?(@raw)
-				end
+				def valid? = Schema.valid?(@raw)
 
 				# Validate this event against its schema.
 				# Raises Schema::ValidationError with detailed errors on failure.
@@ -113,14 +106,10 @@ module Async
 
 				# Content property names defined by the schema for this event type.
 				# @return [Array<String>]
-				def content_properties
-					Schema.content_properties(@type)
-				end
+				def content_properties = Schema.content_properties(@type)
 
 				# Is this a state event? (has a state_key)
-				def state_event?
-					!@state_key.nil?
-				end
+				def state_event? = !@state_key.nil?
 			end
 		end
 	end
