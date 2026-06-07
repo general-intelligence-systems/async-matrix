@@ -132,11 +132,12 @@ module Async
 
           path = "/" + segments.map { |s| _encode(s) }.join("/")
 
+          if query && !query.empty?
+            qs = query.map { |k, v| "#{_encode(k.to_s)}=#{_encode(v.to_s)}" }.join("&")
+            path = "#{path}?#{qs}"
+          end
+
           if _binary_route?(segments)
-            if query && !query.empty?
-              qs = query.map { |k, v| "#{_encode(k.to_s)}=#{_encode(v.to_s)}" }.join("&")
-              path = "#{path}?#{qs}"
-            end
             case method
             when "GET"
               @client.media_client.download(path)
@@ -149,10 +150,6 @@ module Async
             retry_opts = max_retries ? {max_retries: max_retries} : {}
             case method
             when "GET"
-              if query && !query.empty?
-                qs = query.map { |k, v| "#{_encode(k.to_s)}=#{_encode(v.to_s)}" }.join("&")
-                path = "#{path}?#{qs}"
-              end
               @client.get(path, **retry_opts)
             when "POST"
               @client.post(path, body || {}, **retry_opts)
