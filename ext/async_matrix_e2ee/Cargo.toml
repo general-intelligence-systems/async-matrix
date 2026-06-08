@@ -9,7 +9,9 @@ name = "async_matrix_e2ee"
 crate-type = ["cdylib"]
 
 [dependencies]
-magnus = "0.7"
+# magnus 0.8 is required for Ruby 4.0 C-API compatibility (0.7 fails to compile
+# against Ruby 4.0: rb_fiber_raise pointer mutability + RTypedData.typed_flag).
+magnus = "0.8"
 
 # vodozemac 0.10.0 (2026-04-13), default features (libolm-compat).
 #

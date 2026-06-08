@@ -27,7 +27,9 @@ use vodozemac::megolm::{
 // --- helpers ---------------------------------------------------------------
 
 fn rt_err<E: std::fmt::Display>(e: E) -> Error {
-    Error::new(magnus::exception::runtime_error(), e.to_string())
+    // Safe: every caller runs inside a Ruby method invocation (GVL held).
+    let ruby = Ruby::get().expect("rt_err called outside the Ruby VM");
+    Error::new(ruby.exception_runtime_error(), e.to_string())
 }
 
 fn key32(label: &str, bytes: &[u8]) -> Result<[u8; 32], Error> {
