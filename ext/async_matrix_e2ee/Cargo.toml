@@ -1,0 +1,26 @@
+[package]
+name = "async_matrix_e2ee"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "async_matrix_e2ee"
+crate-type = ["cdylib"]
+
+[dependencies]
+magnus = "0.7"
+
+# vodozemac 0.10.0 (2026-04-13), default features (libolm-compat).
+#
+# - 0.10 is the release that fixes the all-zero / non-contributory DH issue from
+#   Soatok's review (the proposed patch was deprecated `since = "0.10.0"`), so we
+#   pin >= 0.10 rather than 0.9.
+# - There is no `strict-signatures` feature in 0.10 (it existed pre-0.10; the
+#   related signature-verification hardening was resolved upstream).
+# - There is no `fuzzing` Cargo feature: vodozemac's MAC/signature bypass is
+#   gated behind `#[cfg(fuzzing)]`, only set by `cargo fuzz`
+#   (RUSTFLAGS=--cfg fuzzing). A normal `cargo build`/`rake compile` never
+#   enables it. Never build production artifacts with `cargo fuzz`.
+[dependencies.vodozemac]
+version = "0.10"

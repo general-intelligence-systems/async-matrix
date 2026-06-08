@@ -1,11 +1,12 @@
 PATH
   remote: .
   specs:
-    async-matrix (1.1.1)
+    async-matrix (1.2.0)
       async (~> 2.39)
       async-http (~> 0.95)
       async-websocket (~> 0.30)
       json_schemer (~> 2.0)
+      rb_sys (~> 0.9)
       scampi (~> 0.1.7)
       sequel (~> 5.0)
       string_builder (~> 1.2)
@@ -170,6 +171,12 @@ GEM
       falcon (~> 0.46)
       samovar (~> 2.1)
       variant
+    rake (13.4.2)
+    rake-compiler (1.3.1)
+      rake
+    rake-compiler-dock (1.12.0)
+    rb_sys (0.9.128)
+      rake-compiler-dock (= 1.12.0)
     rbs (4.0.2)
       logger
       prism (>= 1.6.0)
@@ -235,6 +242,7 @@ DEPENDENCIES
   bake-releases
   falcon (~> 0.55)
   logger
+  rake-compiler (~> 1.2)
   sqlite3
   utopia-project
 

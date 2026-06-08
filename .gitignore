@@ -27,3 +27,9 @@ result
 *.gem
 sqlite
 *.db
+
+# Rust / native extension build artifacts (compiled at install time)
+*.so
+/tmp/
+/ext/**/target/
+ext/**/Cargo.lock

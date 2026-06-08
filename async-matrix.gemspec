@@ -20,8 +20,9 @@ Gem::Specification.new do |spec|
 	spec.metadata["source_code_uri"] = spec.homepage
 	spec.metadata["documentation_uri"] = "https://general-intelligence-systems.github.io/async-matrix/"
 
-	spec.files = Dir["lib/**/*.rb", "lib/**/*.json", "data/**/*.yaml", "data/**/*.json", "LICENSE", "README.md"]
+	spec.files = Dir["lib/**/*.rb", "lib/**/*.json", "data/**/*.yaml", "data/**/*.json", "ext/**/*.{rs,rb,toml}", "LICENSE", "README.md"]
 	spec.require_paths = ["lib"]
+	spec.extensions = ["ext/async_matrix_e2ee/extconf.rb"]
 
 	spec.add_dependency "async", "~> 2.39"
 	spec.add_dependency "async-http", "~> 0.95"
@@ -31,7 +32,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency "sequel", "~> 5.0"
   spec.add_dependency "string_builder", "~> 1.2"
 
+  spec.add_dependency "rb_sys", "~> 0.9"
+
   spec.add_development_dependency "falcon", "~> 0.55"
   spec.add_development_dependency "logger"
   spec.add_development_dependency "sqlite3"
+  spec.add_development_dependency "rake-compiler", "~> 1.2"
 end

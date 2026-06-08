@@ -22,6 +22,13 @@
             openssl
             imagemagick
             kubernetes-helm
+
+            # Rust toolchain for the ext/async_matrix_e2ee vodozemac binding (magnus + rb_sys).
+            rustc
+            cargo
+            # rb_sys/magnus generate Ruby bindings with bindgen, which needs libclang.
+            clang
+            libclang
           ];
 
           shellHook = ''
@@ -30,6 +37,9 @@
             export PATH="$GEM_HOME/bin:$PATH"
             export BUNDLE_PATH="$GEM_HOME"
             export BUNDLE_BIN="$GEM_HOME/bin"
+
+            # rb_sys bindgen needs to locate libclang at build time.
+            export LIBCLANG_PATH="${pkgs.libclang.lib}/lib"
           '';
         };
       }
