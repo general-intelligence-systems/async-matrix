@@ -3,7 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "sequel"
 
 module Async
@@ -80,7 +79,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Bridge::Discord::DB::Connection" do
     it "connects to an in-memory SQLite database" do
       config = Object.new
@@ -140,4 +139,3 @@ test do
       }.should.raise(ArgumentError)
     end
   end
-end

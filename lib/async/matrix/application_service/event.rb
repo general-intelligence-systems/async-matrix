@@ -3,9 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
-
 module Async
 	module Matrix
 		module ApplicationService
@@ -115,7 +112,7 @@ module Async
 	end
 end
 
-test do
+__END__
 	describe "Async::Matrix::ApplicationService::Content" do
 		it "parses msgtype, body, and membership" do
 			content = Async::Matrix::ApplicationService::Content.new({
@@ -286,4 +283,3 @@ test do
 			props.should.include "membership"
 		end
 	end
-end

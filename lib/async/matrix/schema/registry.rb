@@ -234,7 +234,7 @@ module Async
 	end
 end
 
-test do
+__END__
 	describe "Async::Matrix::Schema::Registry" do
 		it "loads schemas from disk" do
 			Async::Matrix::Schema::Registry.instance.size.should.be > 0
@@ -352,4 +352,3 @@ test do
 			Async::Matrix::Schema::Registry.instance.validate(event).should == []
 		end
 	end
-end

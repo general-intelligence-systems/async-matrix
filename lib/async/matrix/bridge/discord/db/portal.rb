@@ -3,8 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
+require_relative "schema"
 
 module Async
   module Matrix
@@ -55,7 +54,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Bridge::Discord::DB::Portal" do
     def setup_db
       db = Sequel.sqlite
@@ -149,4 +148,3 @@ test do
       db.disconnect
     end
   end
-end

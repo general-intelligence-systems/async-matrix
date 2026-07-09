@@ -3,9 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/discord"
-
 module Async
   module Discord
     # Base error for all Discord API errors.
@@ -39,7 +36,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Discord::Error" do
     it "stores code and message" do
       err = Async::Discord::Error.new("DISCORD_ERROR", "something broke")
@@ -85,4 +82,3 @@ test do
   it "GatewayError inherits from Error" do
     Async::Discord::GatewayError.new("GW", "disconnected").should.be.kind_of Async::Discord::Error
   end
-end

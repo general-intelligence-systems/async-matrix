@@ -3,10 +3,8 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "async"
 require "async/condition"
-require "async/matrix"
 
 module Async
   module Matrix
@@ -57,7 +55,7 @@ module Async
   end
 end
 
-test do
+__END__
   it "can be instantiated" do
     notifier = Async::Matrix::Notifier.new
     notifier.should.be.kind_of Async::Matrix::Notifier
@@ -104,4 +102,3 @@ test do
     end.wait
     result.should == true
   end
-end

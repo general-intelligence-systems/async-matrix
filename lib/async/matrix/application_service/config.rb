@@ -3,12 +3,10 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "forwardable"
 require "json_schemer"
 require "pathname"
 require "yaml"
-require "async/matrix"
 require_relative "config/vivify"
 
 module Async
@@ -89,7 +87,7 @@ module Async
   end
 end
 
-test do
+__END__
   require "tempfile"
 
   describe "Async::Matrix::ApplicationService::Config" do
@@ -225,4 +223,3 @@ test do
       config.bridge.permissions[:"@admin:localhost"].should == "admin"
     end
   end
-end

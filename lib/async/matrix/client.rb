@@ -3,9 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "async/http/internet"
-require "async/matrix"
 require "json"
 require "erb"
 require "console"
@@ -323,7 +321,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Client" do
     def make_config
       Async::Matrix::ApplicationService::Config.new({
@@ -934,4 +932,3 @@ test do
       result.should.be.nil
     end
   end
-end

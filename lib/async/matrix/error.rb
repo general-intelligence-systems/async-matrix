@@ -3,8 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-
 module Async
   module Matrix
     class Error < StandardError
@@ -26,7 +24,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Error" do
     it "stores errcode and message" do
       err = Async::Matrix::Error.new("M_UNKNOWN", "something broke")
@@ -67,4 +65,3 @@ test do
   it "ResponseTooLargeError inherits from Error" do
     Async::Matrix::ResponseTooLargeError.new("M_TOO_LARGE", "too big").should.be.kind_of Async::Matrix::Error
   end
-end

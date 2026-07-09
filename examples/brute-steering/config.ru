@@ -5,7 +5,7 @@
 # Extends the brute example with two key capabilities:
 #
 #   1. Per-room conversation memory — each Matrix room maintains a
-#      persistent Brute::Session across turns, so the agent sees the
+#      persistent Brute.log across turns, so the agent sees the
 #      full conversation history.
 #
 #   2. Steering — when a user sends a message while the agent is still
@@ -29,12 +29,15 @@
 require "bundler/setup"
 require "async/matrix"
 require "brute"
+require "anthropic"
 require_relative "steering_check"
 
 Bot    = Async::Matrix::ApplicationService::Bot
 Config = Async::Matrix::ApplicationService::Config
 Server = Async::Matrix::ApplicationService::Server
 Client = Async::Matrix::Client
+
+MODEL = ENV.fetch("BRUTE_MODEL", "claude-sonnet-4-20250514")
 
 # --- Configuration --------------------------------------------------
 
@@ -52,14 +55,14 @@ config = Config.new(
   }
 )
 
-client = Client.new(config)
+bot_client = Client.new(config)
 
 # --- Shared State ---------------------------------------------------
 #
 # These are plain Hashes. Fiber-safe without synchronization because
 # Falcon's cooperative scheduler never preempts in-memory operations.
 #
-# sessions      — { room_id => Brute::Session } per-room conversation history
+# sessions      — { room_id => Brute.log }        per-room conversation history
 # active_rooms  — { room_id => true }            rooms with an active agent turn
 # steering      — { room_id => [String, ...] }   queued messages for busy rooms
 
@@ -70,31 +73,49 @@ steering     = {}
 # --- Agent Pipeline -------------------------------------------------
 #
 # The middleware stack mirrors the brute example but inserts SteeringCheck
-# between ToolResultLoop and MaxIterations. This is the checkpoint where
-# queued messages are drained and injected — equivalent to PicoClaw's
-# dequeueSteeringMessages call after each tool execution.
+# inside Loop::ToolResult. This is the checkpoint where queued messages are
+# drained and injected — equivalent to PicoClaw's dequeueSteeringMessages call
+# after each tool execution.
 #
-#   EventHandler       — routes pipeline events to terminal output
-#   SystemPrompt       — prepends the system prompt on iteration 1
-#   ToolResultLoop     — re-invokes inner stack while tool results are pending
-#   ┌─ SteeringCheck   — drains steering queue, injects as :user messages
-#   │  MaxIterations   — guards against runaway loops
-#   │  ToolCall         — executes tool calls concurrently via Async::Barrier
-#   └─ LLMCall          — terminal: calls the LLM API
+#   SystemPrompt        — prepends the system prompt on iteration 1
+#   Loop::ToolResult    — re-invokes inner stack while tool results are pending
+#   ┌─ SteeringCheck    — drains steering queue, injects as :user messages
+#   │  MaxIterations    — guards against runaway loops
+#   └─ ToolPipeline     — advertises + executes tool calls
+#   run { ... }         — terminal: calls the LLM API (Anthropic)
 
-agent = Brute::Agent.new(
-  provider: Brute.provider,
-  model:    ENV.fetch("BRUTE_MODEL", "claude-sonnet-4-20250514"),
-  tools:    [],
-) do
-  use Brute::Middleware::EventHandler, handler_class: Brute::Events::TerminalOutput
-  use Brute::Middleware::SystemPrompt
-  use Brute::Middleware::ToolResultLoop
-  use SteeringCheck, steering: steering
-  use Brute::Middleware::MaxIterations
-  use Brute::Middleware::ToolCall
-  run Brute::Middleware::LLMCall.new
+# Advertise Brute's tools as Anthropic tool definitions.
+def anthropic_tools(tools)
+  Brute.tools(tools).values.map do |adapter|
+    defn = adapter.to_h
+    {name: defn[:name], description: defn[:description], input_schema: defn[:parameters]}
+  end
 end
+
+agent = Brute.agent
+  .use(Brute::Middleware::SystemPrompt)
+  .use(Brute::Middleware::Loop::ToolResult)
+  .use(SteeringCheck, steering: steering)
+  .use(Brute::Middleware::MaxIterations)
+  .use(Brute::Middleware::ToolPipeline, tools: Brute::Tools::ALL)
+  .run do |env|
+    client    = Anthropic::Client.new(api_key: ENV.fetch("ANTHROPIC_API_KEY"))
+    transport = Brute::MessageTransport::Anthropic
+
+    params = {
+      model:      MODEL,
+      max_tokens: 16_000,
+      messages:   transport.dump_all(env[:messages]),
+    }
+    system_text = transport.system_text(env[:messages])
+    params[:system_] = system_text unless system_text.empty?
+
+    tools = anthropic_tools(env[:tools])
+    params[:tools] = tools unless tools.empty?
+
+    response = client.messages.create(**params)
+    transport.wrap_each(response) { |message| env[:messages] << message }
+  end
 
 # --- Helpers --------------------------------------------------------
 
@@ -102,16 +123,19 @@ end
 # Fiber[:room_id] is already set by the handler fiber before this is called,
 # so SteeringCheck can find the right queue during the pipeline.
 run_turn = ->(session) do
-  agent.call(session)
-  session.select { |m| m.role == :assistant && m.content.present? }.last
+  env = agent.start(session)
+  env[:messages].select { |m| m.role == :assistant && m.content.present? }.last
 end
 
 # --- Matrix Bot -----------------------------------------------------
 
-bot = Bot.new(client) do
+# The dispatch block closes over the steering state (active_rooms/steering/
+# sessions/run_turn) defined above.
+app = Server.new(hs_token: config.appservice.hs_token, client: bot_client) do
+  dispatch do
   on "m.room.member" do |event|
     if event.content.membership == "invite" &&
-       event.state_key == client.config.bot_mxid
+       event.state_key == bot_client.config.bot_mxid
       Console.info(self) { "Invited to #{event.room_id} by #{event.sender} — joining" }
       join_room(event.room_id)
     end
@@ -151,7 +175,7 @@ bot = Bot.new(client) do
     Fiber[:room_id] = room_id
 
     begin
-      session = (sessions[room_id] ||= Brute::Session.new)
+      session = (sessions[room_id] ||= Brute.log)
       session.user(content)
 
       response = run_turn.call(session)
@@ -183,12 +207,8 @@ bot = Bot.new(client) do
       steering.delete(room_id)
     end
   end
+  end
 end
-
-# --- Server ---------------------------------------------------------
-
-app = Server.new(hs_token: config.appservice.hs_token)
-app.register(bot)
 
 Console.info(self) { "Steering Bot starting..." }
 Console.info(self) { "Bot MXID:    #{config.bot_mxid}" }

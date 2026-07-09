@@ -3,12 +3,10 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "json"
 require "pathname"
 require "uri"
-require "async/discord"
-require "async/matrix"
+require_relative "../../matrix/api/path_tree"
 
 module Async
   module Discord
@@ -75,7 +73,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Discord::Api::PathTree" do
     it "loads from the Discord OpenAPI spec" do
       tree = Async::Discord::Api::PathTree.load
@@ -127,4 +125,3 @@ test do
       result[:operation_id].should == "testAction"
     end
   end
-end

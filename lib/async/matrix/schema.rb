@@ -3,9 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
-
 module Async
 	module Matrix
 		# Schema-driven validation for Matrix events using the official matrix-org/matrix-spec
@@ -91,7 +88,7 @@ module Async
 	end
 end
 
-test do
+__END__
 	describe "Async::Matrix::Schema" do
 		it "looks up schemas by event type" do
 			schema = Async::Matrix::Schema["m.room.message"]
@@ -171,4 +168,3 @@ test do
 			event.schema.should.not.be.nil
 		end
 	end
-end

@@ -3,9 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "async/http/internet"
-require "async/discord"
 require "json"
 require "erb"
 require "console"
@@ -223,7 +221,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Discord::Client" do
     it "sets authorization header with Bot prefix" do
       client = Async::Discord::Client.new(token: "test_token_123")
@@ -283,4 +281,3 @@ test do
       lambda { client.close }.should.not.raise
     end
   end
-end

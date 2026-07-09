@@ -65,9 +65,14 @@ dave = Bot.new(Client.new(dave_config)) do
   end
 end
 
-app = Server.new(hs_token: lindsey_config.appservice.hs_token)
-app.register(lindsey)
-app.register(dave)
+# Both bots run under one appservice (same hs_token). Each bot carries its own
+# client, so we pass them as explicit handlers to `dispatch` — no `client:`
+# needed here.
+app =
+  Server.new(hs_token: lindsey_config.appservice.hs_token) do
+    dispatch lindsey
+    dispatch dave
+  end
 
 Console.info(self) { "Homeserver: #{lindsey_config.homeserver.address}" }
 Console.info(self) { "Lindsey MXID: #{lindsey_config.bot_mxid}" }

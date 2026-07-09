@@ -33,3 +33,4 @@ sqlite
 /tmp/
 /ext/**/target/
 ext/**/Cargo.lock
+.example-test-bundle

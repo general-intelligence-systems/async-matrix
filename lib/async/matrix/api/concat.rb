@@ -3,9 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
-
 module Async
   module Matrix
     module Api
@@ -63,7 +60,7 @@ module Async
   end
 end
 
-test do
+__END__
   require "string_builder"
 
   describe "Async::Matrix::Api::Concat" do
@@ -102,4 +99,3 @@ test do
       segments.should == %w[account whoami]
     end
   end
-end

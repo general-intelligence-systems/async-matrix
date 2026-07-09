@@ -3,10 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/discord"
-require "async/matrix"
-
 module Async
   module Discord
     # Runtime-generated Discord HTTP API built from the official OpenAPI spec.
@@ -72,7 +68,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Discord::Api::Gateway" do
     # Stub client that records calls instead of making HTTP requests.
     StubDiscordClient = Struct.new(:calls) do
@@ -153,4 +149,3 @@ test do
       lambda { gw.totally.bogus.endpoint.get }.should.raise Async::Matrix::InvalidEndpointError
     end
   end
-end

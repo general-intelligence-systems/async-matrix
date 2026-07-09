@@ -3,13 +3,11 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "async"
 require "async/http/endpoint"
 require "async/websocket/client"
 require "json"
 require "console"
-require "async/discord"
 
 module Async
   module Discord
@@ -269,7 +267,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Discord::Gateway" do
     it "initializes with token and intents" do
       gw = Async::Discord::Gateway.new(token: "test_token", intents: 0x30001)
@@ -359,4 +357,3 @@ test do
       gw.instance_variable_get(:@gateway_url).should == "wss://custom.gateway.example.com"
     end
   end
-end

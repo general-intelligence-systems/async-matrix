@@ -27,7 +27,7 @@ end
 # rake-compiler installs the shared object alongside this file.
 require_relative "async_matrix_e2ee"
 
-test do
+__END__
   describe "Async::Matrix::E2EE" do
     it "exposes account identity keys as base64" do
       account = Async::Matrix::E2EE::Account.new
@@ -82,4 +82,3 @@ test do
       restored.session_id.should == group.session_id
     end
   end
-end

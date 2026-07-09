@@ -4,7 +4,6 @@
 # Copyright, 2026, by General Intelligence Systems.
 
 require "async/http"
-require "scampi"
 
 module Async
   module Discord

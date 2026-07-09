@@ -115,7 +115,7 @@ module Async
 	end
 end
 
-test do
+__END__
 	describe "Async::Matrix::Schema::ValidationError" do
 		def error_hash(overrides = {})
 			{
@@ -223,4 +223,3 @@ test do
 			err.errors.should.equal raw
 		end
 	end
-end

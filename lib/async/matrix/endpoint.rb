@@ -3,10 +3,8 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "json"
 require "async/http"
-require "async/matrix"
 
 module Async
   module Matrix
@@ -38,7 +36,7 @@ module Async
   end
 end
 
-test do
+__END__
   it "defines the WELL_KNOWN constant" do
     Async::Matrix::Endpoint::WELL_KNOWN.should == "/.well-known/matrix/client"
   end
@@ -57,4 +55,3 @@ test do
       endpoint.to_s.should =~ /nonexistent\.invalid/
     end.wait
   end
-end

@@ -70,13 +70,9 @@ bin/test
 CONSOLE_LEVEL=fatal bundle exec scampi
 ```
 
-Tests use **scampi** (inline co-located test framework). There is no `test/` or `spec/` directory — tests live as `test do ... end` blocks **at the bottom of every source file**. Scampi discovers them via ripgrep.
+Tests use **scampi** (inline co-located test framework). There is no `test/` or `spec/` directory — tests live in an `__END__` section **at the bottom of every source file** (Ruby stops parsing at `__END__`, so specs never load in production). Scampi discovers them via ripgrep (files with an `__END__` section whose tail begins with `describe`/`context`/`shared`/`it`).
 
-To run a single file's tests, use scampi's file filter:
-
-```bash
-CONSOLE_LEVEL=fatal bundle exec scampi lib/async/matrix/client.rb
-```
+Run the whole suite with `bin/test` (`CONSOLE_LEVEL=fatal bundle exec scampi`). Single-file runs (`scampi <file>`) are **not** supported: source files no longer eagerly `require` the rest of the library, so a lone file can't resolve the sibling constants its specs reference — the full run loads every file, which is what makes cross-file references (and shared stubs) resolve.
 
 ### Lint
 
@@ -114,11 +110,13 @@ Requires a `config.ru` (see `examples/echo_bot/` for a working template).
 
 ### Entry point and module loading
 
-`lib/async/matrix.rb` defines the `Async::Matrix` module and auto-requires **every `.rb` file** under `lib/async/matrix/` via `Dir.glob`. All source lives under the `Async::Matrix` namespace.
+`lib/async/matrix.rb` defines the `Async::Matrix` module and auto-requires **every `.rb` file** under `lib/async/matrix/` via `Dir.glob` (skipping `migrations/` and `bridge/`). All source lives under the `Async::Matrix` namespace. Source files do **not** self-`require "async/matrix"`; they rely on the glob loader for ordering, plus targeted `require_relative` for the few load-time cross-file dependencies (e.g. `double_puppet_client.rb` → `client`, `schema/validation_error.rb` → `error`).
+
+The **Discord bridge** (`lib/async/matrix/bridge/discord/`) is excluded from the eager glob because it pulls in Sequel and opens a placeholder database at load time. Load it explicitly with `require "async/matrix/bridge/discord/db"` when you need it; plain `require "async/matrix"` stays free of Sequel.
 
 ### Inline co-located tests (scampi)
 
-Every source file ends with a `test do ... end` block containing its own unit tests. The test DSL uses `describe`/`it` blocks with `value.should == expected` assertions and `lambda { ... }.should.raise(ErrorClass)` for exceptions. Test infrastructure stubs (`FakeBody`, `FakeResponse`, `FakeInternet`) are defined in `lib/async/matrix/client.rb`'s test block.
+Every source file ends with an `__END__` section containing its own unit tests. The test DSL uses `describe`/`it` blocks with `value.should == expected` assertions and `lambda { ... }.should.raise(ErrorClass)` for exceptions. Scampi evaluates each `__END__` tail in `TOPLEVEL_BINDING`, so infrastructure stubs (`FakeBody`, `FakeResponse`, `FakeInternet`) defined in `lib/async/matrix/client.rb`'s `__END__` section are visible to every other file's specs.
 
 ### Application Service protocol (Rack 3 app)
 

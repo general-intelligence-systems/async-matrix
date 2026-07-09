@@ -3,8 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
+require_relative "client"
 
 module Async
   module Matrix
@@ -27,7 +26,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::DoublePuppetClient" do
     def make_config
       Async::Matrix::ApplicationService::Config.new({
@@ -81,4 +80,3 @@ test do
       puppet.should.be.kind_of Async::Matrix::Client
     end
   end
-end

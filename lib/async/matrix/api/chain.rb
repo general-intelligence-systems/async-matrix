@@ -3,8 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
 require "string_builder"
 require "erb"
 
@@ -231,7 +229,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Api::Chain" do
     def make_tree
       tree = Async::Matrix::Api::PathTree.new
@@ -578,4 +576,3 @@ test do
       client.calls.last.last[:max_retries].should.be.nil
     end
   end
-end

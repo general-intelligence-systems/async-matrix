@@ -11,9 +11,9 @@ module Async
       # Routes incoming Matrix events to registered handler objects.
       #
       # Each handler declares the event types it handles via `#event_types`.
-      # When an event arrives, the dispatcher finds all matching handlers
+      # When an event arrives, the transaction_handler finds all matching handlers
       # and calls them. Errors in one handler do not prevent others from running.
-      class Dispatcher
+      class TransactionHandler
         def initialize(txn_store: TransactionStore.new)
           @handlers  = Hash.new { |h, k| h[k] = [] }
           @txn_store = txn_store
@@ -36,7 +36,7 @@ module Async
         # IDs (already seen) are skipped. Returns :processed or :duplicate.
         #
         # The idempotency store lives here rather than in the HTTP layer because
-        # the Grape server is stateless across requests — the dispatcher is the
+        # the Grape server is stateless across requests — the transaction_handler is the
         # stable, long-lived object.
         def receive_transaction(txn_id, body)
           if @txn_store.seen?(txn_id)
@@ -82,30 +82,30 @@ module Async
 end
 
 __END__
-  describe "Async::Matrix::ApplicationService::Dispatcher" do
+  describe "Async::Matrix::ApplicationService::TransactionHandler" do
     it "registers and dispatches to handlers" do
       received = []
       handler = Object.new
       handler.define_singleton_method(:event_types) { ["m.room.message"] }
       handler.define_singleton_method(:call) { |event| received << event }
 
-      dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
-      dispatcher.register(handler)
-      dispatcher.handler_count.should == 1
+      transaction_handler = Async::Matrix::ApplicationService::TransactionHandler.new
+      transaction_handler.register(handler)
+      transaction_handler.handler_count.should == 1
 
       event = Async::Matrix::ApplicationService::Event.new({
         "type" => "m.room.message",
         "content" => {"body" => "hi"}
       })
-      dispatcher.dispatch(event)
+      transaction_handler.dispatch(event)
       received.length.should == 1
       received.first.content.body.should == "hi"
     end
 
     it "ignores events with no matching handler" do
-      dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
+      transaction_handler = Async::Matrix::ApplicationService::TransactionHandler.new
       event = Async::Matrix::ApplicationService::Event.new({"type" => "m.unknown"})
-      lambda { dispatcher.dispatch(event) }.should.not.raise
+      lambda { transaction_handler.dispatch(event) }.should.not.raise
     end
 
     it "continues dispatching when a handler raises" do
@@ -118,15 +118,15 @@ __END__
       good_handler.define_singleton_method(:event_types) { ["m.room.message"] }
       good_handler.define_singleton_method(:call) { |e| results << e }
 
-      dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
-      dispatcher.register(bad_handler)
-      dispatcher.register(good_handler)
+      transaction_handler = Async::Matrix::ApplicationService::TransactionHandler.new
+      transaction_handler.register(bad_handler)
+      transaction_handler.register(good_handler)
 
       event = Async::Matrix::ApplicationService::Event.new({
         "type" => "m.room.message",
         "content" => {"body" => "test"}
       })
-      dispatcher.dispatch(event)
+      transaction_handler.dispatch(event)
       results.length.should == 1
     end
 
@@ -136,10 +136,10 @@ __END__
       handler.define_singleton_method(:event_types) { ["m.room.message"] }
       handler.define_singleton_method(:call) { |e| received << e }
 
-      dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
-      dispatcher.register(handler)
+      transaction_handler = Async::Matrix::ApplicationService::TransactionHandler.new
+      transaction_handler.register(handler)
 
-      dispatcher.dispatch_transaction({
+      transaction_handler.dispatch_transaction({
         "events" => [
           {"type" => "m.room.message", "content" => {"body" => "one"}},
           {"type" => "m.room.message", "content" => {"body" => "two"}}
@@ -157,11 +157,11 @@ __END__
       bot = Object.new
       bot.define_singleton_method(:handlers) { [handler] }
 
-      dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
-      dispatcher.register(bot)
-      dispatcher.handler_count.should == 1
+      transaction_handler = Async::Matrix::ApplicationService::TransactionHandler.new
+      transaction_handler.register(bot)
+      transaction_handler.handler_count.should == 1
 
-      dispatcher.dispatch_transaction({
+      transaction_handler.dispatch_transaction({
         "events" => [{"type" => "m.room.message", "content" => {"body" => "hi"}}]
       })
       received.length.should == 1
@@ -173,13 +173,13 @@ __END__
       handler.define_singleton_method(:event_types) { ["m.room.message"] }
       handler.define_singleton_method(:call) { |e| received << e }
 
-      dispatcher = Async::Matrix::ApplicationService::Dispatcher.new
-      dispatcher.register(handler)
+      transaction_handler = Async::Matrix::ApplicationService::TransactionHandler.new
+      transaction_handler.register(handler)
 
       body = {"events" => [{"type" => "m.room.message", "content" => {"body" => "hi"}}]}
 
-      dispatcher.receive_transaction("txn1", body).should == :processed
-      dispatcher.receive_transaction("txn1", body).should == :duplicate
+      transaction_handler.receive_transaction("txn1", body).should == :processed
+      transaction_handler.receive_transaction("txn1", body).should == :duplicate
       received.length.should == 1
     end
   end

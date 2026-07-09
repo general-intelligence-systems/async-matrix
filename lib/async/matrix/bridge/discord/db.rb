@@ -3,22 +3,21 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "sequel"
 require "sequel/extensions/migration"
-require "async/matrix"
 
-# Sequel::Model requires a database connection at subclass definition time.
-# Set a placeholder in-memory SQLite so models can be defined at require
-# time. The real database is bound later via DB.connect.
-#
-# require_valid_table = false suppresses the column introspection that
-# Sequel normally does on inherited — critical because the placeholder
-# DB has no tables.
-unless Sequel::Model.instance_variable_get(:@db)
-  Sequel::Model.db = Sequel.sqlite
-  Sequel::Model.require_valid_table = false
-end
+# The Discord bridge's database layer. Requiring this file loads the whole
+# subsystem: the Sequel placeholder (schema), the connection helper, and every
+# model class, so DB.connect can bind them all.
+require_relative "db/schema"
+require_relative "db/connection"
+require_relative "db/user"
+require_relative "db/guild"
+require_relative "db/portal"
+require_relative "db/puppet"
+require_relative "db/message"
+require_relative "db/reaction"
+require_relative "db/file"
 
 module Async
   module Matrix
@@ -75,7 +74,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Bridge::Discord::DB" do
     it "connects, migrates, and binds models from config" do
       database_config = Object.new
@@ -137,4 +136,3 @@ test do
       db.disconnect
     end
   end
-end

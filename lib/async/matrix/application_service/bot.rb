@@ -3,18 +3,16 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
 require "console"
-require "async/matrix"
 
 module Async
   module Matrix
     module ApplicationService
       # DSL wrapper that pairs a Client with event handlers.
       #
-      # A Bot produces handler objects that conform to the Dispatcher's
+      # A Bot produces handler objects that conform to the TransactionHandler's
       # duck-type contract (#event_types, #call). Register a bot on a
-      # Server (or Dispatcher) the same way you would register a plain handler.
+      # Server (or TransactionHandler) the same way you would register a plain handler.
       #
       #   bot = Bot.new(client) do
       #     on "m.room.member" do |event|
@@ -61,7 +59,7 @@ module Async
         end
 
         # Internal handler object produced by the #on DSL method.
-        # Conforms to the Dispatcher duck-type: #event_types, #call.
+        # Conforms to the TransactionHandler duck-type: #event_types, #call.
         class Handler
           attr_reader :event_types
 
@@ -128,7 +126,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::ApplicationService::Bot" do
     def make_config
       Async::Matrix::ApplicationService::Config.new({
@@ -232,4 +230,3 @@ test do
       }.should.raise(ArgumentError)
     end
   end
-end

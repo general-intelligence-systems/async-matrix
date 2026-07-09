@@ -22,22 +22,21 @@ config = Async::Matrix::ApplicationService::Config.new(
   }
 )
 
-client = Async::Matrix::Client.new(config)
+bot_client = Async::Matrix::Client.new(config)
 
-dispatcher =
-  Async::Matrix::ApplicationService::Dispatcher.new.tap do |d|
-    d.register(EchoBot::Handlers::Invite.new(client))
-    d.register(EchoBot::Handlers::Message.new(client))
-  end
-
-Console.info(self) { "Handlers registered: #{dispatcher.handler_count}" }
-Console.info(self) { "Bot MXID: #{config.bot_mxid}" }
-Console.info(self) { "Homeserver: #{config.homeserver.address}" }
-
+# A Server wraps a Grape::API with the Matrix AS routes mixed in and dispatches
+# incoming events to the handlers you register with the `dispatch` DSL.
 app =
   Async::Matrix::ApplicationService::Server.new(
-    hs_token:   config.appservice.hs_token,
-    dispatcher: dispatcher
-  )
+    hs_token: config.appservice.hs_token,
+    client:   bot_client
+  ) do
+    dispatch EchoBot::Handlers::Invite.new(bot_client)
+    dispatch EchoBot::Handlers::Message.new(bot_client)
+  end
+
+Console.info(self) { "Handlers registered: #{app.dispatcher.handler_count}" }
+Console.info(self) { "Bot MXID: #{config.bot_mxid}" }
+Console.info(self) { "Homeserver: #{config.homeserver.address}" }
 
 run app

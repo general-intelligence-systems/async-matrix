@@ -3,8 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
 require "yaml"
 require "pathname"
 
@@ -130,7 +128,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Api::PathTree" do
     def make_tree
       tree = Async::Matrix::Api::PathTree.new
@@ -205,4 +203,3 @@ test do
       result[:valid].should == false
     end
   end
-end

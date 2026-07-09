@@ -2,6 +2,7 @@
 
 source "https://rubygems.org"
 
-gem "falcon", "~> 0.55.3"
-gem "async-matrix", "~> 1.0"
-gem "brute", "~> 2.0"
+gem "falcon", "~> 0.55.5"
+gem "async-matrix", "~> 1.2"
+gem "brute", "~> 3.0"
+gem "anthropic", "~> 1.5"

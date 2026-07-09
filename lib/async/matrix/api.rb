@@ -3,9 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
-
 module Async
   module Matrix
     # Runtime-generated Matrix Client-Server API built from official OpenAPI schemas.
@@ -74,7 +71,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::Api::Gateway" do
     # Stub client that records calls instead of making HTTP requests.
     StubClient = Struct.new(:calls) do
@@ -201,4 +198,3 @@ test do
       client.calls[1][1].should == "/_matrix/client/v3/createRoom"
     end
   end
-end

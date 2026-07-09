@@ -3,9 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require "bundler/setup"
-require "async/matrix"
-
 module Async
   module Matrix
     module ApplicationService
@@ -21,7 +18,7 @@ module Async
   end
 end
 
-test do
+__END__
   describe "Async::Matrix::ApplicationService::ErrorResponse" do
     it "parses errcode and error" do
       resp = Async::Matrix::ApplicationService::ErrorResponse.new({
@@ -38,4 +35,3 @@ test do
       resp.error.should.be.nil
     end
   end
-end
