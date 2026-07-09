@@ -1,3 +1,10 @@
+# Jekyll docs build artifacts
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+docs/Gemfile.lock
+docs/vendor/
+
 # Synapse runtime artifacts
 **/files/homeserver.db
 **/files/homeserver.db-shm

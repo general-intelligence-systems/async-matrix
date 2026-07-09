@@ -11,8 +11,6 @@ Async-native [Matrix](https://matrix.org) Application Service SDK for Ruby. Buil
 
 Please see the [project documentation](https://general-intelligence-systems.github.io/async-matrix/) for more details.
 
-  - [Matrix Events Reference](https://general-intelligence-systems.github.io/async-matrix/guides/matrix-events/index) - Auto-generated documentation for every Matrix event type.
-
 ## Install
 
 ```ruby
@@ -38,10 +36,14 @@ bot = Async::Matrix::ApplicationService::Bot.new(client) do
   end
 end
 
-server = Async::Matrix::ApplicationService::Server.new(hs_token: config.appservice.hs_token)
-server.register(bot)
+app = Async::Matrix::ApplicationService::Server.new(
+  hs_token: config.appservice.hs_token,
+  client:   client
+) do
+  dispatch bot
+end
 
-run server
+run app
 ```
 
 ```bash
@@ -67,7 +69,7 @@ class Echo
   end
 end
 
-server.register(Echo.new(client))
+app.dispatch(Echo.new(client))
 ```
 
 Dispatch is fault-tolerant -- one handler raising won't take down the rest.
