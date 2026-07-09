@@ -2,13 +2,29 @@
 # frozen_string_literal: true
 
 require_relative "../lib/async/matrix/version"
+require "fileutils"
+require "open3"
 
 local_version = Async::Matrix::VERSION
 gem_name = "async-matrix"
 gemspec = "async-matrix.gemspec"
+workflow = "cross-compile.yml"
+pkg_dir = "pkg"
+
+# Releasing means publishing TWO kinds of gem for this version:
+#
+#   1. The source gem (async-matrix-X.Y.Z.gem) — compiles the Rust extension at
+#      install time; a fallback for platforms we don't precompile.
+#   2. The precompiled platform gems (async-matrix-X.Y.Z-<platform>.gem) — built
+#      in CI by .github/workflows/cross-compile.yml with the .so already inside,
+#      so `gem install async-matrix` needs no Rust on those platforms.
+#
+# This script builds (1) locally, downloads (2) from the latest successful CI
+# run, and pushes all of them to RubyGems.
 
 puts "Local version: #{local_version}"
 
+# --- 1. Guard: local version must be ahead of what's already published. -------
 remote_output = `gem specification #{gem_name} version --remote 2>&1`
 
 if $?.success?
@@ -22,11 +38,58 @@ else
   puts "Gem not yet published remotely, proceeding with first release"
 end
 
-puts "Building #{gemspec}..."
+abort "ERROR: the GitHub CLI (gh) is required to fetch precompiled gems: https://cli.github.com" \
+  unless system("gh --version > /dev/null 2>&1")
+
+# --- 2. Build the source gem. -------------------------------------------------
+puts "\nBuilding source gem from #{gemspec}..."
 system("gem build #{gemspec}") || abort("ERROR: gem build failed")
+source_gem = "#{gem_name}-#{local_version}.gem"
 
-gem_file = "#{gem_name}-#{local_version}.gem"
-puts "Pushing #{gem_file}..."
-system("gem push #{gem_file}") || abort("ERROR: gem push failed")
+# --- 3. Download the precompiled platform gems from the latest green CI run. ---
+FileUtils.rm_rf(pkg_dir)
+FileUtils.mkdir_p(pkg_dir)
 
-puts "Released #{gem_name} #{local_version}"
+puts "\nLocating latest successful #{workflow} run..."
+run_id = `gh run list --workflow=#{workflow} --status success --limit 1 --json databaseId --jq '.[0].databaseId'`.strip
+abort "ERROR: no successful #{workflow} run found. Push to main and let CI build the platform gems first." if run_id.empty?
+
+puts "Downloading precompiled gems from run #{run_id}..."
+system("gh", "run", "download", run_id, "--dir", pkg_dir, "--pattern", "cross-gem-*") ||
+  abort("ERROR: failed to download artifacts from run #{run_id}")
+
+platform_gems = Dir["#{pkg_dir}/**/#{gem_name}-#{local_version}-*.gem"].sort
+
+if platform_gems.empty?
+  built = Dir["#{pkg_dir}/**/*.gem"].map { |f| File.basename(f) }
+  if built.empty?
+    abort "ERROR: run #{run_id} produced no gems."
+  else
+    abort "ERROR: the latest CI run built #{built.join(', ')}, not version #{local_version}.\n" \
+          "Push #{local_version} to main, wait for cross-compile to finish, then re-run."
+  end
+end
+
+puts "Precompiled platform gems for #{local_version}:"
+platform_gems.each { |g| puts "  #{File.basename(g)}" }
+
+# --- 4. Push the source gem + every precompiled platform gem. -----------------
+# Tolerate gems already on RubyGems so the release is resumable if it dies
+# partway through.
+all_gems = [source_gem] + platform_gems
+all_gems.each do |gem_file|
+  puts "\nPushing #{File.basename(gem_file)}..."
+  out, status = Open3.capture2e("gem", "push", gem_file)
+  print out
+  next if status.success?
+
+  if out.include?("has already been pushed")
+    puts "  (already published — skipping)"
+    next
+  end
+
+  abort "ERROR: gem push failed for #{gem_file}"
+end
+
+puts "\nReleased #{gem_name} #{local_version} " \
+     "(1 source + #{platform_gems.size} precompiled platform gems)"
