@@ -38,6 +38,11 @@ sqlite
 # Rust / native extension build artifacts (compiled at install time)
 *.so
 /tmp/
+# Workspace build dir lives at the repo root now (see /Cargo.toml).
+/target/
 /ext/**/target/
+# The resolved lockfile is committed at the workspace root (/Cargo.lock) for
+# reproducible cross-compiled gems; only stray per-crate locks are ignored.
 ext/**/Cargo.lock
+/pkg/
 .example-test-bundle

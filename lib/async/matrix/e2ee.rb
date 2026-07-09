@@ -24,8 +24,16 @@ module Async
   end
 end
 
-# rake-compiler installs the shared object alongside this file.
-require_relative "async_matrix_e2ee"
+# Precompiled ("fat") gems ship one .so per Ruby minor version under a versioned
+# subdir (lib/async/matrix/3.3/async_matrix_e2ee.so). A locally source-compiled
+# build lands flat, alongside this file. Try the versioned path first, then fall
+# back to the flat one.
+begin
+  RUBY_VERSION =~ /(\d+\.\d+)/
+  require_relative "#{Regexp.last_match(1)}/async_matrix_e2ee"
+rescue LoadError
+  require_relative "async_matrix_e2ee"
+end
 
 __END__
   describe "Async::Matrix::E2EE" do

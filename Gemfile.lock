@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    async-matrix (2.0.0)
+    async-matrix (2.0.1)
       async (~> 2.39)
       async-http (~> 0.95)
       async-websocket (~> 0.30)

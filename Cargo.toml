@@ -1,0 +1,7 @@
+# Workspace root. rb_sys / rake-compiler (and rb-sys-dock during
+# cross-compilation) run `cargo metadata` from the repository root, so the native
+# extension crate under ext/ must be declared here as a workspace member. The
+# resolved Cargo.lock also lives at the root for reproducible cross builds.
+[workspace]
+members = ["ext/async_matrix_e2ee"]
+resolver = "2"

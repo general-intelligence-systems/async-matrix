@@ -20,7 +20,7 @@ Gem::Specification.new do |spec|
 	spec.metadata["source_code_uri"] = spec.homepage
 	spec.metadata["documentation_uri"] = "https://general-intelligence-systems.github.io/async-matrix/"
 
-	spec.files = Dir["lib/**/*.rb", "lib/**/*.json", "data/**/*.yaml", "data/**/*.json", "ext/**/*.{rs,rb,toml}", "LICENSE", "README.md"]
+	spec.files = Dir["lib/**/*.rb", "lib/**/*.json", "data/**/*.yaml", "data/**/*.json", "ext/**/*.{rs,rb,toml}", "Cargo.toml", "Cargo.lock", "LICENSE", "README.md"]
 	spec.require_paths = ["lib"]
 	spec.extensions = ["ext/async_matrix_e2ee/extconf.rb"]
 
