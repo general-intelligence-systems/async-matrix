@@ -44,6 +44,12 @@ jobs:
       fail-fast: false
       matrix:
         platform: ${{ fromJSON(needs.ci-data.outputs.result).supported-ruby-platforms }}
+        # x64-mingw32 is the legacy Windows toolchain used only by Ruby <= 3.0.
+        # We require Ruby >= 3.3, which uses x64-mingw-ucrt (built above), so
+        # rake-compiler never registers a native:x64-mingw32 task and the job
+        # would always fail. Drop it.
+        exclude:
+          - platform: x64-mingw32
     steps:
       - uses: actions/checkout@v4
 

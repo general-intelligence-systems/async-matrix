@@ -4,6 +4,26 @@ All notable changes to **async-matrix** are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 2026-07-09
+
+Packaging release: `gem install async-matrix` no longer requires a Rust
+toolchain.
+
+### Changed
+
+- **Precompiled native gems.** The Rust/vodozemac E2EE extension is now
+  cross-compiled into per-platform ("fat") gems via the rb-sys/oxidize-rb
+  toolchain, so RubyGems serves users a prebuilt `.so` matching their platform
+  instead of compiling from source at install time. Source compilation remains
+  as a fallback for unsupported platforms.
+- Switched the `Rakefile` from `Rake::ExtensionTask` to `RbSys::ExtensionTask`
+  and added a workspace-root `Cargo.toml`/`Cargo.lock` (the lockfile moved out
+  of `ext/`), which the cross-compilation toolchain resolves from.
+- `e2ee.rb` now loads the compiled object from the per-Ruby-version subdirectory
+  used by fat gems, falling back to the flat path for local source builds.
+- Added a CI workflow that cross-compiles the platform gems on push to `main`
+  and uploads them as build artifacts (publishing remains a manual step).
+
 ## [2.0.0] - 2026-07-09
 
 Major release. The Application Service server has been rebuilt on
