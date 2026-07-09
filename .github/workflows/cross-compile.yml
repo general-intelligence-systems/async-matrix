@@ -1,0 +1,64 @@
+name: Cross Compile
+
+# Cross-compiles the Rust/vodozemac extension into precompiled, per-platform
+# native gems and uploads them as build artifacts. This does NOT publish to
+# RubyGems — releasing is a manual step you perform with the built gems.
+#
+# When users install a published precompiled gem, RubyGems serves the one
+# matching their platform (the .so is already inside), so they need no Rust.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ext/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'async-matrix.gemspec'
+      - 'Rakefile'
+      - '.github/workflows/cross-compile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci-data:
+    name: Fetch CI data
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.fetch.outputs.result }}
+    steps:
+      - uses: oxidize-rb/actions/fetch-ci-data@v1
+        id: fetch
+        with:
+          supported-ruby-platforms: true
+          stable-ruby-versions: |
+            exclude: [head]
+
+  cross-gem:
+    name: Compile native gem for ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    needs: ci-data
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.ci-data.outputs.result).supported-ruby-platforms }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+
+      - uses: oxidize-rb/actions/cross-gem@v1
+        id: cross-gem
+        with:
+          platform: ${{ matrix.platform }}
+          ruby-versions: ${{ join(fromJSON(needs.ci-data.outputs.result).stable-ruby-versions, ',') }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cross-gem-${{ matrix.platform }}
+          path: ${{ steps.cross-gem.outputs.gem-path }}
+          if-no-files-found: error
