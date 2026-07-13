@@ -1,0 +1,9 @@
+# Git hooks (managed by lefthook). Install with `bundle exec lefthook install`.
+#
+# Run the full test suite before every commit; a failing test blocks the
+# commit. Wrapped in `nix develop --command` because the hook fires outside the
+# flake devshell, so bundler/scampi wouldn't otherwise be on PATH.
+pre-commit:
+  commands:
+    tests:
+      run: nix develop --command bin/test

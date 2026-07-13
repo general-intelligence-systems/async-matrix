@@ -39,4 +39,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "logger"
   spec.add_development_dependency "sqlite3"
   spec.add_development_dependency "rake-compiler", "~> 1.2"
+  spec.add_development_dependency "lefthook", "~> 2.1"
 end
