@@ -17,6 +17,7 @@
           ];
 
           buildInputs = with pkgs; [
+            pkgs.trufflehog
             ruby
             nodejs
             libyaml
