@@ -167,7 +167,7 @@ GEM
     sequel (5.103.0)
       bigdecimal
     simpleidn (0.2.3)
-    sqlite3 (2.9.3-x86_64-linux-gnu)
+    sqlite3 (2.9.5-x86_64-linux-gnu)
     string-format (0.2.0)
     string_builder (1.2.4)
     traces (0.18.2)
