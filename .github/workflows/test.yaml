@@ -24,11 +24,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ruby/setup-ruby@v1
+      # Ruby AND Rust: the suite cannot run without the compiled extension, so a
+      # ruby-only setup leaves the whole run dead on arrival. Same oxidize-rb
+      # toolchain family the cross-compile workflow uses; it caches cargo by
+      # default, which keeps the vodozemac build off the critical path.
+      - uses: oxidize-rb/actions/setup-ruby-and-rust@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
 
+      # scampi discovers co-located `__END__` specs with ripgrep.
       - run: sudo apt-get install -y ripgrep
+
+      # Build the native extension into lib/ BEFORE the suite runs. Without this
+      # e2ee.rb's `require_relative "async_matrix_e2ee"` raises LoadError at load
+      # time and takes down the entire run — not just the E2EE specs — which is
+      # how this workflow came to be reporting failure regardless of the code.
+      - run: bundle exec rake compile
 
       - run: bundle exec scampi
