@@ -56,6 +56,43 @@ __END__
       inbound.session_id.should == group.session_id
     end
 
+    it "imports an exported session key" do
+      # The path room keys take out of server-side key backup and out of
+      # m.forwarded_room_key. Without .import these are unusable, and a client
+      # can never read history it did not get a live m.room_key for.
+      group   = Async::Matrix::E2EE::GroupSession.new
+      inbound = Async::Matrix::E2EE::InboundGroupSession.new(group.session_key)
+      message = group.encrypt("restored from backup")
+
+      exported = inbound.export_at_first_known_index
+      restored = Async::Matrix::E2EE::InboundGroupSession.import(exported)
+
+      restored.session_id.should == group.session_id
+      restored.decrypt(message).first.should == "restored from backup"
+    end
+
+    it "rejects an exported key passed to .new, which requires a signature" do
+      # .new takes a version-2 SessionKey and verifies its signature; an exported
+      # key is version 1 and unsigned, so it must go through .import instead.
+      group    = Async::Matrix::E2EE::GroupSession.new
+      inbound  = Async::Matrix::E2EE::InboundGroupSession.new(group.session_key)
+      exported = inbound.export_at_first_known_index
+
+      lambda {
+        Async::Matrix::E2EE::InboundGroupSession.new(exported)
+      }.should.raise(RuntimeError)
+    end
+
+    it "exports at a given message index" do
+      group   = Async::Matrix::E2EE::GroupSession.new
+      inbound = Async::Matrix::E2EE::InboundGroupSession.new(group.session_key)
+      3.times { |i| group.encrypt("msg #{i}") }
+
+      Async::Matrix::E2EE::InboundGroupSession
+        .import(inbound.export_at(0))
+        .first_known_index.should == 0
+    end
+
     it "round-trips an olm 1:1 message" do
       alice = Async::Matrix::E2EE::Account.new
       bob   = Async::Matrix::E2EE::Account.new

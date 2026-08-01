@@ -4,6 +4,30 @@ All notable changes to **async-matrix** are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-08-01
+
+Megolm room keys can now be imported from key backup and from forwarded
+sessions, and exported for the same.
+
+### Added
+
+- `InboundGroupSession.import(exported_key)` — build a session from a base64
+  **exported** session key. Server-side key backup
+  (`m.megolm_backup.v1.curve25519-aes-sha2`) and `m.forwarded_room_key` both
+  carry an `ExportedSessionKey`, which is version 1 and carries no signature,
+  while `InboundGroupSession.new` requires a signed version-2 `SessionKey` and
+  rejects them outright. Without `import`, a client can never read history it
+  did not receive a live `m.room_key` for.
+- `InboundGroupSession#export_at(index)` and
+  `InboundGroupSession#export_at_first_known_index` — export a session in that
+  same format, for uploading to key backup or forwarding to another device.
+  `export_at` returns `nil` once the ratchet has advanced past `index`; megolm
+  ratchets forward only, so earlier indices are unrecoverable by design.
+
+Sessions built with `import` are not signature-verified, because an exported
+key has no signature to verify. That is inherent to the format — the spec
+likewise treats backup-restored keys as unverified.
+
 ## [2.0.1] - 2026-07-09
 
 Packaging release: `gem install async-matrix` no longer requires a Rust

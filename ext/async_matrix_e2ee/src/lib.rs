@@ -20,8 +20,9 @@ use vodozemac::olm::{
     SessionConfig as OlmSessionConfig, SessionPickle,
 };
 use vodozemac::megolm::{
-    GroupSession as MegolmGroupSession, GroupSessionPickle, InboundGroupSession as MegolmInbound,
-    InboundGroupSessionPickle, MegolmMessage, SessionConfig as MegolmSessionConfig, SessionKey,
+    ExportedSessionKey, GroupSession as MegolmGroupSession, GroupSessionPickle,
+    InboundGroupSession as MegolmInbound, InboundGroupSessionPickle, MegolmMessage,
+    SessionConfig as MegolmSessionConfig, SessionKey,
 };
 
 // --- helpers ---------------------------------------------------------------
@@ -236,12 +237,46 @@ impl InboundGroupSession {
         ))))
     }
 
+    /// Build from a base64 **exported** session key.
+    ///
+    /// This is the format room keys travel in outside of `m.room_key`: server-side
+    /// key backup (`m.megolm_backup.v1.curve25519-aes-sha2`) and
+    /// `m.forwarded_room_key` both carry an `ExportedSessionKey`, which is
+    /// version 1 and carries no signature — so `new` (which requires a signed
+    /// version 2 `SessionKey`) cannot accept them. Without this, a client can
+    /// never read history it did not receive a live `m.room_key` for.
+    ///
+    /// The resulting session is NOT signature-verified, because an exported key
+    /// has no signature to verify. That is inherent to the format: the sender
+    /// identity of such a session is only as trustworthy as whoever handed it
+    /// over, which is why the spec treats backup-restored keys as unverified.
+    fn import(exported_key: String) -> Result<Self, Error> {
+        let key = ExportedSessionKey::from_base64(&exported_key).map_err(rt_err)?;
+        Ok(InboundGroupSession(RefCell::new(MegolmInbound::import(
+            &key,
+            MegolmSessionConfig::version_1(),
+        ))))
+    }
+
     fn session_id(&self) -> String {
         self.0.borrow().session_id()
     }
 
     fn first_known_index(&self) -> u32 {
         self.0.borrow().first_known_index()
+    }
+
+    /// Export this session at `index`, base64, for uploading to key backup or
+    /// forwarding to another device. Returns nil when the ratchet has already
+    /// moved past `index` and can no longer produce a key for it — megolm
+    /// ratchets forward only, so an earlier index is unrecoverable by design.
+    fn export_at(&self, index: u32) -> Option<String> {
+        self.0.borrow_mut().export_at(index).map(|key| key.to_base64())
+    }
+
+    /// Export at the earliest index this session can still reach.
+    fn export_at_first_known_index(&self) -> String {
+        self.0.borrow().export_at_first_known_index().to_base64()
     }
 
     /// Decrypts a base64 megolm message; returns `[plaintext, message_index]`.
@@ -316,11 +351,17 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
 
     let inbound = namespace.define_class("InboundGroupSession", ruby.class_object())?;
     inbound.define_singleton_method("new", function!(InboundGroupSession::new, 1))?;
+    inbound.define_singleton_method("import", function!(InboundGroupSession::import, 1))?;
     inbound.define_singleton_method("from_pickle", function!(InboundGroupSession::from_pickle, 2))?;
     inbound.define_method("session_id", method!(InboundGroupSession::session_id, 0))?;
     inbound.define_method("first_known_index", method!(InboundGroupSession::first_known_index, 0))?;
     inbound.define_method("decrypt", method!(InboundGroupSession::decrypt, 1))?;
     inbound.define_method("pickle", method!(InboundGroupSession::pickle, 1))?;
+    inbound.define_method("export_at", method!(InboundGroupSession::export_at, 1))?;
+    inbound.define_method(
+        "export_at_first_known_index",
+        method!(InboundGroupSession::export_at_first_known_index, 0),
+    )?;
 
     namespace.define_module_function("verify_signature", function!(verify_signature, 3))?;
 
