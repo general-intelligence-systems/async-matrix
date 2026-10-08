@@ -38,9 +38,8 @@ else
   puts "Gem not yet published remotely, proceeding with first release"
 end
 
-unless system("gh --version > /dev/null 2>&1")
-  abort "ERROR: the GitHub CLI (gh) is required to fetch precompiled gems: https://cli.github.com"
-end
+abort "ERROR: the GitHub CLI (gh) is required to fetch precompiled gems: https://cli.github.com" \
+  unless system("gh --version > /dev/null 2>&1")
 
 # --- 2. Build the source gem. -------------------------------------------------
 puts "\nBuilding source gem from #{gemspec}..."
@@ -53,21 +52,10 @@ FileUtils.mkdir_p(pkg_dir)
 
 puts "\nLocating latest successful #{workflow} run..."
 run_id = `gh run list --workflow=#{workflow} --status success --limit 1 --json databaseId --jq '.[0].databaseId'`.strip
-if run_id.empty?
-  abort "ERROR: no successful #{workflow} run found. Push to main and let CI build the platform gems first."
-end
+abort "ERROR: no successful #{workflow} run found. Push to main and let CI build the platform gems first." if run_id.empty?
 
 puts "Downloading precompiled gems from run #{run_id}..."
-system(
-  "gh",
-  "run",
-  "download",
-  run_id,
-  "--dir",
-  pkg_dir,
-  "--pattern",
-  "cross-gem-*",
-) ||
+system("gh", "run", "download", run_id, "--dir", pkg_dir, "--pattern", "cross-gem-*") ||
   abort("ERROR: failed to download artifacts from run #{run_id}")
 
 platform_gems = Dir["#{pkg_dir}/**/#{gem_name}-#{local_version}-*.gem"].sort
@@ -93,9 +81,7 @@ all_gems.each do |gem_file|
   puts "\nPushing #{File.basename(gem_file)}..."
   out, status = Open3.capture2e("gem", "push", gem_file)
   print out
-  if status.success?
-    next
-  end
+  next if status.success?
 
   if out.include?("has already been pushed")
     puts "  (already published — skipping)"
@@ -107,3 +93,9 @@ end
 
 puts "\nReleased #{gem_name} #{local_version} " \
      "(1 source + #{platform_gems.size} precompiled platform gems)"
+
+# --- 5. Tag. ------------------------------------------------------------------
+tag = "v#{local_version}"
+
+system("git", "tag", "-a", tag, "-m", "Release #{local_version}")
+system("git", "push", "origin", tag)
