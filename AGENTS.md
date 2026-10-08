@@ -93,9 +93,27 @@ bundle exec bake gem:build
 ### Release
 
 ```bash
-bin/release-gem        # compares local vs remote version, builds & pushes
-bin/increment-version  # bumps major/minor/patch via ERB template
+gem kit bump [major|minor|patch]  # version.rb via the .erb, then relock
+gem kit changelog --write         # draft this version's entry
+bin/release-gem                   # build + push, source gem AND platform gems
 ```
+
+`gem kit bump` supersedes the old `bin/increment-version` — same ERB render,
+plus it blocks a bump onto a due deprecation deadline and relocks with
+`BUNDLE_FROZEN=false` (bare `bundle install` inherits the devshell's frozen
+store Gemfile and fails).
+
+`bin/release-gem` is **not** superseded by `gem kit release`, which does one
+`gem build` + one `gem push` and has no notion of per-platform gems. This gem
+has a native extension, so publishing only the source gem would put a Rust
+toolchain back in every user's install path — the regression 2.0.1 was cut to
+fix. `bin/release-gem` builds the source gem locally and downloads the
+precompiled platform gems from the latest green `cross-compile.yml` run, so
+**push to main and let that workflow finish before releasing**.
+
+The tradeoff: `bin/release-gem` skips the `gem kit release` gates (changelog
+entry, deprecation deadlines, clean working tree). Run `gem kit release
+--dry-run` first to get them.
 
 ### Fetch upstream Matrix schemas
 

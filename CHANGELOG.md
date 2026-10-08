@@ -13,23 +13,6 @@ The Application Service layer has moved out of this gem into
 async-matrix is now the Matrix *protocol* layer only: the Client-Server API
 client, events and schema validation, media, and end-to-end encryption.
 
-### Removed
-
-- **`Async::Matrix::ApplicationService::*`** — `Server`, `Bot`, `Dispatcher`,
-  `TransactionHandler`, `Transaction`, `TransactionStore`, and the bridgev2
-  `Config` schema suite now live in async-matrix-bridge as
-  `Async::Matrix::Bridge::ApplicationService::*`. Add that gem and
-  `require "async/matrix/bridge"`; the class names are otherwise unchanged.
-- **`Async::Matrix::Bridge::Discord` and `Async::Discord`** — the Discord
-  bridge database layer and the Discord API/gateway client are gone, with no
-  replacement. This drops the `sequel`, `async-websocket` and `sqlite3`
-  dependencies.
-- **`grape`** is no longer a dependency; it belongs to the application service,
-  and so now to async-matrix-bridge. `falcon` is likewise no longer a
-  development dependency.
-- `bin/fetch-discord-api-spec`, and `examples/` (which are all application
-  services — they moved to async-matrix-bridge too).
-
 ### Added
 
 - **`Async::Matrix::Config`** — the config loading and `Vivify` dot-notation
@@ -56,6 +39,29 @@ client, events and schema validation, media, and end-to-end encryption.
 - The documentation site is now built with
   [just-the-docs](https://just-the-docs.com/) instead of utopia-project, at the
   same `documentation_uri`.
+
+### Removed
+
+- **`Async::Matrix::ApplicationService::*`** — `Server`, `Bot`, `Dispatcher`,
+  `TransactionHandler`, `Transaction`, `TransactionStore`, and the bridgev2
+  `Config` schema suite now live in async-matrix-bridge as
+  `Async::Matrix::Bridge::ApplicationService::*`. Add that gem and
+  `require "async/matrix/bridge"`; the class names are otherwise unchanged.
+- **`Async::Matrix::Bridge::Discord` and `Async::Discord`** — the Discord
+  bridge database layer and the Discord API/gateway client are gone, with no
+  replacement. This drops the `sequel`, `async-websocket` and `sqlite3`
+  dependencies.
+- **`grape`** is no longer a dependency; it belongs to the application service,
+  and so now to async-matrix-bridge. `falcon` is likewise no longer a
+  development dependency.
+- **`Config.schema` and `Config::SCHEMA_DIR`**, with the bundled bridgev2 JSON
+  Schema files. `Config.validate!` is now a no-op, so `Config.new` no longer
+  raises `BadJsonError` for a config that fails the schema, and no longer
+  inserts the schema's property defaults into the data. Subclass `Config` and
+  override `.validate!` — or use async-matrix-bridge's `Config` — if you want
+  either back.
+- `bin/fetch-discord-api-spec`, and `examples/` (which are all application
+  services — they moved to async-matrix-bridge too).
 
 ### Fixed
 
