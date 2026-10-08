@@ -73,9 +73,9 @@ module Async
 
 				# Parse a raw event hash into a schema-aware Event.
 				# @param event_hash [Hash] the raw event data (string keys)
-				# @return [ApplicationService::Event]
+				# @return [Event]
 				def parse(event_hash)
-					ApplicationService::Event.new(event_hash)
+					Event.new(event_hash)
 				end
 
 				# Total schemas loaded (base + variants).
@@ -161,7 +161,7 @@ __END__
 				"origin_server_ts" => 1234567890,
 				"room_id" => "!room:example.org"
 			})
-			event.should.be.kind_of Async::Matrix::ApplicationService::Event
+			event.should.be.kind_of Async::Matrix::Event
 			event.type.should == "m.room.message"
 			event.content.body.should == "hello"
 			event.valid?.should == true

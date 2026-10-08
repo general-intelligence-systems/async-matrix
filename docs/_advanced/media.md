@@ -32,7 +32,7 @@ The Matrix media endpoints moved across spec versions. When you build a media pa
 
 ## Config
 
-Two config sections govern media behavior at the bridge level (see [Configuration]({% link _advanced/configuration.md %})):
+Two config sections govern media behavior at the bridge level (see [Configuration](https://general-intelligence-systems.github.io/async-matrix-bridge/configuration/)):
 
 - **`direct_media`** — serve media straight from the remote network rather than reuploading to your homeserver.
 - **`public_media`** — expose media over a public, unauthenticated URL.

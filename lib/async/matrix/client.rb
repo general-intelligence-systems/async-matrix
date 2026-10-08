@@ -205,7 +205,7 @@ module Async
           end
 
           payload = read_limited(response, @error_response_size_limit)
-          parsed = ApplicationService::ErrorResponse.new(
+          parsed = ErrorResponse.new(
             begin; JSON.parse(payload); rescue; {} end
           )
           Console.error(self) { "Matrix API #{status}: #{parsed.errcode} — #{parsed.error}" }
@@ -324,7 +324,7 @@ end
 __END__
   describe "Async::Matrix::Client" do
     def make_config
-      Async::Matrix::ApplicationService::Config.new({
+      Async::Matrix::Config.new({
         "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
         "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
       })
@@ -465,7 +465,7 @@ __END__
 
   describe "Client retry logic" do
     def make_config
-      Async::Matrix::ApplicationService::Config.new({
+      Async::Matrix::Config.new({
         "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
         "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
       })
@@ -689,7 +689,7 @@ __END__
 
   describe "Client ignore_rate_limit" do
     def make_config
-      Async::Matrix::ApplicationService::Config.new({
+      Async::Matrix::Config.new({
         "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
         "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
       })
@@ -757,7 +757,7 @@ __END__
 
   describe "Client per-request max_retries" do
     def make_config
-      Async::Matrix::ApplicationService::Config.new({
+      Async::Matrix::Config.new({
         "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
         "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
       })
@@ -848,7 +848,7 @@ __END__
 
   describe "Client response size limiting" do
     def make_config
-      Async::Matrix::ApplicationService::Config.new({
+      Async::Matrix::Config.new({
         "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
         "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
       })

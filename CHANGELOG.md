@@ -4,6 +4,52 @@ All notable changes to **async-matrix** are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+The Application Service layer has moved out of this gem into
+[async-matrix-bridge](https://github.com/general-intelligence-systems/async-matrix-bridge).
+async-matrix is now the Matrix *protocol* layer only: the Client-Server API
+client, events and schema validation, media, and end-to-end encryption.
+
+This removes a public namespace, so it wants a major version bump when
+released.
+
+### Removed
+
+- **`Async::Matrix::ApplicationService::*`** — `Server`, `Bot`, `Dispatcher`,
+  `TransactionHandler`, `Transaction`, `TransactionStore`, and the bridgev2
+  `Config` schema suite now live in async-matrix-bridge as
+  `Async::Matrix::Bridge::ApplicationService::*`. Add that gem and
+  `require "async/matrix/bridge"`; the class names are otherwise unchanged.
+- **`Async::Matrix::Bridge::Discord` and `Async::Discord`** — the Discord
+  bridge database layer and the Discord API/gateway client are gone, with no
+  replacement. This drops the `sequel`, `async-websocket` and `sqlite3`
+  dependencies.
+- **`grape`** is no longer a dependency; it belongs to the application service,
+  and so now to async-matrix-bridge.
+- `bin/fetch-discord-api-spec`, and `examples/` (which are all application
+  services — they moved to async-matrix-bridge too).
+
+### Added
+
+- **`Async::Matrix::Config`** — the config loading and `Vivify` dot-notation
+  access that used to sit on `ApplicationService::Config`, minus the schema.
+  It validates nothing; `.validate!` is a no-op class-method hook a subclass
+  overrides to raise, which is the seam async-matrix-bridge uses to layer the
+  bridgev2 JSON Schema suite back on. `Client` only ever read
+  `homeserver.address` and `appservice.as_token`, so nothing in this gem needs
+  the schema.
+
+### Changed
+
+- **`ApplicationService::Event` is now `Async::Matrix::Event`**, and
+  `ApplicationService::Content` is `Async::Matrix::Content`. Neither was
+  application-service-specific — `Schema.parse` returns one — and both are now
+  in the namespace they describe, one constant per file.
+- **`ApplicationService::ErrorResponse` is now `Async::Matrix::ErrorResponse`**,
+  for the same reason: `Client` and `MediaClient` parse every failed response
+  into one.
+
 ## [2.1.0] - 2026-08-01
 
 Megolm room keys can now be imported from key backup and from forwarded

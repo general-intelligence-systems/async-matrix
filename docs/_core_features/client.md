@@ -7,7 +7,7 @@ description: The fiber-safe HTTP client — convenience methods, the schema-vali
 
 # Client
 
-`Async::Matrix::Client` is how your service talks *back* to the homeserver. It wraps `Async::HTTP::Internet` — fiber-safe, with automatic connection pooling — and authenticates every request with the `as_token` from your [config]({% link _advanced/configuration.md %}).
+`Async::Matrix::Client` is how your service talks *back* to the homeserver. It wraps `Async::HTTP::Internet` — fiber-safe, with automatic connection pooling — and authenticates every request with the `as_token` from your [config]({% link _getting_started/getting-started.md %}#configuration).
 
 ```ruby
 client = Async::Matrix::Client.new(config)

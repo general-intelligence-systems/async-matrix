@@ -7,7 +7,7 @@ description: The Event wrapper and schema-driven validation against the official
 
 # Events & Schemas
 
-Every event delivered to a handler is an `ApplicationService::Event` wrapping the raw Matrix JSON. It gives you typed accessors and, when you want it, validation against the official Matrix event schemas.
+Every event — from a /sync response, an application service transaction, or a hash you built yourself — is an `Async::Matrix::Event` wrapping the raw Matrix JSON. It gives you typed accessors and, when you want it, validation against the official Matrix event schemas.
 
 ## The Event object
 

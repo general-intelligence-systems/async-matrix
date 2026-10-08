@@ -32,8 +32,6 @@ result
 *~
 /refs
 *.gem
-sqlite
-*.db
 
 # Rust / native extension build artifacts (compiled at install time)
 *.so
@@ -45,4 +43,3 @@ sqlite
 # reproducible cross-compiled gems; only stray per-crate locks are ignored.
 ext/**/Cargo.lock
 /pkg/
-.example-test-bundle

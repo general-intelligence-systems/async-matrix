@@ -54,7 +54,7 @@ module Async
 
         unless (200..299).cover?(status)
           payload = read_limited(response, ERROR_RESPONSE_SIZE_LIMIT)
-          parsed = ApplicationService::ErrorResponse.new(
+          parsed = ErrorResponse.new(
             begin; JSON.parse(payload); rescue; {} end
           )
           Console.error(self) { "Matrix media upload #{status}: #{parsed.errcode} — #{parsed.error}" }
@@ -92,7 +92,7 @@ module Async
 
         unless (200..299).cover?(status)
           payload = response.read
-          parsed = ApplicationService::ErrorResponse.new(
+          parsed = ErrorResponse.new(
             begin; JSON.parse(payload); rescue; {} end
           )
           Console.error(self) { "Matrix media download #{status}: #{parsed.errcode} — #{parsed.error}" }
@@ -151,7 +151,7 @@ end
 __END__
   describe "Async::Matrix::MediaClient" do
     def make_config
-      Async::Matrix::ApplicationService::Config.new({
+      Async::Matrix::Config.new({
         "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
         "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
       })

@@ -56,7 +56,9 @@ Layout/EmptyLinesAroundAccessModifier:
 
 ## Project Overview
 
-**async-matrix** is an async-native Matrix Application Service SDK for Ruby (gem: `async-matrix`, version 1.0.0). Built entirely on the Socketry ecosystem (`async`, `async-http`, Falcon) using fibers. Licensed Apache 2.0, authored by Nathan Kidd at General Intelligence Systems.
+**async-matrix** is an async-native Matrix *protocol* library for Ruby (gem: `async-matrix`, version 2.1.0). Built entirely on the Socketry ecosystem (`async`, `async-http`, Falcon) using fibers. Licensed Apache 2.0, authored by Nathan Kidd at General Intelligence Systems.
+
+Scope is the protocol layer: the Client-Server API client, schema-validated events, media, and end-to-end encryption. The Application Service *server* side — receiving homeserver transactions, dispatching events to handlers, the Bot DSL, the bridgev2 config schema suite — lives in the sibling gem **async-matrix-bridge** (`Async::Matrix::Bridge::ApplicationService::*`) at `../async-matrix-bridge`. Do not add app-service or bridge code here; it belongs there.
 
 Requires Ruby >= 3.3. Uses Nix flake for dev environment (`.envrc` + `flake.nix`).
 
@@ -76,7 +78,11 @@ Run the whole suite with `bin/test` (`CONSOLE_LEVEL=fatal bundle exec scampi`). 
 
 ### Lint
 
-No `.rubocop.yml` exists yet. One needs to be created per the Ruby repos section above, along with `bin/rubocop`.
+```bash
+bin/rubocop
+```
+
+`.rubocop.yml` runs with `DisabledByDefault` and enables a hand-picked set, plus eight local cops in `cops/`. `Local/ConstantMatchesPath` is the one to know: every file under `lib/` must define the constant its path spells, Zeitwerk-style, so `lib/async/matrix/config/vivify.rb` defines `Async::Matrix::Config::Vivify` and nothing else at top level.
 
 ### Build gem
 
@@ -98,45 +104,31 @@ bin/fetch-matrix-schemas      # event type schemas -> data/
 bin/fetch-matrix-api-schemas  # Client-Server OpenAPI specs -> data/
 ```
 
-### Serve locally
-
-```bash
-falcon serve --bind http://0.0.0.0:9292
-```
-
-Requires a `config.ru` (see `examples/echo_bot/` for a working template).
-
 ## Architecture
 
 ### Entry point and module loading
 
-`lib/async/matrix.rb` defines the `Async::Matrix` module and auto-requires **every `.rb` file** under `lib/async/matrix/` via `Dir.glob` (skipping `migrations/` and `bridge/`). All source lives under the `Async::Matrix` namespace. Source files do **not** self-`require "async/matrix"`; they rely on the glob loader for ordering, plus targeted `require_relative` for the few load-time cross-file dependencies (e.g. `double_puppet_client.rb` → `client`, `schema/validation_error.rb` → `error`).
-
-The **Discord bridge** (`lib/async/matrix/bridge/discord/`) is excluded from the eager glob because it pulls in Sequel and opens a placeholder database at load time. Load it explicitly with `require "async/matrix/bridge/discord/db"` when you need it; plain `require "async/matrix"` stays free of Sequel.
+`lib/async/matrix.rb` defines the `Async::Matrix` module and auto-requires **every `.rb` file** under `lib/async/matrix/` via `Dir.glob`. All source lives under the `Async::Matrix` namespace. Source files do **not** self-`require "async/matrix"`; they rely on the glob loader for ordering, plus targeted `require_relative` for the few load-time cross-file dependencies (e.g. `double_puppet_client.rb` → `client`, `config.rb` → `config/vivify`, `schema/validation_error.rb` → `error`).
 
 ### Inline co-located tests (scampi)
 
 Every source file ends with an `__END__` section containing its own unit tests. The test DSL uses `describe`/`it` blocks with `value.should == expected` assertions and `lambda { ... }.should.raise(ErrorClass)` for exceptions. Scampi evaluates each `__END__` tail in `TOPLEVEL_BINDING`, so infrastructure stubs (`FakeBody`, `FakeResponse`, `FakeInternet`) defined in `lib/async/matrix/client.rb`'s `__END__` section are visible to every other file's specs.
 
-### Application Service protocol (Rack 3 app)
+**Known wart:** scampi only `require`s the files it discovers (those with an `__END__` tail), and `version.rb` has no specs — so `Async::Matrix::VERSION` is undefined under `bin/test` and every spec that constructs a `Client` errors with `NameError`. The suite reports ~60 errors for this reason alone, independent of the code under test.
 
-`ApplicationService::Server` is a Rack 3 `#call(env)` app implementing four Matrix AS API routes:
+### Client HTTP layer
 
-- `PUT /_matrix/app/v1/transactions/{txnId}` — receive events (authenticated, idempotent)
-- `GET /_matrix/app/v1/users/{userId}` — user existence (returns 200)
-- `GET /_matrix/app/v1/rooms/{roomAlias}` — room alias (returns 404)
-- `POST /_matrix/app/v1/ping` — healthcheck (no auth)
+`Client` wraps `Async::HTTP::Internet` (fiber-safe connection pooling) with:
 
-**Event flow:** Homeserver PUT -> Server authenticates (constant-time compare on hs_token) -> TransactionStore deduplicates (in-memory LRU, prunes oldest half at capacity 1024) -> Transaction wraps body -> Dispatcher iterates events -> matching Handlers called. Errors in one handler do not prevent others from running.
+- Bearer token auth (`as_token` from config)
+- Exponential backoff with full jitter for 502/503/504
+- Retry-After header parsing (delta-seconds and HTTP-date) for 429
+- Per-request `max_retries:` override
+- Response size limiting (50 MiB for JSON, 512 KiB for errors) with streaming enforcement
+- `MediaClient` for binary upload/download operations
+- `DoublePuppetClient`, a subclass authenticating as a puppeted user rather than the appservice
 
-### Handler duck-type
-
-Any object with `#event_types -> Array<String>` and `#call(event)` is a handler. Two creation paths:
-
-1. **Plain handler class** — implement the two methods directly
-2. **Bot DSL** — `Bot.new(client) { on "m.room.message", msgtype: "m.text", not_from: :self do |event| ... end }` generates `Handler` objects with filter support. The `Context` inner class provides helper methods (`send_text`, `send_notice`, `join_room`, etc.).
-
-Register handlers via `server.register(handler_or_bot)`.
+`Client` duck-types on its config: it reads only `config.homeserver.address` and `config.appservice.as_token`, so anything answering those works.
 
 ### Runtime-generated API from OpenAPI schemas
 
@@ -147,34 +139,24 @@ Register handlers via `server.register(handler_or_bot)`.
 - **Binary route detection** — upload/download/thumbnail paths dispatch to `MediaClient` instead of the JSON `Client`
 - **Version rewriting** — media endpoints at `/v3` are rewritten to `/v1` where spec requires
 
-### Schema-driven event validation
+### Events and schema-driven validation
 
-`Schema::Registry` (singleton) lazily loads Matrix event YAML schemas from `data/matrix-spec/event-schemas/schema/` using `json_schemer`. Supports base schemas and variant schemas (filename convention: `m.room.message$m.text` split on `$`). Custom format validators handle `mx-user-id`, `mx-room-id`, `mx-event-id`, etc. Events expose `valid?` (returns bool) and `valid!` (raises `ValidationError` with human-readable key paths).
+`Schema::Registry` (singleton) lazily loads Matrix event YAML schemas from `data/matrix-spec/event-schemas/schema/` using `json_schemer`. Supports base schemas and variant schemas (filename convention: `m.room.message$m.text` split on `$`). Custom format validators handle `mx-user-id`, `mx-room-id`, `mx-event-id`, etc.
 
-### Configuration with JSON Schema validation
+`Schema.parse(hash)` returns an `Async::Matrix::Event`: typed envelope accessors plus an `Async::Matrix::Content` for the content object, which is dot-accessible via `method_missing` over the raw hash. Events expose `valid?` (returns bool) and `valid!` (raises `Schema::ValidationError` with human-readable key paths).
 
-`ApplicationService::Config` loads YAML appservice config and validates against a 17-file JSON Schema suite under `lib/async/matrix/application_service/config/schema/` (mirrors mautrix bridgev2 Go structs). `json_schemer` with `insert_property_defaults: true` auto-fills defaults. The `Vivify` module provides dot-notation access with autovivification: `config.homeserver.address`.
+### Configuration
 
-### Client HTTP layer
+`Async::Matrix::Config` loads YAML (or takes a hash) and exposes it through `Config::Vivify`, a mixin giving a Hash dot-notation access with autovivification. Top-level sections are an explicit `def_delegators` list, not a `method_missing` forward, so a typo'd section raises `NoMethodError` instead of autovivifying.
 
-`Client` wraps `Async::HTTP::Internet` (fiber-safe connection pooling) with:
+It validates **nothing**. `.validate!` is a no-op class-method hook called with the raw hash before vivification; a subclass overrides it to raise (and may mutate the hash to insert defaults). That is the seam async-matrix-bridge uses to layer the mautrix bridgev2 JSON Schema suite on top.
 
-- Bearer token auth (as_token from config)
-- Exponential backoff with full jitter for 502/503/504
-- Retry-After header parsing (delta-seconds and HTTP-date) for 429
-- Per-request `max_retries:` override
-- Response size limiting (50 MiB for JSON, 512 KiB for errors) with streaming enforcement
-- `MediaClient` for binary upload/download operations
+### End-to-end encryption
+
+`Async::Matrix::E2EE` wraps a native Rust extension (`ext/async_matrix_e2ee`, magnus over [vodozemac](https://github.com/matrix-org/vodozemac)) compiled into `lib/async/matrix/async_matrix_e2ee.so` by `rake compile`. **The suite cannot run without it** — `e2ee.rb`'s `require_relative` raises `LoadError` at load time and takes down the whole run, which is why CI builds the extension before `scampi`.
+
+`.github/workflows/cross-compile.yml` cross-compiles per-platform precompiled gems via the oxidize-rb toolchain, so `gem install async-matrix` needs no Rust on those platforms. `bin/release-gem` builds the source gem locally, downloads the precompiled gems from the latest green CI run, and pushes all of them.
 
 ### Data directory
 
 `data/` contains bundled Matrix specification schemas (fetched from matrix-org/matrix-spec via `bin/fetch-matrix-schemas` and `bin/fetch-matrix-api-schemas`). These are YAML files included in the gem package.
-
-### Examples
-
-`examples/` contains complete working applications with Docker Compose stacks:
-
-- `echo_bot/` — minimal echo bot with Synapse + FluffyChat
-- `brute/` — AI agent bot (passes `ANTHROPIC_API_KEY`)
-- `lindsey_and_dave/` — two-bot example
-- `synapse/` — shared Synapse + FluffyChat + Nginx reverse proxy base stack

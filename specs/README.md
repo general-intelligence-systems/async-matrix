@@ -23,7 +23,7 @@
 
 # Project Specifications
 
-async-matrix is an async-native Matrix Application Service SDK for Ruby, built on the Socketry ecosystem (async, async-http, Falcon).
+async-matrix is an async-native Matrix protocol library for Ruby, built on the Socketry ecosystem (async, async-http, Falcon). The Application Service layer lives in the sibling gem async-matrix-bridge.
 
 ## Core
 

@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
 
 	spec.summary = "An asynchronous Ruby library for the Matrix protocol."
 	spec.description = "Async-native Matrix protocol primitives built on the Socketry async ecosystem. " \
-		"Provides well-known discovery, event notification, and application service models."
+		"Provides a Client-Server API client, schema-validated events, media and end-to-end encryption."
 	spec.homepage = "https://github.com/general-intelligence-systems/async-matrix"
 
 	spec.required_ruby_version = ">= 3.3"
@@ -24,20 +24,15 @@ Gem::Specification.new do |spec|
 	spec.require_paths = ["lib"]
 	spec.extensions = ["ext/async_matrix_e2ee/extconf.rb"]
 
-	spec.add_dependency "async", "~> 2.39"
-	spec.add_dependency "async-http", "~> 0.95"
-	spec.add_dependency "async-websocket", "~> 0.30"
-	spec.add_dependency "grape", "~> 3.3"
-	spec.add_dependency "json_schemer", "~> 2.0"
-  spec.add_dependency "sequel", "~> 5.0"
+	spec.add_dependency "async", "~> 2.46"
+	spec.add_dependency "async-http", "~> 0.105"
+	spec.add_dependency "json_schemer", "~> 2.5"
   spec.add_dependency "string_builder", "~> 1.2"
 
   spec.add_dependency "rb_sys", "~> 0.9"
 
   spec.add_development_dependency "scampi", "~> 1.0"
-  spec.add_development_dependency "falcon", "~> 0.55"
   spec.add_development_dependency "logger"
-  spec.add_development_dependency "sqlite3"
-  spec.add_development_dependency "rake-compiler", "~> 1.2"
-  spec.add_development_dependency "lefthook", "~> 2.1"
+  spec.add_development_dependency "rake-compiler", "~> 1.3"
+  spec.add_development_dependency "lefthook", "~> 2.2"
 end

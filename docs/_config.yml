@@ -1,5 +1,5 @@
 title: async-matrix
-description: 'An async-native Matrix Application Service SDK for Ruby. Fibers, not threads — built on the Socketry ecosystem (async, async-http, Falcon).'
+description: 'Async-native Matrix protocol primitives for Ruby. Fibers, not threads — built on the Socketry ecosystem (async, async-http, Falcon).'
 url: https://general-intelligence-systems.github.io
 baseurl: /async-matrix
 lang: en-US
@@ -18,9 +18,6 @@ collections:
   advanced:
     permalink: "/:name/"
     output: true
-  examples:
-    permalink: "/:name/"
-    output: true
 
 # Configure Just the Docs collections
 just_the_docs:
@@ -33,9 +30,6 @@ just_the_docs:
       nav_fold: false
     advanced:
       name: Advanced
-      nav_fold: false
-    examples:
-      name: Examples
       nav_fold: false
 
 # Set default layout for collections
@@ -57,13 +51,6 @@ defaults:
   - scope:
       path: ""
       type: "advanced"
-    values:
-      layout: "default"
-      seo:
-        type: "WebPage"
-  - scope:
-      path: ""
-      type: "examples"
     values:
       layout: "default"
       seo:

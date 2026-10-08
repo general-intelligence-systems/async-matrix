@@ -2,13 +2,13 @@
 layout: default
 title: async-matrix
 nav_order: 1
-description: 'An async-native Matrix Application Service SDK for Ruby. Fibers, not threads — built on the Socketry ecosystem (async, async-http, Falcon).'
+description: 'Async-native Matrix protocol primitives for Ruby. Fibers, not threads — built on the Socketry ecosystem (async, async-http, Falcon).'
 permalink: /
 ---
 
 # async-matrix
 
-An async-native [Matrix](https://matrix.org) Application Service SDK for Ruby. Built on the [Socketry](https://github.com/socketry) ecosystem (`async`, `async-http`, [Falcon](https://github.com/socketry/falcon)) — no threads, no callbacks, just fibers.
+Async-native [Matrix](https://matrix.org) protocol primitives for Ruby. Built on the [Socketry](https://github.com/socketry) ecosystem (`async`, `async-http`, [Falcon](https://github.com/socketry/falcon)) — no threads, no callbacks, just fibers.
 {: .fs-6 .fw-300 }
 
 <div class="hero-actions">
@@ -16,51 +16,35 @@ An async-native [Matrix](https://matrix.org) Application Service SDK for Ruby. B
   <a href="https://github.com/general-intelligence-systems/async-matrix" class="btn fs-5 mb-4 mb-md-0 mr-2">GitHub</a>
 </div>
 
-async-matrix implements the [Matrix Application Service API](https://spec.matrix.org/latest/application-service-api/): the server side of a bridge or bot. Your homeserver `PUT`s transactions of events at your service; async-matrix authenticates them, deduplicates them, and dispatches each event to the handlers you register. The whole stack runs on fibers, so thousands of concurrent HTTP calls back to the homeserver cost you connection-pool slots, not threads.
+async-matrix is the Matrix protocol layer: a Client-Server API client whose method chains validate against the official OpenAPI documents, events that validate against the upstream event JSON schemas, media upload and download, and Olm/Megolm end-to-end encryption through a native binding. Every HTTP call is a fiber operation over a pooled connection, so thousands of concurrent calls to a homeserver cost you connection-pool slots, not threads.
+
+Writing the *server* side of a bridge or bot — receiving transactions from a homeserver and dispatching events to handlers — is [async-matrix-bridge](https://general-intelligence-systems.github.io/async-matrix-bridge/), which builds on this gem.
 
 ## Quick start
 
 ```ruby
-# config.ru
 require "async/matrix"
 
-config = Async::Matrix::ApplicationService::Config.load("config/appservice.yml")
+config = Async::Matrix::Config.load("config/appservice.yml")
 client = Async::Matrix::Client.new(config)
 
-bot = Async::Matrix::ApplicationService::Bot.new(client) do
-  on "m.room.member" do |event|
-    join_room(event.room_id) if event.content.membership == "invite"
-  end
-
-  on "m.room.message", msgtype: "m.text", not_from: :self do |event|
-    send_notice event.room_id, "Echo: #{event.content.body}"
-  end
+Async do
+  client.join_room("!room:example.org")
+  client.send_notice("!room:example.org", "Hello from a fiber")
 end
-
-app = Async::Matrix::ApplicationService::Server.new(
-  hs_token: config.appservice.hs_token,
-  client:   client
-) do
-  dispatch bot
-end
-
-run app
 ```
 
 ```sh
-falcon serve --bind http://0.0.0.0:9292
+gem install async-matrix
 ```
-
-That's a complete echo bot. The `Server` wraps a [Grape](https://github.com/ruby-grape/grape) API with the Matrix wire-protocol routes mixed in; `dispatch` registers a bot or plain handler; Falcon serves it. Head to [Getting Started]({% link _getting_started/getting-started.md %}) for a full walkthrough with a homeserver.
 
 ## What's here
 
-- **Core Features** — the [Application Service server]({% link _core_features/application-service.md %}) and event flow, [bots and handlers]({% link _core_features/bots-and-handlers.md %}) (the `dispatch` DSL and the handler duck-type), the [Client]({% link _core_features/client.md %}) and its schema-validated API chain, and [events and schema validation]({% link _core_features/events-and-schemas.md %}).
-- **Advanced** — [configuration]({% link _advanced/configuration.md %}) with JSON-Schema validation, [end-to-end encryption]({% link _advanced/encryption.md %}) (Olm/Megolm via a native binding), [media]({% link _advanced/media.md %}) upload/download, and the [Discord bridge]({% link _advanced/discord-bridge.md %}).
-- **Examples** — [runnable bots and bridges]({% link _examples/examples.md %}), each with a Docker Compose + Synapse stack.
+- **Core Features** — the [Client]({% link _core_features/client.md %}) and its schema-validated API chain, and [events and schema validation]({% link _core_features/events-and-schemas.md %}).
+- **Advanced** — [end-to-end encryption]({% link _advanced/encryption.md %}) (Olm/Megolm via a native binding) and [media]({% link _advanced/media.md %}) upload/download.
 
 ## Design principles
 
 1. **Async all the way down.** Every HTTP call is a fiber operation on `Async::HTTP::Internet` with fiber-safe connection pooling. No thread pools, no callback soup.
-2. **The homeserver is untrusted input.** Transactions are authenticated with a constant-time token compare and deduplicated by transaction ID before any handler runs. One handler raising never takes down the rest.
+2. **Retries are the library's job.** Exponential backoff with full jitter for 502/503/504, `Retry-After` parsing for 429, and response size limits enforced while streaming.
 3. **Specs are the source of truth.** The API chain validates against the official Matrix Client-Server OpenAPI documents, and events validate against the upstream event JSON schemas — both bundled into the gem.

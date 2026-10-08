@@ -29,7 +29,7 @@ end
 __END__
   describe "Async::Matrix::DoublePuppetClient" do
     def make_config
-      Async::Matrix::ApplicationService::Config.new({
+      Async::Matrix::Config.new({
         "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
         "appservice" => { "as_token" => "as_token_value", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
       })

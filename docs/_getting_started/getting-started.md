@@ -2,55 +2,36 @@
 layout: default
 title: Getting Started
 nav_order: 1
-description: Install async-matrix, register an application service with your homeserver, and run your first bot on Falcon.
+description: Install async-matrix, point a Client at a homeserver, and make your first authenticated call.
 ---
 
 # Getting Started
 
-This guide installs async-matrix, wires a bot up to a homeserver via the Application Service API, and runs it on Falcon.
+This guide installs async-matrix and makes authenticated calls against a Matrix homeserver from inside an async reactor.
+
+If what you want is the *server* side — a service your homeserver `PUT`s transactions at, dispatching events to handlers — that is [async-matrix-bridge](https://general-intelligence-systems.github.io/async-matrix-bridge/), which depends on this gem. Everything below still applies: the bridge hands you the same `Client`.
 
 ## Requirements
 
 - Ruby >= 3.3
-- A Matrix homeserver you can register an application service with (e.g. [Synapse](https://github.com/element-hq/synapse))
+- A Matrix homeserver and an access token for it
+
+async-matrix ships a native Rust extension for [end-to-end encryption]({% link _advanced/encryption.md %}). `gem install` serves a precompiled gem for common platforms; on anything else it compiles at install time and needs a Rust toolchain.
 
 ## Installation
 
 ```ruby
 # Gemfile
 gem "async-matrix"
-gem "falcon"      # the async Rack server you'll run the service on
 ```
 
 ```sh
 bundle install
 ```
 
-## 1. Register the service with your homeserver
+## Configuration
 
-An application service is trusted code that runs *alongside* your homeserver. The homeserver needs a `registration.yml` describing your service and the two shared secrets that authenticate traffic in each direction:
-
-```yaml
-# registration.yml — hand this to your homeserver
-id: "echo"
-url: "http://echo:9292"                     # where the homeserver reaches your service
-as_token: "long-random-string-A"            # your service -> homeserver
-hs_token: "long-random-string-B"            # homeserver -> your service
-sender_localpart: "bot"
-namespaces:
-  users:
-    - exclusive: true
-      regex: "@bot:.*"
-```
-
-Point your homeserver at it (Synapse: add the path to `app_service_config_files` in `homeserver.yaml`) and restart.
-
-{: .note }
-The `as_token` authenticates *your* calls to the homeserver; the `hs_token` authenticates the homeserver's transactions to *you*. async-matrix uses a constant-time compare on the `hs_token` for every inbound transaction.
-
-## 2. Configure the service
-
-async-matrix loads its own YAML config, validated against a JSON-Schema suite (see [Configuration]({% link _advanced/configuration.md %})):
+A `Config` is a YAML file (or plain hash) exposed through dot notation. `Client` reads exactly two fields from it — `homeserver.address` and `appservice.as_token` — and ignores the rest:
 
 ```yaml
 # config/appservice.yml
@@ -60,68 +41,81 @@ homeserver:
 
 appservice:
   as_token: "long-random-string-A"
-  hs_token: "long-random-string-B"
   bot:
     username: "bot"
 ```
 
-## 3. Write the bot
-
-The [`Bot` DSL]({% link _core_features/bots-and-handlers.md %}) pairs a `Client` with event handlers. Blocks run in a context that exposes helpers like `send_notice` and `join_room`, so you rarely touch the client directly:
-
 ```ruby
-# config.ru
 require "async/matrix"
 
-config = Async::Matrix::ApplicationService::Config.load("config/appservice.yml")
+config = Async::Matrix::Config.load("config/appservice.yml")
+
+config.homeserver.address   # => "http://synapse:8008"
+config.bot_mxid             # => "@bot:localhost"
+```
+
+`Config` validates nothing — it vivifies whatever you hand it. A subclass adds validation by overriding `.validate!`, which is how async-matrix-bridge layers the mautrix bridgev2 JSON Schema suite on top without reimplementing the loading.
+
+Building one inline works too, which is handy in specs:
+
+```ruby
+config = Async::Matrix::Config.new(
+  "homeserver" => {"address" => "http://localhost:8008", "domain" => "localhost"},
+  "appservice" => {"as_token" => "token", "bot" => {"username" => "bot"}}
+)
+```
+
+## Making calls
+
+Every `Client` method is a fiber operation, so calls belong inside an async reactor:
+
+```ruby
 client = Async::Matrix::Client.new(config)
 
-bot = Async::Matrix::ApplicationService::Bot.new(client) do
-  # Auto-join whenever someone invites the bot.
-  on "m.room.member" do |event|
-    join_room(event.room_id) if event.content.membership == "invite"
-  end
-
-  # Echo text messages back as a notice, skipping the bot's own messages.
-  on "m.room.message", msgtype: "m.text", not_from: :self do |event|
-    send_notice event.room_id, "Echo: #{event.content.body}"
-  end
+Async do
+  client.join_room("!room:example.org")
+  client.send_text("!room:example.org", "Hello world")
+  client.send_notice("!room:example.org", "A notice")
+  client.send_html("!room:example.org", "<b>bold</b>")
 end
+```
 
-app = Async::Matrix::ApplicationService::Server.new(
-  hs_token: config.appservice.hs_token,
-  client:   client
-) do
-  dispatch bot
+Concurrency is what fibers buy you — these run in parallel over a pooled connection, not one after another:
+
+```ruby
+Async do
+  rooms.map { |id| Async { client.send_notice(id, "broadcast") } }.each(&:wait)
 end
-
-run app
 ```
 
-`dispatch` accepts a `Bot` or any plain handler object — see [Bots and Handlers]({% link _core_features/bots-and-handlers.md %}) for the duck-type contract and filter options.
+The client retries 502/503/504 with exponential backoff and full jitter, honours `Retry-After` on 429, and caps response bodies while streaming them. See the [Client]({% link _core_features/client.md %}) page for the per-request knobs and the full method list.
 
-## 4. Serve it
+## Beyond the convenience methods
 
-`Server` is a Rack app, so any async-capable Rack server works. Use Falcon:
+The convenience methods cover the common cases. For anything else, `client.api` builds a path by method chaining and validates it against the official Matrix Client-Server OpenAPI documents bundled in the gem:
 
-```sh
-falcon serve --bind http://0.0.0.0:9292
+```ruby
+Async do
+  client.api.account.whoami.get
+  client.api.createRoom.post(name: "Pub", preset: "public_chat")
+  client.api.rooms("!room:example.org").messages.get(dir: "b", limit: 10)
+end
 ```
 
-Override the config path at runtime with an environment variable:
+Binary routes (upload, download, thumbnail) are detected and dispatched to the [media client]({% link _advanced/media.md %}) automatically.
 
-```sh
-APPSERVICE_CONFIG=/etc/bot/appservice.yml falcon serve --bind http://0.0.0.0:9292
+## Events
+
+Events parse into `Async::Matrix::Event`, with dot-accessible content and optional validation against the upstream Matrix event schemas:
+
+```ruby
+event = Async::Matrix::Schema.parse(raw_hash)
+
+event.type              # => "m.room.message"
+event.sender            # => "@alice:example.org"
+event.content.body      # => "hello"
+event.valid?            # => true
+event.valid!            # => true, or raises Schema::ValidationError
 ```
 
-Invite `@bot:localhost` to a room and say hello — it echoes back.
-
-## What happens on each transaction
-
-1. The homeserver `PUT`s a batch of events to `/_matrix/app/v1/transactions/{txnId}`.
-2. The `Server` authenticates the request (constant-time `hs_token` compare) and rejects anything unauthenticated with `403 M_FORBIDDEN`.
-3. The transaction ID is checked against an in-memory store; already-seen IDs return `200` immediately without re-dispatching — the endpoint is idempotent.
-4. Each event is wrapped and routed to every handler whose `#event_types` matches. Handlers run independently; an exception in one is logged and the rest still run.
-5. Your handler calls back to the homeserver through the [`Client`]({% link _core_features/client.md %}) — every call a fiber operation over a pooled connection.
-
-Next: the [Application Service internals]({% link _core_features/application-service.md %}), or jump to a complete [Docker Compose example]({% link _examples/examples.md %}).
+Next: the [Client]({% link _core_features/client.md %}) in full, or [events and schema validation]({% link _core_features/events-and-schemas.md %}).

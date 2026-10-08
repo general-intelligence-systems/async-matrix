@@ -69,4 +69,4 @@ Async::Matrix::E2EE.verify_signature(account.ed25519_key, "tampered", signature)
 
 ## Building requirement
 
-Because the binding is native, building the gem needs a Rust toolchain (the `magnus` extension is compiled at install time). The `encryption` section of the [config schema]({% link _advanced/configuration.md %}) carries the bridge-level encryption settings that sit on top of these primitives.
+Because the binding is native, building the gem needs a Rust toolchain (the `magnus` extension is compiled at install time). The `encryption` section of the [config schema](https://general-intelligence-systems.github.io/async-matrix-bridge/configuration/) carries the bridge-level encryption settings that sit on top of these primitives.
