@@ -54,6 +54,7 @@ Local/ConstantMatchesPath:
     oidc: OIDC
     csrf: CSRF
     id: ID
+    e2ee: E2EE
   # No entries: every file under lib/ defines the constant its path spells.
   # Adding one means a file deliberately opens someone else's namespace (a
   # monkey patch, or a plugin that must live in a third party's module).
@@ -76,12 +77,16 @@ Local/NoModifierIf:
 Local/NoReturn:
   Enabled: true
 
-# Bans logging at the `Console` singleton (Console.info, Console.logger.warn).
-# console-adapter-rails makes `Rails.logger` a Console logger already, so the
-# direct call gains nothing and skips the adapter's tagging, silencing and
-# per-environment config.
+# Bans logging at the `Console` singleton (Console.info, Console.logger.warn)
+# in favour of `Rails.logger`, which console-adapter-rails has already made a
+# Console logger.
+#
+# OFF here: async-matrix is a plain gem with no Rails and no adapter, so there
+# is no `Rails.logger` to route through. `Console.info(self) { ... }` IS the
+# Socketry convention, and `self` is what gives the message its subject — the
+# same tagging the cop is asking for. Turn this back on in an app, not here.
 Local/NoConsoleLogging:
-  Enabled: true
+  Enabled: false
 
 # Requires `tap` where a method assigns a local on its first line and returns
 # that same local on its last. Skipped when the body reassigns the variable —

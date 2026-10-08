@@ -22,7 +22,13 @@ module Async
       class PathTree
         SCHEMA_DIR = Pathname.new(File.expand_path("../../../../data/matrix-spec/api/client-server", __dir__))
 
-        Node = Struct.new(:children, :wildcard, :methods, :operation_ids, keyword_init: true) do
+        Node = Struct.new(
+          :children,
+          :wildcard,
+          :methods,
+          :operation_ids,
+          keyword_init: true,
+        ) do
           def initialize(**)
             super
             self.children ||= {}
@@ -39,34 +45,46 @@ module Async
 
         # Load all OpenAPI schemas from data/ and build the tree.
         def self.load(schema_dir: SCHEMA_DIR)
-          tree = new
-          Pathname.glob(schema_dir / "*.yaml").each do |path|
-            tree.load_schema(path)
+          new.tap do |tree|
+            Pathname.glob(schema_dir / "*.yaml").each do |path|
+              tree.load_schema(path)
+            end
           end
-          tree
         end
 
         # Parse a single OpenAPI YAML file and insert its paths into the tree.
         def load_schema(path)
           doc = YAML.safe_load(File.read(path), permitted_classes: [Symbol], aliases: true)
-          return unless doc.is_a?(Hash)
+          if doc.is_a?(Hash)
+            base_path = extract_base_path(doc)
+            paths = doc["paths"]
+            if paths.is_a?(Hash)
+              paths.each do |path_template, methods_hash|
+                unless methods_hash.is_a?(Hash)
+                  next
+                end
 
-          base_path = extract_base_path(doc)
-          paths = doc["paths"]
-          return unless paths.is_a?(Hash)
+                # Build full path: basePath + path_template
+                full_path = "#{base_path}#{path_template.strip}"
+                segments = full_path.split("/").reject(&:empty?)
 
-          paths.each do |path_template, methods_hash|
-            next unless methods_hash.is_a?(Hash)
-
-            # Build full path: basePath + path_template
-            full_path = "#{base_path}#{path_template.strip}"
-            segments = full_path.split("/").reject(&:empty?)
-
-            methods_hash.each do |method, operation|
-              next unless %w[get post put delete patch head].include?(method)
-              operation_id = operation.is_a?(Hash) ? operation["operationId"] : nil
-              insert(segments, method, operation_id)
+                methods_hash.each do |method, operation|
+                  unless %w[get post put delete patch head].include?(method)
+                    next
+                  end
+                  if operation.is_a?(Hash)
+                    operation_id = operation["operationId"]
+                  else
+                    operation_id = nil
+                  end
+                  insert(segments, method, operation_id)
+                end
+              end
+            else
+              nil
             end
+          else
+            nil
           end
         end
 
@@ -83,25 +101,30 @@ module Async
               node = node.children[segment]
             end
           end
-          node.methods << method.downcase unless node.methods.include?(method.downcase)
-          node.operation_ids[method.downcase] = operation_id if operation_id
+          unless node.methods.include?(method.downcase)
+            node.methods << method.downcase
+          end
+          if operation_id
+            node.operation_ids[method.downcase] = operation_id
+          end
         end
 
         # Match a concrete path (array of segments) against the trie.
         # Returns a result hash.
         def match(segments, method = nil)
-          node = @root
-          segments.each do |segment|
-            if node.children.key?(segment)
-              node = node.children[segment]
-            elsif node.wildcard
-              node = node.wildcard
-            else
-              return {valid: false, methods: [], operation_id: nil}
+          node = segments.inject(@root) do |current, segment|
+            if current.nil?
+              nil
+            elsif current.children.key?(segment)
+              current.children[segment]
+            elsif current.wildcard
+              current.wildcard
             end
           end
 
-          if method
+          if node.nil?
+            {valid: false, methods: [], operation_id: nil}
+          elsif method
             method_down = method.downcase
             valid = node.methods.include?(method_down)
             {valid: valid, methods: node.methods, operation_id: node.operation_ids[method_down]}
@@ -112,17 +135,21 @@ module Async
 
         private
 
-        def extract_base_path(doc)
-          servers = doc["servers"]
-          return "" unless servers.is_a?(Array) && servers.first.is_a?(Hash)
-
-          server = servers.first
-          variables = server["variables"] || {}
-          base_path_var = variables["basePath"]
-          return "" unless base_path_var.is_a?(Hash)
-
-          base_path_var["default"] || ""
-        end
+          def extract_base_path(doc)
+            servers = doc["servers"]
+            if servers.is_a?(Array) && servers.first.is_a?(Hash)
+              server = servers.first
+              variables = server["variables"] || {}
+              base_path_var = variables["basePath"]
+              if base_path_var.is_a?(Hash)
+                base_path_var["default"] || ""
+              else
+                ""
+              end
+            else
+              ""
+            end
+          end
       end
     end
   end

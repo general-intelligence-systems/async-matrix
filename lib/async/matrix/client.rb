@@ -72,7 +72,7 @@ module Async
           msgtype:        "m.text",
           body:           plaintext || html.gsub(/<[^>]+>/, ""),
           format:         "org.matrix.custom.html",
-          formatted_body: html
+          formatted_body: html,
         }
         send_message_event(room_id, "m.room.message", content)
       end
@@ -98,7 +98,7 @@ module Async
         uid = user_id || @config.bot_mxid
         put(
           "#{CLIENT_PREFIX}/profile/#{encode(uid)}/displayname",
-          {displayname: name}
+          {displayname: name},
         )
       end
 
@@ -151,15 +151,30 @@ module Async
       end
 
       def get(path, max_retries: nil)
-        request("GET", path, nil, max_retries: max_retries)
+        request(
+          "GET",
+          path,
+          nil,
+          max_retries: max_retries,
+        )
       end
 
       def put(path, body = {}, max_retries: nil)
-        request("PUT", path, body, max_retries: max_retries)
+        request(
+          "PUT",
+          path,
+          body,
+          max_retries: max_retries,
+        )
       end
 
       def post(path, body = {}, max_retries: nil)
-        request("POST", path, body, max_retries: max_retries)
+        request(
+          "POST",
+          path,
+          body,
+          max_retries: max_retries,
+        )
       end
 
       def close
@@ -171,51 +186,67 @@ module Async
 
       private
 
-      def internet
-        @internet ||= Async::HTTP::Internet.new
-      end
-
-      def request(method, path, body = nil, max_retries: nil)
-        url = "#{@base}#{path}"
-        json_body = body ? JSON.generate(body) : nil
-        effective_max_retries = max_retries || @max_retries
-
-        Console.debug(self) { "#{method} #{path}" }
-
-        attempt = 0
-        loop do
-          response = internet.call(method, url, @headers, json_body)
-          status   = response.status
-
-          if (200..299).cover?(status)
-            payload = read_limited(response, @response_size_limit)
-            return payload && !payload.empty? ? JSON.parse(payload) : {}
-          end
-
-          attempt += 1
-
-          if attempt <= effective_max_retries && retryable_status?(status)
-            delay = compute_retry_delay(status, response, attempt)
-            Console.warn(self) {
-              "#{method} #{path} returned #{status}, retry #{attempt}/#{effective_max_retries} in #{delay.round(2)}s"
-            }
-            response.close if response.respond_to?(:close)
-            sleep(delay)
-            next
-          end
-
-          payload = read_limited(response, @error_response_size_limit)
-          parsed = ErrorResponse.new(
-            begin; JSON.parse(payload); rescue; {} end
-          )
-          Console.error(self) { "Matrix API #{status}: #{parsed.errcode} — #{parsed.error}" }
-          raise HomeserverError.new(
-            parsed.errcode || "UNKNOWN",
-            parsed.error || payload.to_s[0..200],
-            status: status
-          )
+        def internet
+          @internet ||= Async::HTTP::Internet.new
         end
-      end
+
+        def request(method, path, body = nil, max_retries: nil)
+          url = "#{@base}#{path}"
+          if body
+            json_body = JSON.generate(body)
+          else
+            json_body = nil
+          end
+          effective_max_retries = max_retries || @max_retries
+
+          Console.debug(self) { "#{method} #{path}" }
+
+          attempt = 0
+          loop do
+            response = internet.call(
+              method,
+              url,
+              @headers,
+              json_body,
+            )
+            status   = response.status
+
+            if (200..299).cover?(status)
+              payload = read_limited(response, @response_size_limit)
+
+              if payload && !payload.empty?
+                break JSON.parse(payload)
+              else
+                break {}
+              end
+            end
+
+            attempt += 1
+
+            if attempt <= effective_max_retries && retryable_status?(status)
+              delay = compute_retry_delay(status, response, attempt)
+              Console.warn(self) {
+                "#{method} #{path} returned #{status}, retry #{attempt}/#{effective_max_retries} in #{delay.round(2)}s"
+              }
+              if response.respond_to?(:close)
+                response.close
+              end
+              sleep(delay)
+              next
+            end
+
+            payload = read_limited(response, @error_response_size_limit)
+            parsed = ErrorResponse.new(
+              begin; JSON.parse(payload); rescue; {} end,
+            )
+            Console.error(self) { "Matrix API #{status}: #{parsed.errcode} — #{parsed.error}" }
+            raise HomeserverError.new(
+              parsed.errcode || "UNKNOWN",
+              parsed.error || payload.to_s[0..200],
+              status: status,
+            )
+          end
+        end
 
       # ── Response size limiting ──────────────────────────────────
 
@@ -226,46 +257,45 @@ module Async
       # @param response [Protocol::HTTP::Response] the HTTP response
       # @param limit [Integer] maximum allowed body size in bytes
       # @return [String, nil] the response body, or nil if empty
-      def read_limited(response, limit)
-        body = response.body
-        return nil unless body
-
-        # Fast path: reject immediately if Content-Length exceeds limit
-        if body.respond_to?(:length) && body.length && body.length > limit
-          body.close
-          raise ResponseTooLargeError.new(
-            "M_TOO_LARGE",
-            "Response Content-Length #{body.length} bytes exceeds limit of #{limit} bytes"
-          )
-        end
-
-        # Streaming read with enforcement
-        buffer = String.new(encoding: Encoding::BINARY)
-        body.each do |chunk|
-          buffer << chunk
-          if buffer.bytesize > limit
-            body.close
-            raise ResponseTooLargeError.new(
-              "M_TOO_LARGE",
-              "Response body exceeds limit of #{limit} bytes"
-            )
+        def read_limited(response, limit)
+          body = response.body
+          if body
+            if body.respond_to?(:length) && body.length && body.length > limit
+              body.close
+              raise ResponseTooLargeError.new(
+                "M_TOO_LARGE",
+                "Response Content-Length #{body.length} bytes exceeds limit of #{limit} bytes",
+              )
+            end
+            buffer = String.new(encoding: Encoding::BINARY)
+            body.each do |chunk|
+              buffer << chunk
+              if buffer.bytesize > limit
+                body.close
+                raise ResponseTooLargeError.new(
+                  "M_TOO_LARGE",
+                  "Response body exceeds limit of #{limit} bytes",
+                )
+              end
+            end
+            buffer.empty? ? nil : buffer
+          else
+            nil
           end
         end
-        buffer.empty? ? nil : buffer
-      end
 
       # ── Retry logic ─────────────────────────────────────────────
 
       # Whether the given HTTP status code should trigger a retry.
       # 429 is only retried if @ignore_rate_limit is false.
       # 502/503/504 are always retried.
-      def retryable_status?(status)
-        if status == RATE_LIMIT_STATUS
-          !@ignore_rate_limit
-        else
-          GATEWAY_ERROR_STATUSES.include?(status)
+        def retryable_status?(status)
+          if status == RATE_LIMIT_STATUS
+            !@ignore_rate_limit
+          else
+            GATEWAY_ERROR_STATUSES.include?(status)
+          end
         end
-      end
 
       # Compute the delay before the next retry attempt.
       #
@@ -276,47 +306,49 @@ module Async
       # For 502/503/504 (gateway errors): exponential backoff with full jitter.
       # Full jitter means rand(0..calculated), which is the AWS-recommended
       # approach to avoid thundering herd on shared homeservers.
-      def compute_retry_delay(status, response, attempt)
-        if status == RATE_LIMIT_STATUS
-          server_delay = parse_retry_after(response)
-          delay = server_delay || exponential_delay(attempt)
-          [delay, @max_retry_delay].min
-        else
-          calculated = exponential_delay(attempt)
-          rand(0.0..[calculated, @max_retry_delay].min)
+        def compute_retry_delay(status, response, attempt)
+          if status == RATE_LIMIT_STATUS
+            server_delay = parse_retry_after(response)
+            delay = server_delay || exponential_delay(attempt)
+            [delay, @max_retry_delay].min
+          else
+            calculated = exponential_delay(attempt)
+            rand(0.0..[calculated, @max_retry_delay].min)
+          end
         end
-      end
 
       # Base * 2^(attempt-1): 0.5, 1.0, 2.0, 4.0, ...
-      def exponential_delay(attempt)
-        @retry_base_delay * (2 ** (attempt - 1))
-      end
+        def exponential_delay(attempt)
+          @retry_base_delay * (2 ** (attempt - 1))
+        end
 
       # Parse the Retry-After header. Supports both delta-seconds ("120")
       # and HTTP-date ("Fri, 31 Dec 2026 23:59:59 GMT") formats per RFC 9110.
       # Returns seconds to wait as a Float, or nil if absent/unparseable.
-      def parse_retry_after(response)
-        value = response.headers["retry-after"]
-        return nil unless value
-
-        value = value.strip
-        if value.match?(/\A\d+\z/)
-          value.to_f
-        else
-          # HTTP-date format
-          begin
-            target = Time.httpdate(value)
-            delay = target - Time.now
-            delay > 0 ? delay : 0.0
-          rescue ArgumentError
+        def parse_retry_after(response)
+          value = response.headers["retry-after"]
+          if value
+            value = value.strip
+            if value.match?(/\A\d+\z/)
+              value.to_f
+            else
+              # HTTP-date format
+              begin
+                target = Time.httpdate(value)
+                delay = target - Time.now
+                delay > 0 ? delay : 0.0
+              rescue ArgumentError
+                nil
+              end
+            end
+          else
             nil
           end
         end
-      end
 
-      def encode(value)
-        ERB::Util.url_encode(value)
-      end
+        def encode(value)
+          ERB::Util.url_encode(value)
+        end
     end
   end
 end

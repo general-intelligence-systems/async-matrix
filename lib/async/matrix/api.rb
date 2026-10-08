@@ -54,7 +54,12 @@ module Async
           if name.start_with?("to_")
             super
           else
-            chain.__send__(name, *args, **kwargs, &block)
+            chain.__send__(
+              name,
+              *args,
+              **kwargs,
+              &block
+            )
           end
         end
 

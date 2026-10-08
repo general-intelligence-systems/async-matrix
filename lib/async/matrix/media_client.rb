@@ -49,19 +49,24 @@ module Async
 
         Console.debug(self) { "UPLOAD #{method} #{path} (#{content_type}, #{body.bytesize} bytes)" }
 
-        response = internet.call(method, url, headers, body)
+        response = internet.call(
+          method,
+          url,
+          headers,
+          body,
+        )
         status   = response.status
 
         unless (200..299).cover?(status)
           payload = read_limited(response, ERROR_RESPONSE_SIZE_LIMIT)
           parsed = ErrorResponse.new(
-            begin; JSON.parse(payload); rescue; {} end
+            begin; JSON.parse(payload); rescue; {} end,
           )
           Console.error(self) { "Matrix media upload #{status}: #{parsed.errcode} — #{parsed.error}" }
           raise HomeserverError.new(
             parsed.errcode || "UNKNOWN",
             parsed.error || payload.to_s[0..200],
-            status: status
+            status: status,
           )
         end
 
@@ -87,19 +92,24 @@ module Async
 
         Console.debug(self) { "DOWNLOAD #{path}" }
 
-        response = internet.call("GET", url, @auth_headers, nil)
+        response = internet.call(
+          "GET",
+          url,
+          @auth_headers,
+          nil,
+        )
         status   = response.status
 
         unless (200..299).cover?(status)
           payload = response.read
           parsed = ErrorResponse.new(
-            begin; JSON.parse(payload); rescue; {} end
+            begin; JSON.parse(payload); rescue; {} end,
           )
           Console.error(self) { "Matrix media download #{status}: #{parsed.errcode} — #{parsed.error}" }
           raise HomeserverError.new(
             parsed.errcode || "UNKNOWN",
             parsed.error || payload.to_s[0..200],
-            status: status
+            status: status,
           )
         end
 
@@ -113,37 +123,38 @@ module Async
 
       private
 
-      def internet
-        @internet ||= Async::HTTP::Internet.new
-      end
+        def internet
+          @internet ||= Async::HTTP::Internet.new
+        end
 
       # Read response body with a size limit. Raises ResponseTooLargeError
       # if the body exceeds the limit.
-      def read_limited(response, limit)
-        body = response.body
-        return nil unless body
-
-        if body.respond_to?(:length) && body.length && body.length > limit
-          body.close
-          raise ResponseTooLargeError.new(
-            "M_TOO_LARGE",
-            "Response Content-Length #{body.length} bytes exceeds limit of #{limit} bytes"
-          )
-        end
-
-        buffer = String.new(encoding: Encoding::BINARY)
-        body.each do |chunk|
-          buffer << chunk
-          if buffer.bytesize > limit
-            body.close
-            raise ResponseTooLargeError.new(
-              "M_TOO_LARGE",
-              "Response body exceeds limit of #{limit} bytes"
-            )
+        def read_limited(response, limit)
+          body = response.body
+          if body
+            if body.respond_to?(:length) && body.length && body.length > limit
+              body.close
+              raise ResponseTooLargeError.new(
+                "M_TOO_LARGE",
+                "Response Content-Length #{body.length} bytes exceeds limit of #{limit} bytes",
+              )
+            end
+            buffer = String.new(encoding: Encoding::BINARY)
+            body.each do |chunk|
+              buffer << chunk
+              if buffer.bytesize > limit
+                body.close
+                raise ResponseTooLargeError.new(
+                  "M_TOO_LARGE",
+                  "Response body exceeds limit of #{limit} bytes",
+                )
+              end
+            end
+            buffer.empty? ? nil : buffer
+          else
+            nil
           end
         end
-        buffer.empty? ? nil : buffer
-      end
     end
   end
 end

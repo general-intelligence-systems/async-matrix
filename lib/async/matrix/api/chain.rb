@@ -108,122 +108,148 @@ module Async
 
         private
 
-        def execute(method, body: nil, query: nil, content_type: nil, max_retries: nil)
-          segments = _rewrite_version(_build_full_segments)
-          result = @path_tree.match(segments, method)
+          def execute(method, body: nil, query: nil, content_type: nil, max_retries: nil)
+            segments = _rewrite_version(_build_full_segments)
+            result = @path_tree.match(segments, method)
 
-          if !result[:valid]
-            path = "/" + segments.join("/")
-            available = result[:methods]
-            if available.empty?
-              ::Kernel.raise ::Async::Matrix::InvalidEndpointError.new(
-                "INVALID_ENDPOINT",
-                "No Matrix API endpoint matches: #{method} #{path}"
-              )
+            if !result[:valid]
+              path = "/" + segments.join("/")
+              available = result[:methods]
+              if available.empty?
+                ::Kernel.raise ::Async::Matrix::InvalidEndpointError.new(
+                  "INVALID_ENDPOINT",
+                  "No Matrix API endpoint matches: #{method} #{path}",
+                )
+              else
+                ::Kernel.raise ::Async::Matrix::InvalidEndpointError.new(
+                  "METHOD_NOT_ALLOWED",
+                  "#{method} not allowed for #{path}. Valid methods: #{available.map(&:upcase).join(", ")}",
+                )
+              end
+            end
+
+            path = "/" + segments.map { |s| _encode(s) }.join("/")
+
+            if query && !query.empty?
+              qs = query.map { |k, v| "#{_encode(k.to_s)}=#{_encode(v.to_s)}" }.join("&")
+              path = "#{path}?#{qs}"
+            end
+
+            if _binary_route?(segments)
+              case method
+              when "GET"
+                @client.media_client.download(path)
+              when "POST"
+                @client.media_client.upload(
+                  "POST",
+                  path,
+                  body,
+                  content_type || "application/octet-stream",
+                )
+              when "PUT"
+                @client.media_client.upload(
+                  "PUT",
+                  path,
+                  body,
+                  content_type || "application/octet-stream",
+                )
+              end
             else
-              ::Kernel.raise ::Async::Matrix::InvalidEndpointError.new(
-                "METHOD_NOT_ALLOWED",
-                "#{method} not allowed for #{path}. Valid methods: #{available.map(&:upcase).join(", ")}"
-              )
+              if max_retries
+                retry_opts = {max_retries: max_retries}
+            else
+              retry_opts = {}
+            end
+              case method
+              when "GET"
+                @client.get(path, **retry_opts)
+              when "POST"
+                @client.post(path, body || {}, **retry_opts)
+              when "PUT"
+                @client.put(path, body || {}, **retry_opts)
+              when "DELETE"
+                @client.request(
+                  "DELETE",
+                  path,
+                  nil,
+**retry_opts,
+                )
+              when "PATCH"
+                @client.request(
+                  "PATCH",
+                  path,
+                  body || {},
+**retry_opts,
+                )
+              end
             end
           end
-
-          path = "/" + segments.map { |s| _encode(s) }.join("/")
-
-          if query && !query.empty?
-            qs = query.map { |k, v| "#{_encode(k.to_s)}=#{_encode(v.to_s)}" }.join("&")
-            path = "#{path}?#{qs}"
-          end
-
-          if _binary_route?(segments)
-            case method
-            when "GET"
-              @client.media_client.download(path)
-            when "POST"
-              @client.media_client.upload("POST", path, body, content_type || "application/octet-stream")
-            when "PUT"
-              @client.media_client.upload("PUT", path, body, content_type || "application/octet-stream")
-            end
-          else
-            retry_opts = max_retries ? {max_retries: max_retries} : {}
-            case method
-            when "GET"
-              @client.get(path, **retry_opts)
-            when "POST"
-              @client.post(path, body || {}, **retry_opts)
-            when "PUT"
-              @client.put(path, body || {}, **retry_opts)
-            when "DELETE"
-              @client.request("DELETE", path, nil, **retry_opts)
-            when "PATCH"
-              @client.request("PATCH", path, body || {}, **retry_opts)
-            end
-          end
-        end
 
         # Rewrites version segments for endpoints that only exist at
         # a different version than the gateway prefix provides.
         #   _matrix/media/v3/create        → _matrix/media/v1/create
         #   _matrix/client/v3/media/...    → _matrix/client/v1/media/...
-        def _rewrite_version(segments)
-          # POST /_matrix/media/v1/create (only exists at v1)
-          if segments.length == 4 &&
-             segments[0] == "_matrix" && segments[1] == "media" &&
-             segments[2] == "v3" && segments[3] == "create"
-            segments = segments.dup
-            segments[2] = "v1"
-            return segments
-          end
+          def _rewrite_version(segments)
+            # POST /_matrix/media/v1/create (only exists at v1)
+            media_create = segments.length == 4 &&
+                           segments[0] == "_matrix" && segments[1] == "media" &&
+                           segments[2] == "v3" && segments[3] == "create"
 
-          # Authenticated media endpoints live at /_matrix/client/v1/media/...
-          if segments.length >= 5 &&
-             segments[0] == "_matrix" && segments[1] == "client" &&
-             segments[2] == "v3" && segments[3] == "media"
-            segments = segments.dup
-            segments[2] = "v1"
-            return segments
-          end
+            # Authenticated media endpoints live at /_matrix/client/v1/media/...
+            client_media = segments.length >= 5 &&
+                           segments[0] == "_matrix" && segments[1] == "client" &&
+                           segments[2] == "v3" && segments[3] == "media"
 
-          segments
-        end
-
-        def _binary_route?(segments)
-          BINARY_ROUTES.any? do |pattern|
-            parts = pattern.split("/")
-            next false unless parts.length == segments.length + 1 # leading slash adds empty element
-            parts.shift # remove empty string from leading /
-            parts.length == segments.length &&
-              parts.zip(segments).all? { |pat, seg| pat == "*" || pat == seg }
-          end
-        end
-
-        def _extract_query_params(kwargs)
-          query = {}
-          kwargs.each_key do |k|
-            key_s = k.to_s
-            if key_s.start_with?("?")
-              query[key_s[1..]] = kwargs.delete(k)
+            if media_create || client_media
+              segments.dup.tap { |rewritten| rewritten[2] = "v1" }
+            else
+              segments
             end
           end
-          query.empty? ? nil : query
-        end
 
-        def _build_full_segments
-          chain_segments = []
-          @buffer.each do |name, args|
-            chain_segments << name
-            next if args.nil? || args.empty?
-            args.each do |arg|
-              next if arg.is_a?(::Hash)
-              chain_segments << arg.to_s
+          def _binary_route?(segments)
+            BINARY_ROUTES.any? do |pattern|
+              parts = pattern.split("/")
+              unless parts.length == segments.length + 1
+                next false
+              end # leading slash adds empty element
+              parts.shift # remove empty string from leading /
+              parts.length == segments.length &&
+                parts.zip(segments).all? { |pat, seg| pat == "*" || pat == seg }
             end
           end
-          @prefix + chain_segments
-        end
 
-        def _encode(value)
-          ::ERB::Util.url_encode(value.to_s)
-        end
+          def _extract_query_params(kwargs)
+            query = {}
+            kwargs.each_key do |k|
+              key_s = k.to_s
+              if key_s.start_with?("?")
+                query[key_s[1..]] = kwargs.delete(k)
+              end
+            end
+            query.empty? ? nil : query
+          end
+
+          def _build_full_segments
+            chain_segments = []
+            @buffer.each do |name, args|
+              chain_segments << name
+              if args.nil? || args.empty?
+                next
+              end
+              args.each do |arg|
+                if arg.is_a?(::Hash)
+                  next
+                end
+                chain_segments << arg.to_s
+              end
+            end
+            @prefix + chain_segments
+          end
+
+          def _encode(value)
+            ::ERB::Util.url_encode(value.to_s)
+          end
       end
     end
   end

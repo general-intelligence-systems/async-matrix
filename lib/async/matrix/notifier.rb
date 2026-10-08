@@ -37,17 +37,21 @@ module Async
 
         loop do
           result = yield
-          return result if result
+          if result
+            break result
+          end
 
           remaining = deadline - Time.now
-          return result if remaining <= 0
+          if remaining <= 0
+            break result
+          end
 
           begin
             Async::Task.current.with_timeout(remaining) do
               @condition.wait
             end
           rescue Async::TimeoutError
-            return yield
+            break yield
           end
         end
       end

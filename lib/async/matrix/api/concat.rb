@@ -24,36 +24,42 @@ module Async
         end
 
         def initialize(buffer)
-          @buffer = buffer.respond_to?(:to_a) ? buffer.to_a : buffer
+          if buffer.respond_to?(:to_a)
+            @buffer = buffer.to_a
+          else
+            @buffer = buffer
+          end
         end
 
         def segments
-          result = []
+          [].tap do |result|
+            @buffer.each do |entry|
+              case entry
+              when Symbol
+                # :slash, :dash -- ignore in URL context
+                next
+              when Array
+                name, args = entry
+                unless name.is_a?(String)
+                  next
+                end
 
-          @buffer.each do |entry|
-            case entry
-            when Symbol
-              # :slash, :dash -- ignore in URL context
-              next
-            when Array
-              name, args = entry
-              next unless name.is_a?(String)
-
-              if args.nil? || args.empty?
-                # Bare method -> path segment
-                result << name
-              else
-                # Method with args -> method name as segment, then each arg as segment
-                result << name
-                args.each do |arg|
-                  next if arg.is_a?(Hash) # kwargs are not path segments
-                  result << arg.to_s
+                if args.nil? || args.empty?
+                  # Bare method -> path segment
+                  result << name
+                else
+                  # Method with args -> method name as segment, then each arg as segment
+                  result << name
+                  args.each do |arg|
+                    if arg.is_a?(Hash)
+                      next
+                    end # kwargs are not path segments
+                    result << arg.to_s
+                  end
                 end
               end
             end
           end
-
-          result
         end
       end
     end
