@@ -11,7 +11,13 @@ crate-type = ["cdylib"]
 [dependencies]
 # magnus 0.8 is required for Ruby 4.0 C-API compatibility (0.7 fails to compile
 # against Ruby 4.0: rb_fiber_raise pointer mutability + RTypedData.typed_flag).
-magnus = "0.8"
+#
+# 0.9 is required to cross-compile for arm-linux-musl. On 32-bit musl, bindgen
+# renders timespec's padding around tv_nsec as bitfield members, so magnus 0.8's
+# `From<Timespec> for timespec` struct literal fails with E0063 (missing fields
+# `_bitfield_1`, `_bitfield_align_1`). 0.9 builds the struct with mem::zeroed
+# and assigns the two fields instead.
+magnus = "0.9"
 
 # vodozemac 0.10.0 (2026-04-13), default features (libolm-compat).
 #
