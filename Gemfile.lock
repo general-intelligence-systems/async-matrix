@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    async-matrix (2.1.0)
+    async-matrix (3.0.0)
       async (~> 2.46)
       async-http (~> 0.105)
       json_schemer (~> 2.5)
@@ -108,6 +108,7 @@ PLATFORMS
 
 DEPENDENCIES
   async-matrix!
+  gem_kit (~> 0.2)
   gem_kit-release (~> 0.3)
   lefthook (~> 2.2)
   logger

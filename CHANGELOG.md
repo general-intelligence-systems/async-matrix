@@ -6,13 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-08
+
 The Application Service layer has moved out of this gem into
 [async-matrix-bridge](https://github.com/general-intelligence-systems/async-matrix-bridge).
 async-matrix is now the Matrix *protocol* layer only: the Client-Server API
 client, events and schema validation, media, and end-to-end encryption.
-
-This removes a public namespace, so it wants a major version bump when
-released.
 
 ### Removed
 
@@ -26,7 +25,8 @@ released.
   replacement. This drops the `sequel`, `async-websocket` and `sqlite3`
   dependencies.
 - **`grape`** is no longer a dependency; it belongs to the application service,
-  and so now to async-matrix-bridge.
+  and so now to async-matrix-bridge. `falcon` is likewise no longer a
+  development dependency.
 - `bin/fetch-discord-api-spec`, and `examples/` (which are all application
   services — they moved to async-matrix-bridge too).
 
@@ -38,7 +38,9 @@ released.
   overrides to raise, which is the seam async-matrix-bridge uses to layer the
   bridgev2 JSON Schema suite back on. `Client` only ever read
   `homeserver.address` and `appservice.as_token`, so nothing in this gem needs
-  the schema.
+  the schema. `Config.load(path)` and `Config#bot_mxid` are unchanged; top-level
+  sections remain an explicit `def_delegators` list, so a typo'd section still
+  raises `NoMethodError` instead of autovivifying.
 
 ### Changed
 
@@ -49,6 +51,24 @@ released.
 - **`ApplicationService::ErrorResponse` is now `Async::Matrix::ErrorResponse`**,
   for the same reason: `Client` and `MediaClient` parse every failed response
   into one.
+- Raised the minimum runtime dependencies to `async ~> 2.46`,
+  `async-http ~> 0.105` and `json_schemer ~> 2.5`.
+- The documentation site is now built with
+  [just-the-docs](https://just-the-docs.com/) instead of utopia-project, at the
+  same `documentation_uri`.
+
+### Fixed
+
+- `lib/async/matrix.rb` no longer calls `require "bundler/setup"`. A library
+  has no business activating the host application's bundle, and doing so broke
+  any application whose own `Gemfile` did not already match.
+
+### Security
+
+- Dropping `grape` removes `activesupport` and with it `concurrent-ruby` from
+  the dependency tree entirely, which closes GHSA-h8w8-99g7-qmvj (plus two low
+  advisories) for this gem. The transitive pin had already been bumped to
+  `concurrent-ruby 1.3.7` before the dependency was removed.
 
 ## [2.1.0] - 2026-08-01
 
@@ -101,7 +121,7 @@ Major release. The Application Service server has been rebuilt on
 extracted into a dedicated, long-lived object. These are breaking changes to the
 server-side API.
 
-### Breaking changes
+### Changed
 
 - **Grape-based Application Service server.** `ApplicationService::Server` now
   wraps a `Grape::API` instead of a hand-rolled Rack app. It forwards the Grape
@@ -116,9 +136,6 @@ server-side API.
   duck-type (`#event_types`, `#call`) is unchanged.
 - **`scampi` is now a development dependency** (bumped to `~> 1.0`) instead of a
   runtime dependency. Inline co-located tests moved to `__END__` sections.
-
-### Changed
-
 - Reworked the dispatcher and transaction store around the new
   `TransactionHandler`.
 - Query parameters are now supported on all HTTP client methods.
@@ -128,21 +145,31 @@ server-side API.
   (`examples/run_test.sh`).
 - Improved event logging.
 
-## [1.2.1] - 2026
+## [1.2.1] - 2026-06-08
+
+### Fixed
 
 - Fixed the Ruby 4.0 build by bumping the native `magnus` binding from 0.7 to
   0.8.
 
-## [1.2.0] - 2026
+## [1.2.0] - 2026-06-08
+
+### Added
 
 - Added end-to-end encryption (Olm/Megolm) via a native `vodozemac` binding.
 
-## [1.0.0] - 2026
+## [1.0.0] - 2026-04-28
+
+### Added
 
 - First release: async-native Matrix Application Service SDK built on the
   Socketry ecosystem, with schema-driven event validation, an OpenAPI-backed
   client, media support, and mautrix-compatible configuration.
 
+[Unreleased]: https://github.com/general-intelligence-systems/async-matrix/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v3.0.0
+[2.1.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v2.1.0
+[2.0.1]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v2.0.1
 [2.0.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v2.0.0
 [1.2.1]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v1.2.1
 [1.2.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v1.2.0
