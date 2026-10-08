@@ -114,7 +114,7 @@ bin/fetch-matrix-api-schemas  # Client-Server OpenAPI specs -> data/
 
 Every source file ends with an `__END__` section containing its own unit tests. The test DSL uses `describe`/`it` blocks with `value.should == expected` assertions and `lambda { ... }.should.raise(ErrorClass)` for exceptions. Scampi evaluates each `__END__` tail in `TOPLEVEL_BINDING`, so infrastructure stubs (`FakeBody`, `FakeResponse`, `FakeInternet`) defined in `lib/async/matrix/client.rb`'s `__END__` section are visible to every other file's specs.
 
-**Known wart:** scampi only `require`s the files it discovers (those with an `__END__` tail), and `version.rb` has no specs — so `Async::Matrix::VERSION` is undefined under `bin/test` and every spec that constructs a `Client` errors with `NameError`. The suite reports ~60 errors for this reason alone, independent of the code under test.
+Scampi `require`s only the files it discovers (those with an `__END__` tail), so nothing loads `lib/async/matrix.rb` or its glob. Constants still resolve because `bundler/setup` evaluates `async-matrix.gemspec`, which `require_relative`s `lib/async/matrix/version.rb` — which is why a broken `BUNDLE_GEMFILE` shows up as ~60 `uninitialized constant Async::Matrix::VERSION` errors rather than as a bundler failure. See the `extraConfigPaths` comment in `flake.nix`.
 
 ### Client HTTP layer
 

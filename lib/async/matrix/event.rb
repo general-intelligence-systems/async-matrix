@@ -19,8 +19,15 @@ module Async
     #   event.valid!         # => true (or raises Schema::ValidationError)
     #
     class Event
-      attr_reader :type, :sender, :room_id, :state_key, :content,
-                  :event_id, :origin_server_ts, :unsigned, :raw
+      attr_reader :type,
+        :sender,
+        :room_id,
+        :state_key,
+        :content,
+        :event_id,
+        :origin_server_ts,
+        :unsigned,
+        :raw
 
       def initialize(data)
         @raw       = data
@@ -51,7 +58,7 @@ module Async
           raise Schema::ValidationError.new(
             errors,
             event_type: @type,
-            event_id: @event_id,
+            event_id:   @event_id,
           )
         end
 

@@ -33,10 +33,22 @@ module Async
       # explicit list, not a method_missing forward: a typo'd section should
       # raise NoMethodError rather than autovivify into an empty hash.
       def_delegators :@data,
-        :network, :bridge, :database, :homeserver, :appservice,
-        :matrix, :analytics, :provisioning, :public_media, :direct_media,
-        :backfill, :double_puppet, :encryption, :logging,
-        :management_room_texts, :env_config_prefix
+        :network,
+        :bridge,
+        :database,
+        :homeserver,
+        :appservice,
+        :matrix,
+        :analytics,
+        :provisioning,
+        :public_media,
+        :direct_media,
+        :backfill,
+        :double_puppet,
+        :encryption,
+        :logging,
+        :management_room_texts,
+        :env_config_prefix
 
       def initialize(data)
         self.class.validate!(data)
