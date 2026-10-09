@@ -3,7 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-require_relative "error"
+require_relative "errors"
 require_relative "event"
 require_relative "encrypted_message"
 
@@ -53,11 +53,11 @@ module Protocol
       # state rather than timeline, which the event itself does not say.
       SECTIONS = %i[to_device join invite leave transaction].freeze
 
-      class Error < Protocol::Matrix::Error; end
+      Error = Errors::MessageBatchError
 
       # #read after the batch was drained is fine (nil). This is for a consumer
       # that asks for a second pass over something already consumed.
-      class ConsumedError < Error; end
+      ConsumedError = Errors::ConsumedError
 
       # Unpack a /sync response.
       #

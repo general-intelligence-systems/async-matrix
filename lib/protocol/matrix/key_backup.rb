@@ -6,7 +6,7 @@
 require "json"
 require "openssl"
 
-require_relative "error"
+require_relative "errors"
 require_relative "secret_storage"
 
 module Protocol
@@ -45,8 +45,8 @@ module Protocol
       # initialization vector."
       DERIVED_LENGTH = 80
 
-      class Error < Protocol::Matrix::Error; end
-      class MacError < Error; end
+      Error = Errors::KeyBackupError
+      MacError = Errors::KeyBackupMacError
 
       # Decrypt one backed-up session blob to its BackedUpSessionData.
       #

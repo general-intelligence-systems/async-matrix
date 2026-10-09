@@ -10,9 +10,6 @@ require "console"
 require "securerandom"
 require "time"
 
-# The action surface, mixed in below. Required explicitly because the library's
-# loader globs this directory in sorted order, which reaches client.rb before
-# client/ -- so `include Encryption` would resolve against nothing.
 require_relative "client/encryption"
 require_relative "client/rooms"
 
@@ -30,17 +27,14 @@ module Async
     class Client
       CLIENT_PREFIX = "/_matrix/client/v3"
 
-      # Retry defaults
-      DEFAULT_MAX_RETRIES     = 3    # max retry attempts (0 disables)
-      DEFAULT_RETRY_BASE      = 0.5  # initial backoff in seconds
-      DEFAULT_MAX_RETRY_DELAY = 30   # cap on any single delay in seconds
+      DEFAULT_MAX_RETRIES     = 3
+      DEFAULT_RETRY_BASE      = 0.5
+      DEFAULT_MAX_RETRY_DELAY = 30
 
-      # Status codes eligible for retry
       RATE_LIMIT_STATUS      = 429
       GATEWAY_ERROR_STATUSES = [502, 503, 504].freeze
 
-      # Response size limits (bytes)
-      DEFAULT_RESPONSE_SIZE_LIMIT       = 50 * 1024 * 1024  # 50 MiB for JSON API responses
+      DEFAULT_RESPONSE_SIZE_LIMIT       = 50 * 1024 * 1024   # 50 MiB for JSON API responses
       DEFAULT_ERROR_RESPONSE_SIZE_LIMIT = 512 * 1024         # 512 KiB for error bodies
 
       include Encryption
@@ -69,8 +63,6 @@ module Async
         ]
       end
 
-      # ── Messaging ──────────────────────────────────────────────
-
       def send_text(room_id, text)
         content = {msgtype: "m.text", body: text}
         send_message_event(room_id, "m.room.message", content)
@@ -91,12 +83,6 @@ module Async
         send_message_event(room_id, "m.room.message", content)
       end
 
-      # ── Room actions ───────────────────────────────────────────
-
-      # Positional OR keyword: `join_room("!r:example.org")` is how this was
-      # always called, and `join_room(room_id: "!r:example.org")` is the form
-      # every other action here takes. Keeping both means the action surface is
-      # consistent without breaking callers written against 3.0.
       def join_room(room_id = nil, **options)
         target = room_id || options[:room_id]
         post("#{CLIENT_PREFIX}/join/#{encode(target)}")
@@ -107,8 +93,6 @@ module Async
         post("#{CLIENT_PREFIX}/rooms/#{encode(target)}/leave")
       end
 
-      # ── Profile ────────────────────────────────────────────────
-
       def set_display_name(name, user_id = nil)
         uid = user_id || @config.bot_mxid
         put(
@@ -117,51 +101,18 @@ module Async
         )
       end
 
-      # ── Verification ───────────────────────────────────────────
-
       def whoami
         get("#{CLIENT_PREFIX}/account/whoami")
       end
 
-      # ── Syncing ────────────────────────────────────────────────────────────
-
-      # A stream of messages from this account, decrypted by +store+.
-      #
-      #   client.sync(store: device_store).each do |message|
-      #     ...
-      #   end
-      #
-      # See Client::Sync: the stream yields room messages only, and to-device
-      # events are fed to the store on the way through, which is how room keys
-      # arrive.
       def sync(store: nil, since: nil, timeout: Sync::DEFAULT_TIMEOUT, filter: nil)
         Sync.new(self, store: store, since: since, timeout: timeout, filter: filter)
       end
 
-      # ── Full API (runtime-generated from OpenAPI schemas) ─────
-
-      # Returns a Gateway that provides method-chained access to every
-      # Matrix Client-Server API endpoint. Chains are validated against
-      # the official OpenAPI path tree and terminated by .get(), .post(),
-      # .put(), or .delete().
-      #
-      #   client.api.account.whoami.get
-      #   client.api.createRoom.post(name: "Pub")
-      #   client.api.rooms("!room:ex.com").ban.post(user_id: "@bad:ex.com")
-      #   client.api.rooms("!room:ex.com").messages.get(dir: "b", limit: 10)
-      #
       def api
         Api::Gateway.new(self)
       end
 
-      # Returns a Gateway rooted at /_matrix/media/v3 for media operations.
-      # Binary routes (upload/download/thumbnail) are automatically detected
-      # by the Chain and dispatched to the MediaClient.
-      #
-      #   client.media.upload.post(bytes, content_type: "image/png")
-      #   client.media.download("example.com", "abc123").get
-      #   client.media.thumbnail("example.com", "abc123").get(width: 64, height: 64)
-      #
       def media
         Api::Gateway.new(self, prefix: %w[_matrix media v3])
       end
@@ -169,10 +120,8 @@ module Async
       # Returns the binary media client used for upload/download operations.
       # Lazily initialized, shares the same config as this client.
       def media_client
-        @media_client ||= MediaClient.new(@config)
+        @media_client ||= Media.new(@config)
       end
-
-      # ── Low-level HTTP ─────────────────────────────────────────
 
       def send_message_event(room_id, event_type, content)
         txn_id = SecureRandom.uuid
@@ -207,14 +156,6 @@ module Async
         )
       end
 
-      # Query parameters added to EVERY request this client makes.
-      #
-      # EMPTY FOR AN ORDINARY CLIENT: a user's own access token already says who
-      # the request is for. AppServiceClient overrides it, because an as_token
-      # says only "an appservice" -- without `?user_id=` the homeserver assumes
-      # the registration's sender_localpart, and without `?device_id=` the
-      # request has no device at all, which fails precisely the calls encryption
-      # depends on.
       def default_query = {}
 
       def close
@@ -318,15 +259,6 @@ module Async
           end
         end
 
-      # ── Response size limiting ──────────────────────────────────
-
-      # Read the response body with a size limit. Raises ResponseTooLargeError
-      # if the body exceeds the limit. Checks Content-Length first (fast path),
-      # then enforces during streaming read (safe path).
-      #
-      # @param response [Protocol::HTTP::Response] the HTTP response
-      # @param limit [Integer] maximum allowed body size in bytes
-      # @return [String, nil] the response body, or nil if empty
         def read_limited(response, limit)
           body = response.body
           if body
@@ -354,11 +286,6 @@ module Async
           end
         end
 
-      # ── Retry logic ─────────────────────────────────────────────
-
-      # Whether the given HTTP status code should trigger a retry.
-      # 429 is only retried if @ignore_rate_limit is false.
-      # 502/503/504 are always retried.
         def retryable_status?(status)
           if status == RATE_LIMIT_STATUS
             !@ignore_rate_limit
@@ -367,15 +294,6 @@ module Async
           end
         end
 
-      # Compute the delay before the next retry attempt.
-      #
-      # For 429 (rate-limited): use the server's Retry-After header if present,
-      # falling back to exponential backoff. The value is capped but not jittered
-      # — the server is telling us exactly when to come back.
-      #
-      # For 502/503/504 (gateway errors): exponential backoff with full jitter.
-      # Full jitter means rand(0..calculated), which is the AWS-recommended
-      # approach to avoid thundering herd on shared homeservers.
         def compute_retry_delay(status, response, attempt)
           if status == RATE_LIMIT_STATUS
             server_delay = parse_retry_after(response)
@@ -387,14 +305,10 @@ module Async
           end
         end
 
-      # Base * 2^(attempt-1): 0.5, 1.0, 2.0, 4.0, ...
         def exponential_delay(attempt)
           @retry_base_delay * (2 ** (attempt - 1))
         end
 
-      # Parse the Retry-After header. Supports both delta-seconds ("120")
-      # and HTTP-date ("Fri, 31 Dec 2026 23:59:59 GMT") formats per RFC 9110.
-      # Returns seconds to wait as a Float, or nil if absent/unparseable.
         def parse_retry_after(response)
           value = response.headers["retry-after"]
           if value
@@ -464,9 +378,9 @@ __END__
       client.should.respond_to :media_client
     end
 
-    it "returns a MediaClient from media_client" do
+    it "returns a Client::Media from media_client" do
       client = Async::Matrix::Client.new(make_config)
-      client.media_client.should.be.kind_of Async::Matrix::MediaClient
+      client.media_client.should.be.kind_of Async::Matrix::Client::Media
     end
 
     it "returns a Gateway from media with media prefix" do

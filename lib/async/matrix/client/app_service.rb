@@ -1,95 +1,42 @@
 # frozen_string_literal: true
 
-# Released under the Apache License, Version 2.0.
-# Copyright, 2026, by General Intelligence Systems.
-
-require_relative "client"
+require_relative "../client"
 
 module Async
   module Matrix
-    # A Client that acts AS one of the appservice's users, on one of that user's
-    # devices.
-    #
-    #   client = AppServiceClient.new(config, user_id: "@ada:example.org", device_id: "ABCDEFGHIJ")
-    #   client.upload_keys(device_keys: ...)   # uploaded for Ada's device, not the bot's
-    #
-    # This is double puppeting, and it is the officially intended mechanism
-    # rather than a trick. Identity assertion -- `?user_id=` -- has been in the
-    # application service spec for years; [MSC4326] added `?device_id=` beside
-    # it and is MERGED, so the plain parameter names below are stable spec, not
-    # the unstable `org.matrix.msc3202.device_id` an older implementation would
-    # have sent.
-    #
-    # WHY NOT A TOKEN. Bridges used to get a per-user access token by calling
-    # /login with `m.login.application_service` ([MSC2778]), and that route is
-    # gone on a homeserver fronted by OAuth2 -- it answers
-    # M_APPSERVICE_LOGIN_UNSUPPORTED. [MSC4190], which is also merged, replaced
-    # it: an appservice creates devices directly (`PUT /devices/{deviceId}`) and
-    # then acts as them with these two parameters. No token is ever issued, so
-    # none can expire or need refreshing.
-    #
-    # IT STILL WORKS BEHIND MAS. Synapse checks an as_token against its own
-    # appservice registry before it introspects anything at the authentication
-    # service, so masquerading is unaffected by next-generation auth.
-    #
-    # THE USER MUST BE IN THE REGISTRATION'S NAMESPACE. The homeserver refuses
-    # otherwise -- which is why a double-puppet registration claims a wide user
-    # namespace non-exclusively rather than naming individuals.
-    #
-    # [MSC4326]: https://github.com/matrix-org/matrix-spec-proposals/pull/4326
-    # [MSC4190]: https://github.com/matrix-org/matrix-spec-proposals/pull/4190
-    # [MSC2778]: https://github.com/matrix-org/matrix-spec-proposals/pull/2778
-    class AppServiceClient < Client
-      # @parameter user_id [String] the user to act as. Must match the
-      #   registration's user namespace.
-      # @parameter device_id [String] the device to act as.
-      #
-      #   WITHOUT IT THE REQUEST HAS NO DEVICE, and an appservice request with
-      #   no device cannot upload one-time keys, claim keys or send to-device
-      #   messages -- every call encryption is made of. It is optional only
-      #   because the device has to be CREATED before it can be acted as, and
-      #   that one call is made without it.
-      def initialize(config, user_id:, device_id: nil, **options)
-        super(config, **options)
+    class Client
+      class AppService < Client
+        def initialize(config, user_id:, device_id: nil, **options)
+          super(config, **options)
 
-        @user_id = user_id
-        @device_id = device_id
-      end
+          @user_id = user_id
+          @device_id = device_id
+        end
 
-      attr_reader :user_id, :device_id
+        attr_reader :user_id, :device_id
 
-      # NAMED ON EVERY REQUEST, not only the ones that obviously need it. An
-      # appservice request that omits them is not an error: it silently acts as
-      # the registration's sender_localpart, with no device, which is far worse
-      # than a failure because it succeeds.
-      def default_query
-        {user_id: @user_id}.tap do |query|
-          if @device_id
-            query[:device_id] = @device_id
+        def default_query
+          {user_id: @user_id}.tap do |query|
+            if @device_id
+              query[:device_id] = @device_id
+            end
           end
         end
-      end
 
-      # A sibling client for another user or device, sharing this one's config
-      # and retry policy.
-      #
-      # One appservice commonly acts for many users, and the alternative --
-      # mutating user_id on a single client -- races itself the moment two
-      # fibers use it, which is exactly what an async bridge does.
-      def as(user_id:, device_id: nil)
-        self.class.new(@config, user_id: user_id, device_id: device_id)
-      end
+        def as(user_id:, device_id: nil)
+          self.class.new(@config, user_id: user_id, device_id: device_id)
+        end
 
-      # The same user, now on a device: what you call once the device exists.
-      def with_device(device_id)
-        as(user_id: @user_id, device_id: device_id)
+        def with_device(device_id)
+          as(user_id: @user_id, device_id: device_id)
+        end
       end
     end
   end
 end
 
 __END__
-  describe "Async::Matrix::AppServiceClient" do
+  describe "Async::Matrix::Client::AppService" do
     def config
       Async::Matrix::Config.new({
         "homeserver" => {"address" => "http://synapse:8008", "domain" => "example.org"},
@@ -100,7 +47,7 @@ __END__
     def recording_client(user_id: "@ada:example.org", device_id: "ABCDEFGHIJ")
       Async::Matrix::Api.reset!
 
-      client = Async::Matrix::AppServiceClient.new(config, user_id: user_id, device_id: device_id)
+      client = Async::Matrix::Client::AppService.new(config, user_id: user_id, device_id: device_id)
       calls = []
       client.define_singleton_method(:calls) { calls }
       client.define_singleton_method(:internet) do
@@ -206,7 +153,7 @@ __END__
     end
 
     # An ordinary client asserts nothing: a user's own token already says who
-    # the request is for.
+    # request is for.
     it "is the only client that asserts anything" do
       Async::Matrix::Client.new(config).default_query.should == {}
     end

@@ -6,6 +6,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: the client classes moved under `Client::`, without the suffix.**
+  `Async::Matrix::AppServiceClient` is now `Async::Matrix::Client::AppService`,
+  `DoublePuppetClient` is `Client::DoublePuppet`, and `MediaClient` is
+  `Client::Media` — every client lives in `lib/async/matrix/client/*.rb`, named
+  for its path. The old constant names are gone.
+
 ## [3.0.1] - 2026-10-09
 
 Encryption is now usable end to end. The message *format* layer moved to a new

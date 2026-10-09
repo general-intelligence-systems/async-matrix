@@ -4,7 +4,7 @@
 # Copyright, 2026, by General Intelligence Systems.
 
 require_relative "canonical_json"
-require_relative "error"
+require_relative "errors"
 
 module Protocol
   module Matrix
@@ -27,10 +27,10 @@ module Protocol
     module Signing
       ED25519 = "ed25519"
 
-      class Error < Protocol::Matrix::Error; end
+      Error = Errors::SigningError
 
       # No signature from the entity and key we were told to check.
-      class MissingSignatureError < Error; end
+      MissingSignatureError = Errors::MissingSignatureError
 
       # "{algorithm}:{key_id}" — for a device key the key_id is the device id.
       def self.key_id(name, algorithm: ED25519)

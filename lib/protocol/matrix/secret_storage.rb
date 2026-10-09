@@ -5,7 +5,7 @@
 
 require "openssl"
 
-require_relative "error"
+require_relative "errors"
 
 module Protocol
   module Matrix
@@ -40,14 +40,9 @@ module Protocol
 
       DEFAULT_PASSPHRASE_BITS = 256
 
-      class Error < Protocol::Matrix::Error; end
-
-      # The MAC did not verify: the wrong key, or tampered ciphertext.
-      class MacError < Error; end
-
-      # The input is neither a recovery key nor usable as a passphrase for this
-      # account's key.
-      class UnusableKeyError < Error; end
+      Error = Errors::SecretStorageError
+      MacError = Errors::SecretStorageMacError
+      UnusableKeyError = Errors::UnusableKeyError
 
       # ── Getting to the storage key ──────────────────────────────────────────
 

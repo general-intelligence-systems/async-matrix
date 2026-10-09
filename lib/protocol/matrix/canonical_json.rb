@@ -5,7 +5,7 @@
 
 require "json"
 
-require_relative "error"
+require_relative "errors"
 
 module Protocol
   module Matrix
@@ -36,7 +36,7 @@ module Protocol
       # `signatures` object are not covered by the signature."
       EXCLUDED_FROM_SIGNATURE = %w[signatures unsigned].freeze
 
-      class Error < Protocol::Matrix::Error; end
+      Error = Errors::CanonicalJsonError
 
       # @returns [String] the canonical encoding of +value+.
       def self.encode(value)

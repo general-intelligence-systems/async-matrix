@@ -4,7 +4,7 @@
 # Copyright, 2026, by General Intelligence Systems.
 
 require_relative "encrypted_message"
-require_relative "error"
+require_relative "errors"
 require_relative "signing"
 
 module Protocol
@@ -41,7 +41,7 @@ module Protocol
       # decrypt would have peers encrypt into a void.
       ALGORITHMS = EncryptedMessage::ALGORITHMS
 
-      class Error < Protocol::Matrix::Error; end
+      Error = Errors::KeysError
 
       # The signed device identity document.
       #

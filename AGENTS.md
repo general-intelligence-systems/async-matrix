@@ -126,7 +126,7 @@ bin/fetch-matrix-api-schemas  # Client-Server OpenAPI specs -> data/
 
 ### Entry point and module loading
 
-`lib/async/matrix.rb` defines the `Async::Matrix` module and auto-requires **every `.rb` file** under `lib/async/matrix/` via `Dir.glob`. All source lives under the `Async::Matrix` namespace. Source files do **not** self-`require "async/matrix"`; they rely on the glob loader for ordering, plus targeted `require_relative` for the few load-time cross-file dependencies (e.g. `double_puppet_client.rb` → `client`, `config.rb` → `config/vivify`, `schema/validation_error.rb` → `error`).
+`lib/async/matrix.rb` defines the `Async::Matrix` module and auto-requires **every `.rb` file** under `lib/async/matrix/` via `Dir.glob`. All source lives under the `Async::Matrix` namespace. Source files do **not** self-`require "async/matrix"`; they rely on the glob loader for ordering, plus targeted `require_relative` for the few load-time cross-file dependencies (e.g. `client/double_puppet.rb` → `../client`, `config.rb` → `config/vivify`, `schema/validation_error.rb` → `error`).
 
 ### Inline co-located tests (scampi)
 
@@ -143,8 +143,8 @@ Scampi `require`s only the files it discovers (those with an `__END__` tail), so
 - Retry-After header parsing (delta-seconds and HTTP-date) for 429
 - Per-request `max_retries:` override
 - Response size limiting (50 MiB for JSON, 512 KiB for errors) with streaming enforcement
-- `MediaClient` for binary upload/download operations
-- `DoublePuppetClient`, a subclass authenticating as a puppeted user rather than the appservice
+- `Client::Media` for binary upload/download operations
+- `Client::DoublePuppet`, a subclass authenticating as a puppeted user rather than the appservice
 
 `Client` duck-types on its config: it reads only `config.homeserver.address` and `config.appservice.as_token`, so anything answering those works.
 
@@ -154,7 +154,7 @@ Scampi `require`s only the files it discovers (those with an `__END__` tail), so
 
 - **PathTree** — trie loaded from OpenAPI YAML; template segments (`{roomId}`) become wildcards
 - **Chain** — inherits `BasicObject` so that methods like `send`, `display`, `format` fall through to `method_missing`. Records path segments, then `.get()/.post()/.put()/.delete()` validates against PathTree and dispatches
-- **Binary route detection** — upload/download/thumbnail paths dispatch to `MediaClient` instead of the JSON `Client`
+- **Binary route detection** — upload/download/thumbnail paths dispatch to `Client::Media` instead of the JSON `Client`
 - **Version rewriting** — media endpoints at `/v3` are rewritten to `/v1` where spec requires
 
 ### Events and schema-driven validation

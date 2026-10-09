@@ -5,7 +5,7 @@
 
 require "json"
 
-require_relative "error"
+require_relative "errors"
 
 module Protocol
   module Matrix
@@ -61,25 +61,13 @@ module Protocol
       # refusing a payload that omits them does not.
       OLM_PAYLOAD_REQUIRED = %w[type content sender recipient recipient_keys keys].freeze
 
-      # A message that does not match the format its own algorithm demands.
-      class MalformedError < Error; end
-
-      # An algorithm this library does not implement. NOT fatal to a batch: an
-      # unknown algorithm is a message we cannot read, which is the same
-      # practical state as a missing key.
-      class UnsupportedAlgorithmError < Error; end
-
-      # An Olm event whose ciphertext map has no entry for our identity key.
-      class NotAddressedError < Error; end
-
-      # The cryptography itself refused the message: a corrupt ciphertext, a
-      # session that cannot read it, a ratchet too far advanced. Wrapped rather
-      # than propagated so a caller rescues one protocol error instead of
-      # whichever RuntimeError the vodozemac binding happened to raise.
-      class DecryptionError < Error; end
-
-      # #payload, #type, #content or #message_index asked for before #decrypt!.
-      class NotDecryptedError < Error; end
+      # The errors this class raises, defined in Protocol::Matrix::Errors and
+      # aliased here so `EncryptedMessage::MalformedError` keeps resolving.
+      MalformedError = Errors::MalformedError
+      UnsupportedAlgorithmError = Errors::UnsupportedAlgorithmError
+      NotAddressedError = Errors::NotAddressedError
+      DecryptionError = Errors::DecryptionError
+      NotDecryptedError = Errors::NotDecryptedError
 
       # Does this event need decrypting at all? Lets a caller sort a mixed batch
       # without rescuing.

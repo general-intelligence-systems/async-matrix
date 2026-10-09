@@ -52,7 +52,7 @@ client.api.createRoom.post(name: "Pub")
 client.api.rooms("!room:ex.com").messages.get(dir: "b", limit: 10)
 ```
 
-Binary routes (upload, download, thumbnail) are detected and dispatched to a dedicated `MediaClient`, so raw bytes never pass through JSON encoding.
+Binary routes (upload, download, thumbnail) are detected and dispatched to a dedicated `Client::Media`, so raw bytes never pass through JSON encoding.
 
 All methods are fiber-safe with automatic connection pooling. The client retries 502/503/504 with exponential backoff and full jitter, honours `Retry-After` on 429, and caps response bodies while streaming them.
 
