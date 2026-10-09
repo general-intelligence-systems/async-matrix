@@ -6,6 +6,134 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-09
+
+Encryption is now usable end to end. The message *format* layer moved to a new
+`Protocol::Matrix` namespace that does no IO, `Async::Matrix::DeviceStore`
+holds one device's key material and reads anything it has a key for, and
+`Client#sync` streams decrypted messages off a homeserver. The old
+`Async::Matrix` constant names still work.
+
+### Added
+
+- **`Protocol::Matrix`** — the format layer, in the namespace the Socketry
+  convention puts it in (`protocol-http` owns the format, `async-http` binds it
+  to IO). Everything under it can be unit tested with a Hash: no network, no
+  homeserver, and no crypto. `require "async/matrix"` loads it, and
+  `require "protocol/matrix"` loads it alone. New constants:
+  - **`EncryptedMessage`** — an `m.room.encrypted` event of either algorithm
+    (`OLM`, `MEGOLM`). `.encrypted?(data)` classifies a raw hash;
+    `#ciphertext_for`, `#addressed_to?`, `#message_type` and `#prekey?` answer
+    the Olm addressing questions; `#decrypt!(session)` then makes `#type`,
+    `#content` and `#message_index` readable. The builders —
+    `.megolm_content`, `.olm_content`, `.room_payload`, `.olm_payload`,
+    `.room_key_payload` — produce the wire shapes.
+  - **`MessageBatch`** — `.from_sync(response)` and
+    `.from_transaction(transaction)` turn either wire format into one
+    single-pass stream of messages. **To-device messages are always read
+    first**, so an `m.room_key` in a batch unlocks the timeline event later in
+    the same batch on its first pass. Not rewindable: `#read` answers `nil`
+    forever once drained, because decrypting ratchets a session forward.
+  - **`Keys`** — builds and verifies the signed key objects
+    `/keys/upload` wants: `.device_keys`, `.one_time_keys`, `.fallback_keys`,
+    `.signed_key`, plus `.identity_key`, `.fingerprint` and
+    `.valid_device_keys?` for reading somebody else's.
+  - **`Signing`** and **`CanonicalJson`** — canonical JSON encoding per the
+    spec (`.encode`, `.signable_bytes`, with the ±2^53 integer bounds enforced)
+    and signatures over it (`.sign`, `.verify`, `.signed_by?`, `.key_id`). The
+    signer and verifier are injected, so neither module names a crypto library.
+  - **`SecretStorage`** — 4S (`m.secret_storage.v1.aes-hmac-sha2`):
+    `.decode_recovery_key` / `.encode_recovery_key` for the base58 key the user
+    writes down, `.derive_from_passphrase`, `.valid_key?` to check a key against
+    `key_info` before trusting it, and `.decrypt_secret`.
+  - **`KeyBackup`** — server-side key backup
+    (`m.megolm_backup.v1.curve25519-aes-sha2`): `.decrypt_session`,
+    `.public_key_for` and `.key_matches?`. The sessions it yields feed
+    `InboundGroupSession.import`, added in 2.1.0.
+  - **`Error`** — see *Changed*.
+- **`Async::Matrix::DeviceStore`** — one device's Olm account, its 1:1 sessions
+  and every Megolm room key it has accumulated; this is what you hand to a sync
+  client. `#decrypt(message)` returns the message if it could be read and `nil`
+  if not, `#encrypt(room_id:, type:, content:)` produces megolm content and
+  rotates the session on `DEFAULT_ROTATION_MESSAGES`/`DEFAULT_ROTATION_MS`,
+  and `#absorb(payload)` takes in an `m.room_key` or `m.forwarded_room_key`.
+  `#device_keys`, `#generate_one_time_keys`, `#generate_fallback_key` and
+  `#needs_one_time_keys?(server_count)` cover the publishing side.
+
+  It persists nothing: the crypto primitives are injected already unpickled
+  (`account:` is duck-typed, `e2ee:` is any module providing
+  `InboundGroupSession`), and every ratchet step is reported through `#changes`
+  / `#changed?` / `#flush_changes!` for the caller to write where it likes.
+  `#export(pickle_key)` pickles the lot. It also raises `ReplayError` on a
+  repeated megolm message index and `RoomMismatchError` on a session used for
+  the wrong room.
+- **`Client#sync`**, returning a **`Client::Sync`** — a stream of messages,
+  decrypted on the way through by the `store:` you pass. `#each` yields room
+  messages *only*: to-device events are fed to the store rather than yielded,
+  which is how room keys arrive, and `#next_batch` is the cursor to resume
+  from. `#one_time_keys_count` surfaces what the server says it still holds.
+  A failed request raises rather than retrying — a homeserver that is down is
+  policy for whatever drives the loop.
+- **`Client::Encryption`**, mixed into `Client` — `#register_user`,
+  `#create_device`, `#upload_keys`, `#upload_cross_signing_keys`,
+  `#upload_signatures`, `#query_keys`, `#claim_keys` and `#send_to_device`.
+  Until `#upload_keys` has run the device is invisible and every message in an
+  encrypted room stays ciphertext.
+- **`Client::Rooms`**, mixed into `Client` — the room action surface, all
+  keyword arguments and all routed through `#api` so a typo is an
+  `InvalidEndpointError` rather than a 404: `#invite`, `#kick`, `#ban`,
+  `#unban`, `#forget_room`, `#joined_members`, `#joined_rooms`, `#create_room`,
+  `#send_event`, `#redact`, `#messages`, `#event`, `#send_state`, `#get_state`,
+  `#room_state`, `#set_room_name`, `#set_room_topic`, `#set_pinned_events`,
+  `#set_power_level`, `#read_receipt`, `#typing`, `#account_data`,
+  `#set_account_data` and `#room_account_data`. Nothing here encrypts;
+  `#send_event` sends exactly the content it is given.
+- **`Async::Matrix::AppServiceClient`** — a `Client` that acts *as* one of the
+  appservice's users on one of their devices, via the merged `?user_id=`
+  ([MSC4326](https://github.com/matrix-org/matrix-spec-proposals/pull/4326)) and MSC4190 device creation rather than the `/login` route that
+  OAuth2-fronted homeservers answer `M_APPSERVICE_LOGIN_UNSUPPORTED` to. No
+  per-user token is issued, so none can expire. `#as(user_id:, device_id:)` and
+  `#with_device(device_id)` return sibling clients sharing the config and retry
+  policy, which is what keeps two fibers from racing over one client's
+  identity.
+- **`Async::Matrix::E2EE::PickleKey`** — the key every pickle in `E2EE` is
+  encrypted with at rest. `.derive(secret, info:, salt:)` turns an application
+  secret into the exact shape vodozemac accepts (32 characters of valid UTF-8,
+  which is why 24 bytes of entropy are base64'd), and `#inspect` is redacted so
+  the key cannot reach a log. Lose or rotate it and every pickle is
+  permanently undecryptable.
+- **`Client#default_query`** — query parameters added to every request this
+  client makes. Empty on `Client`; `AppServiceClient` overrides it. A parameter
+  the caller already set wins.
+- **`Protocol::Matrix::Event#encrypted?`** (always `false`) and
+  **`#decrypted?`** (always `true`), so a consumer reading a `MessageBatch`
+  need not ask which class it is holding before reading `#type` and `#content`.
+
+### Changed
+
+- **`Async::Matrix::Event`, `Content`, `Schema`, `Schema::Registry` and
+  `Schema::ValidationError` now live under `Protocol::Matrix`.** The old names
+  are kept as aliases, so code written against 3.0 keeps working and
+  `Schema.parse` still returns something `Async::Matrix::Event` matches; new
+  code should name `Protocol::Matrix` directly.
+- **`Async::Matrix::Error` is now a constant pointing at
+  `Protocol::Matrix::Error`**, not a class of its own, so `rescue
+  Async::Matrix::Error` catches a format failure and a transport failure alike
+  and every existing subclass (`AuthError` and friends) still inherits it.
+  The constructor now accepts a lone message — `raise MalformedError, "..."` —
+  as well as the `(errcode, message, status:)` form the transport has always
+  used. Anything matching on `Async::Matrix::Error.name` or comparing classes
+  by identity across the two namespaces should stop doing so; they are one
+  class.
+- **`Client#join_room` and `#leave_room` accept `room_id:` as a keyword** as
+  well as positionally, so they match the rest of the action surface. The
+  positional form is unchanged.
+
+### Fixed
+
+- `DELETE` through `client.api` raised `NoMethodError`: `Api::Chain#execute`
+  calls `Client#request`, which was private. It is now public.
+
 ## [3.0.0] - 2026-10-08
 
 The Application Service layer has moved out of this gem into
@@ -172,7 +300,8 @@ server-side API.
   Socketry ecosystem, with schema-driven event validation, an OpenAPI-backed
   client, media support, and mautrix-compatible configuration.
 
-[Unreleased]: https://github.com/general-intelligence-systems/async-matrix/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/general-intelligence-systems/async-matrix/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v3.0.1
 [3.0.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v3.0.0
 [2.1.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v2.1.0
 [2.0.1]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v2.0.1
