@@ -105,8 +105,61 @@ module Async
         get("#{CLIENT_PREFIX}/account/whoami")
       end
 
-      def sync(store: nil, since: nil, timeout: Sync::DEFAULT_TIMEOUT, filter: nil)
-        Sync.new(self, store: store, since: since, timeout: timeout, filter: filter)
+      # Poll /sync forever, yielding each batch's messages as one array.
+      #
+      #   client.sync do |events|
+      #     events.each { |event| handle(event) }
+      #   end
+      #
+      # THE LOOP IS HERE because the cursor is: each round trip returns the
+      # cursor the next one has to be made with, and a consumer threading that
+      # value from one request into the next is doing the only part of polling
+      # that is not optional. {Sync} is one such request, and the second block
+      # argument is the one just drained -- `poll.next_batch` is the cursor to
+      # checkpoint, `poll.one_time_keys_count` what the server still holds of
+      # our keys.
+      #
+      #   client.sync do |events, poll|
+      #     store_all(events)
+      #     checkpoint(poll.next_batch)   # AFTER the events are durable
+      #   end
+      #
+      # AN EMPTY BATCH IS NOT YIELDED. A quiet room returns one every time the
+      # long poll elapses, and a consumer woken every 30 seconds to be told
+      # that nothing happened would only have to filter them back out.
+      #
+      # RUNS UNTIL +stop+ SAYS OTHERWISE, which by default is never -- a sync
+      # stream has no natural end. Returns the cursor it stopped on, so a caller
+      # that stops can resume from it with +since+.
+      #
+      # NOT RESILIENT, DELIBERATELY. A failed request raises out of the loop;
+      # how to treat a homeserver that is down is policy, and policy belongs to
+      # whatever called this.
+      def sync(store: nil, since: nil, timeout: Sync::DEFAULT_TIMEOUT, filter: nil,
+               stop: -> { false }, &block)
+        unless block
+          raise ArgumentError, "Client#sync requires a block; use Client::Sync.new for a single poll"
+        end
+
+        cursor = since
+
+        until stop.call
+          poll = Sync.new(self, store: store, since: cursor, timeout: timeout, filter: filter)
+
+          events = []
+          poll.read { |message| events << message }
+
+          # The cursor advances whether or not anything was in the batch: an
+          # empty batch is still progress, and re-requesting it would be a
+          # request that can only come back empty again.
+          cursor = poll.next_batch
+
+          unless events.empty?
+            block.call(events, poll)
+          end
+        end
+
+        cursor
       end
 
       def api
@@ -948,5 +1001,139 @@ __END__
       client = Async::Matrix::Client.new(make_config)
       result = client.send(:read_limited, resp, 1024)
       result.should.be.nil
+    end
+  end
+
+  # ── The sync loop ───────────────────────────────────────────────────────────
+  #
+  # Client#sync is the loop; Client::Sync is one request. These specs are about
+  # the looping -- the cursor threaded from each round trip into the next, and
+  # what reaches the block -- so `api` is stubbed rather than the transport,
+  # exactly as the Client::Sync specs do it.
+  describe "Async::Matrix::Client#sync" do
+    def make_config
+      Async::Matrix::Config.new({
+        "homeserver" => { "address" => "http://localhost:8008", "domain" => "localhost" },
+        "appservice" => { "as_token" => "test_token", "hs_token" => "hs_secret", "bot" => { "username" => "bot" } }
+      })
+    end
+
+    def timeline_event(body)
+      {
+        "type" => "m.room.message",
+        "event_id" => "$#{body}",
+        "sender" => "@alice:example.org",
+        "content" => { "msgtype" => "m.text", "body" => body },
+      }
+    end
+
+    def sync_batch(bodies, next_batch:)
+      {
+        "next_batch" => next_batch,
+        "rooms" => {
+          "join" => {
+            "!room:example.org" => { "timeline" => { "events" => bodies.map { |b| timeline_event(b) } } },
+          },
+        },
+      }
+    end
+
+    # A client whose api chain hands back canned /sync responses, recording the
+    # query of each request so the cursor can be checked.
+    def syncing_client(*responses)
+      client = Async::Matrix::Client.new(make_config)
+      queried = []
+      remaining = responses.dup
+      client.define_singleton_method(:queried) { queried }
+      client.define_singleton_method(:api) do
+        chain = Object.new
+        chain.define_singleton_method(:sync) do
+          endpoint = Object.new
+          endpoint.define_singleton_method(:get) do |**query|
+            queried << query
+            remaining.shift || { "next_batch" => "exhausted" }
+          end
+          endpoint
+        end
+        chain
+      end
+      client
+    end
+
+    it "yields a whole batch at a time" do
+      client = syncing_client(sync_batch(%w[one two], next_batch: "s2"))
+      batches = []
+
+      client.sync(stop: -> { batches.any? }) { |events| batches << events }
+
+      batches.length.should == 1
+      batches.first.map { |event| event.content.body }.should == %w[one two]
+    end
+
+    # The cursor is the whole reason the loop is here rather than in the caller.
+    it "resumes each request from the cursor the last one returned" do
+      client = syncing_client(
+        sync_batch(%w[one], next_batch: "s2"),
+        sync_batch(%w[two], next_batch: "s3"),
+      )
+      polls = 0
+
+      client.sync(stop: -> { polls >= 2 }) { |_events| polls += 1 }
+
+      client.queried.should == [
+        { timeout: 30_000 },
+        { timeout: 30_000, since: "s2" },
+      ]
+    end
+
+    it "starts from the cursor it was given" do
+      client = syncing_client(sync_batch(%w[one], next_batch: "s2"))
+      done = false
+
+      client.sync(since: "s1", stop: -> { done }) { |_events| done = true }
+
+      client.queried.first.should == { timeout: 30_000, since: "s1" }
+    end
+
+    it "returns the cursor it stopped on, so a caller can resume from it" do
+      client = syncing_client(sync_batch(%w[one], next_batch: "s2"))
+      done = false
+
+      cursor = client.sync(stop: -> { done }) { |_events| done = true }
+
+      cursor.should == "s2"
+    end
+
+    # A quiet room returns an empty batch every time the long poll elapses.
+    it "does not yield an empty batch, but still advances past it" do
+      client = syncing_client(
+        sync_batch([], next_batch: "s2"),
+        sync_batch(%w[one], next_batch: "s3"),
+      )
+      batches = []
+
+      client.sync(stop: -> { batches.any? }) { |events| batches << events }
+
+      batches.length.should == 1
+      batches.first.length.should == 1
+      client.queried.should == [
+        { timeout: 30_000 },
+        { timeout: 30_000, since: "s2" },
+      ]
+    end
+
+    # The poll is handed over too, because next_batch is what gets checkpointed.
+    it "yields the drained poll alongside its events" do
+      client = syncing_client(sync_batch(%w[one], next_batch: "s2"))
+      seen = nil
+
+      client.sync(stop: -> { seen }) { |_events, poll| seen = poll }
+
+      seen.next_batch.should == "s2"
+    end
+
+    it "requires a block, because the loop has nowhere to put messages" do
+      lambda { syncing_client(sync_batch(%w[one], next_batch: "s2")).sync }
+        .should.raise(ArgumentError)
     end
   end

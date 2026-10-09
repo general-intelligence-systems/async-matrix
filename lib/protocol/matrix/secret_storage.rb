@@ -40,10 +40,6 @@ module Protocol
 
       DEFAULT_PASSPHRASE_BITS = 256
 
-      Error = Errors::SecretStorageError
-      MacError = Errors::SecretStorageMacError
-      UnusableKeyError = Errors::UnusableKeyError
-
       # ── Getting to the storage key ──────────────────────────────────────────
 
       # The 32-byte storage key from whatever the user typed.
@@ -56,7 +52,7 @@ module Protocol
       def self.storage_key(input, key_info)
         (decode_recovery_key(input) || passphrase_key(input, key_info)).tap do |key|
           unless valid_key?(key, key_info)
-            raise UnusableKeyError, "that key does not match this account's secret storage"
+            raise Protocol::Matrix::Errors::UnusableKeyError, "that key does not match this account's secret storage"
           end
         end
       end
@@ -65,7 +61,7 @@ module Protocol
         passphrase = key_info["passphrase"]
 
         if passphrase.nil?
-          raise UnusableKeyError,
+          raise Protocol::Matrix::Errors::UnusableKeyError,
             "not a valid recovery key, and this account has no passphrase configured"
         end
 
@@ -137,14 +133,14 @@ module Protocol
       # Decrypt one account-data secret.
       #
       # @parameter name [String] the secret's name, which is the HKDF info.
-      # @raises [MacError] unless the MAC verifies -- a wrong key must fail here
+      # @raises [Protocol::Matrix::Errors::SecretStorageMacError] unless the MAC verifies -- a wrong key must fail here
       #   rather than produce plausible rubbish.
       def self.decrypt_secret(storage_key, name:, ciphertext:, iv:, mac:)
         aes_key, mac_key = subkeys(storage_key, name)
         raw = decode64(ciphertext.to_s)
 
         unless mac_equal?(OpenSSL::HMAC.digest("SHA256", mac_key, raw), mac)
-          raise MacError, "secret #{name} failed its MAC -- wrong recovery key?"
+          raise Protocol::Matrix::Errors::SecretStorageMacError, "secret #{name} failed its MAC -- wrong recovery key?"
         end
 
         cipher = OpenSSL::Cipher.new("aes-256-ctr")
@@ -423,7 +419,7 @@ __END__
           iv: encrypted["iv"],
           mac: encrypted["mac"],
         )
-      }.should.raise(Protocol::Matrix::SecretStorage::MacError)
+      }.should.raise(Protocol::Matrix::Errors::SecretStorageMacError)
     end
 
     # A wrong key must fail here rather than produce plausible rubbish.
@@ -438,7 +434,7 @@ __END__
           iv: encrypted["iv"],
           mac: encrypted["mac"],
         )
-      }.should.raise(Protocol::Matrix::SecretStorage::MacError)
+      }.should.raise(Protocol::Matrix::Errors::SecretStorageMacError)
     end
 
     it "refuses tampered ciphertext" do
@@ -452,7 +448,7 @@ __END__
           iv: encrypted["iv"],
           mac: encrypted["mac"],
         )
-      }.should.raise(Protocol::Matrix::SecretStorage::MacError)
+      }.should.raise(Protocol::Matrix::Errors::SecretStorageMacError)
     end
 
     it "splits HKDF output into an AES key and a MAC key" do
@@ -505,13 +501,13 @@ __END__
     it "refuses a recovery key that does not match the account" do
       lambda {
         S.storage_key(S.encode_recovery_key(("x" * 32).b), key_info_for(storage_key))
-      }.should.raise(Protocol::Matrix::SecretStorage::UnusableKeyError)
+      }.should.raise(Protocol::Matrix::Errors::UnusableKeyError)
     end
 
     it "says plainly when a passphrase cannot be used" do
       lambda {
         S.storage_key("hunter2", key_info_for(storage_key))
-      }.should.raise(Protocol::Matrix::SecretStorage::UnusableKeyError)
+      }.should.raise(Protocol::Matrix::Errors::UnusableKeyError)
     end
 
     # ── MAC comparison ────────────────────────────────────────────────────────

@@ -5,10 +5,11 @@
 
 module Protocol
   module Matrix
-    # Every error the protocol layer raises, defined in one place. The classes
-    # that raise them alias these back to their historical constant paths
-    # (`EncryptedMessage::MalformedError`, `KeyBackup::MacError`, and friends),
-    # so nothing a caller rescues has moved.
+    # Every error the protocol layer raises, defined in one place and nowhere
+    # else. There are no aliases back to per-class constant paths: a caller
+    # names the full path, `Protocol::Matrix::Errors::MalformedError`, so the
+    # class that raises an error and the place the error is defined are never
+    # two answers to the same question.
     module Errors
       # THE base error for this gem, in both namespaces: Async::Matrix::Error
       # is a constant pointing here, so `rescue Async::Matrix::Error` catches a
@@ -231,36 +232,32 @@ module Protocol
           end
       end
     end
-
-    # The one error base for the whole gem. Async::Matrix::Error points here
-    # too, so a single rescue catches transport and format failures alike.
-    Error = Errors::Error
   end
 end
 
 __END__
-  describe "Protocol::Matrix::Error" do
+  describe "Protocol::Matrix::Errors::Error" do
     it "stores errcode and message" do
-      err = Protocol::Matrix::Error.new("M_UNKNOWN", "something broke")
+      err = Protocol::Matrix::Errors::Error.new("M_UNKNOWN", "something broke")
       err.errcode.should == "M_UNKNOWN"
       err.message.should == "something broke"
     end
 
     it "stores optional status" do
-      err = Protocol::Matrix::Error.new("M_UNKNOWN", "bad", status: 400)
+      err = Protocol::Matrix::Errors::Error.new("M_UNKNOWN", "bad", status: 400)
       err.status.should == 400
     end
 
     it "defaults status to nil" do
-      Protocol::Matrix::Error.new("M_UNKNOWN", "bad").status.should.be.nil
+      Protocol::Matrix::Errors::Error.new("M_UNKNOWN", "bad").status.should.be.nil
     end
 
     it "is a StandardError" do
-      Protocol::Matrix::Error.new("M_UNKNOWN", "bad").should.be.kind_of StandardError
+      Protocol::Matrix::Errors::Error.new("M_UNKNOWN", "bad").should.be.kind_of StandardError
     end
   end
 
-  describe "Protocol::Matrix::Schema::ValidationError" do
+  describe "Protocol::Matrix::Errors::ValidationError" do
     def error_hash(overrides = {})
       {
         "data" => nil,
@@ -274,7 +271,7 @@ __END__
     end
 
     it "includes event type in header" do
-      err = Protocol::Matrix::Schema::ValidationError.new(
+      err = Protocol::Matrix::Errors::ValidationError.new(
         [error_hash],
         event_type: "m.room.message"
       )
@@ -282,7 +279,7 @@ __END__
     end
 
     it "includes event ID in header" do
-      err = Protocol::Matrix::Schema::ValidationError.new(
+      err = Protocol::Matrix::Errors::ValidationError.new(
         [error_hash],
         event_type: "m.room.member",
         event_id: "$abc123"
@@ -291,7 +288,7 @@ __END__
     end
 
     it "formats type mismatch errors" do
-      err = Protocol::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Errors::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/body",
           "type" => "string",
@@ -302,7 +299,7 @@ __END__
     end
 
     it "formats required errors with missing keys" do
-      err = Protocol::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Errors::ValidationError.new([
         error_hash(
           "data_pointer" => "/content",
           "type" => "required",
@@ -314,7 +311,7 @@ __END__
     end
 
     it "formats enum errors" do
-      err = Protocol::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Errors::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/membership",
           "type" => "enum",
@@ -327,7 +324,7 @@ __END__
     end
 
     it "formats pattern errors" do
-      err = Protocol::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Errors::ValidationError.new([
         error_hash(
           "data_pointer" => "/state_key",
           "type" => "pattern",
@@ -339,7 +336,7 @@ __END__
     end
 
     it "formats format errors" do
-      err = Protocol::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Errors::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/avatar_url",
           "type" => "format",
@@ -351,7 +348,7 @@ __END__
     end
 
     it "truncates long values" do
-      err = Protocol::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Errors::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/body",
           "type" => "integer",
@@ -363,7 +360,7 @@ __END__
 
     it "exposes the raw errors array" do
       raw = [error_hash]
-      err = Protocol::Matrix::Schema::ValidationError.new(raw)
+      err = Protocol::Matrix::Errors::ValidationError.new(raw)
       err.errors.should.equal raw
     end
   end

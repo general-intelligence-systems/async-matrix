@@ -61,14 +61,6 @@ module Protocol
       # refusing a payload that omits them does not.
       OLM_PAYLOAD_REQUIRED = %w[type content sender recipient recipient_keys keys].freeze
 
-      # The errors this class raises, defined in Protocol::Matrix::Errors and
-      # aliased here so `EncryptedMessage::MalformedError` keeps resolving.
-      MalformedError = Errors::MalformedError
-      UnsupportedAlgorithmError = Errors::UnsupportedAlgorithmError
-      NotAddressedError = Errors::NotAddressedError
-      DecryptionError = Errors::DecryptionError
-      NotDecryptedError = Errors::NotDecryptedError
-
       # Does this event need decrypting at all? Lets a caller sort a mixed batch
       # without rescuing.
       def self.encrypted?(data)
@@ -269,24 +261,24 @@ module Protocol
       def valid?
         validate!
         true
-      rescue Error
+      rescue Protocol::Matrix::Errors::Error
         false
       end
 
-      # @raises [MalformedError] a required field is absent, or the ciphertext is
+      # @raises [Protocol::Matrix::Errors::MalformedError] a required field is absent, or the ciphertext is
       #   the wrong shape for the algorithm.
-      # @raises [UnsupportedAlgorithmError] an algorithm we do not implement.
+      # @raises [Protocol::Matrix::Errors::UnsupportedAlgorithmError] an algorithm we do not implement.
       def validate!
         if @algorithm.nil?
-          raise MalformedError, "m.room.encrypted with no algorithm"
+          raise Protocol::Matrix::Errors::MalformedError, "m.room.encrypted with no algorithm"
         end
 
         if @ciphertext.nil?
-          raise MalformedError, "#{@algorithm} with no ciphertext"
+          raise Protocol::Matrix::Errors::MalformedError, "#{@algorithm} with no ciphertext"
         end
 
         unless supported?
-          raise UnsupportedAlgorithmError, "unsupported algorithm: #{@algorithm}"
+          raise Protocol::Matrix::Errors::UnsupportedAlgorithmError, "unsupported algorithm: #{@algorithm}"
         end
 
         if megolm?
@@ -336,7 +328,7 @@ module Protocol
       # The decrypted payload: `{"type" =>, "content" =>, ...}`.
       def payload
         unless @decrypted
-          raise NotDecryptedError, "message has not been decrypted"
+          raise Protocol::Matrix::Errors::NotDecryptedError, "message has not been decrypted"
         end
 
         @payload
@@ -363,7 +355,7 @@ module Protocol
       # because remembering is storage.
       def message_index
         unless @decrypted
-          raise NotDecryptedError, "message has not been decrypted"
+          raise Protocol::Matrix::Errors::NotDecryptedError, "message has not been decrypted"
         end
 
         @message_index
@@ -373,22 +365,22 @@ module Protocol
 
         def validate_megolm!
           unless @ciphertext.is_a?(String)
-            raise MalformedError, "megolm ciphertext must be a string"
+            raise Protocol::Matrix::Errors::MalformedError, "megolm ciphertext must be a string"
           end
 
           if @session_id.nil?
-            raise MalformedError, "megolm event with no session_id"
+            raise Protocol::Matrix::Errors::MalformedError, "megolm event with no session_id"
           end
         end
 
         def validate_olm!
           unless @ciphertext.is_a?(Hash)
-            raise MalformedError, "olm ciphertext must be a map of recipient keys"
+            raise Protocol::Matrix::Errors::MalformedError, "olm ciphertext must be a map of recipient keys"
           end
 
           # Not deprecated for Olm: this is how the recipient finds the session.
           if @encrypted_content["sender_key"].nil?
-            raise MalformedError, "olm event with no sender_key"
+            raise Protocol::Matrix::Errors::MalformedError, "olm event with no sender_key"
           end
         end
 
@@ -404,7 +396,7 @@ module Protocol
           when OLM
             decrypt_olm(session, identity_key)
           else
-            raise UnsupportedAlgorithmError, "unsupported algorithm: #{@algorithm.inspect}"
+            raise Protocol::Matrix::Errors::UnsupportedAlgorithmError, "unsupported algorithm: #{@algorithm.inspect}"
           end
         end
 
@@ -414,7 +406,7 @@ module Protocol
           payload = parse(plaintext)
 
           unless payload.key?("type") && payload.key?("content")
-            raise MalformedError, "megolm payload has no type/content"
+            raise Protocol::Matrix::Errors::MalformedError, "megolm payload has no type/content"
           end
 
           payload
@@ -424,7 +416,7 @@ module Protocol
         def megolm_plaintext(session)
           session.decrypt(@ciphertext)
         rescue StandardError => e
-          raise DecryptionError, "failed to decrypt megolm message: #{e.class}: #{e.message}"
+          raise Protocol::Matrix::Errors::DecryptionError, "failed to decrypt megolm message: #{e.class}: #{e.message}"
         end
 
         def decrypt_olm(session, identity_key)
@@ -435,14 +427,14 @@ module Protocol
           info = ciphertext_for(identity_key)
 
           if info.nil?
-            raise NotAddressedError, "olm event is not addressed to #{identity_key}"
+            raise Protocol::Matrix::Errors::NotAddressedError, "olm event is not addressed to #{identity_key}"
           end
 
           payload = parse(olm_plaintext(session, info))
           missing = OLM_PAYLOAD_REQUIRED.reject { |field| payload.key?(field) }
 
           unless missing.empty?
-            raise MalformedError, "olm payload is missing #{missing.join(', ')}"
+            raise Protocol::Matrix::Errors::MalformedError, "olm payload is missing #{missing.join(', ')}"
           end
 
           payload
@@ -451,13 +443,13 @@ module Protocol
         def olm_plaintext(session, info)
           session.decrypt(info["type"], info["body"])
         rescue StandardError => e
-          raise DecryptionError, "failed to decrypt olm message: #{e.class}: #{e.message}"
+          raise Protocol::Matrix::Errors::DecryptionError, "failed to decrypt olm message: #{e.class}: #{e.message}"
         end
 
         def parse(plaintext)
           JSON.parse(plaintext)
         rescue JSON::ParserError => e
-          raise MalformedError, "decrypted payload was not JSON: #{e.message}"
+          raise Protocol::Matrix::Errors::MalformedError, "decrypted payload was not JSON: #{e.message}"
         end
     end
   end
@@ -688,13 +680,13 @@ __END__
 
       message.supported?.should == false
       message.valid?.should == false
-      lambda { message.validate! }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      lambda { message.validate! }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     it "rejects an event with no ciphertext" do
       message = message_for({"content" => {"algorithm" => "m.megolm.v1.aes-sha2"}})
 
-      lambda { message.validate! }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      lambda { message.validate! }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     # An unknown algorithm is not a crash: it is a message we cannot read, the
@@ -708,13 +700,13 @@ __END__
       message.valid?.should == false
       lambda {
         message.validate!
-      }.should.raise(Protocol::Matrix::EncryptedMessage::UnsupportedAlgorithmError)
+      }.should.raise(Protocol::Matrix::Errors::UnsupportedAlgorithmError)
     end
 
     it "rejects a megolm event whose ciphertext is a recipient map" do
       message = message_for(megolm_event("ciphertext" => {our_key => {"type" => 0, "body" => "b"}}))
 
-      lambda { message.validate! }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      lambda { message.validate! }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     it "rejects a megolm event with no session_id" do
@@ -723,13 +715,13 @@ __END__
 
       lambda {
         message_for(event).validate!
-      }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     it "rejects an olm event whose ciphertext is a bare string" do
       message = message_for(olm_event("ciphertext" => "not-a-map"))
 
-      lambda { message.validate! }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      lambda { message.validate! }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     it "rejects an olm event with no sender_key" do
@@ -738,7 +730,7 @@ __END__
 
       lambda {
         message_for(event).validate!
-      }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     # ── Decrypting megolm ─────────────────────────────────────────────────────
@@ -784,7 +776,7 @@ __END__
 
       lambda {
         message.decrypt!(session)
-      }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     it "rejects a payload that is not JSON" do
@@ -792,7 +784,7 @@ __END__
 
       lambda {
         message.decrypt!(megolm_session("not json at all"))
-      }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+      }.should.raise(Protocol::Matrix::Errors::MalformedError)
     end
 
     # Whatever the cryptography raises becomes one protocol error, so a caller
@@ -802,7 +794,7 @@ __END__
 
       lambda {
         message.decrypt!(exploding_session)
-      }.should.raise(Protocol::Matrix::EncryptedMessage::DecryptionError)
+      }.should.raise(Protocol::Matrix::Errors::DecryptionError)
     end
 
     # ── Decrypting olm ────────────────────────────────────────────────────────
@@ -836,7 +828,7 @@ __END__
 
       lambda {
         message.decrypt!(olm_session(olm_payload), identity_key: "not-our-key")
-      }.should.raise(Protocol::Matrix::EncryptedMessage::NotAddressedError)
+      }.should.raise(Protocol::Matrix::Errors::NotAddressedError)
     end
 
     # The OlmPayload required set. These fields live inside the ciphertext, so
@@ -850,7 +842,7 @@ __END__
 
         lambda {
           message.decrypt!(olm_session(JSON.generate(payload)), identity_key: our_key)
-        }.should.raise(Protocol::Matrix::EncryptedMessage::MalformedError)
+        }.should.raise(Protocol::Matrix::Errors::MalformedError)
       end
     end
 
@@ -859,7 +851,7 @@ __END__
 
       lambda {
         message.decrypt!(exploding_session, identity_key: our_key)
-      }.should.raise(Protocol::Matrix::EncryptedMessage::DecryptionError)
+      }.should.raise(Protocol::Matrix::Errors::DecryptionError)
     end
 
     # ── Before decryption ─────────────────────────────────────────────────────
@@ -867,12 +859,12 @@ __END__
     it "raises rather than guessing when read before decryption" do
       message = message_for(megolm_event)
 
-      lambda { message.payload }.should.raise(Protocol::Matrix::EncryptedMessage::NotDecryptedError)
-      lambda { message.type }.should.raise(Protocol::Matrix::EncryptedMessage::NotDecryptedError)
-      lambda { message.content }.should.raise(Protocol::Matrix::EncryptedMessage::NotDecryptedError)
+      lambda { message.payload }.should.raise(Protocol::Matrix::Errors::NotDecryptedError)
+      lambda { message.type }.should.raise(Protocol::Matrix::Errors::NotDecryptedError)
+      lambda { message.content }.should.raise(Protocol::Matrix::Errors::NotDecryptedError)
       lambda {
         message.message_index
-      }.should.raise(Protocol::Matrix::EncryptedMessage::NotDecryptedError)
+      }.should.raise(Protocol::Matrix::Errors::NotDecryptedError)
     end
 
     it "validates before attempting to decrypt" do
@@ -880,7 +872,7 @@ __END__
 
       lambda {
         message.decrypt!(megolm_session(megolm_payload))
-      }.should.raise(Protocol::Matrix::EncryptedMessage::UnsupportedAlgorithmError)
+      }.should.raise(Protocol::Matrix::Errors::UnsupportedAlgorithmError)
     end
     # ── Building the outgoing side ────────────────────────────────────────────
 

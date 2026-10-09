@@ -1,0 +1,24 @@
+# Throwaway local homeserver for the examples in this directory.
+#
+#   docker compose up -d
+#   ruby sync.rb
+#
+# Any username with any password logs in and is created on the spot (see
+# synapse/modules/any_password.py), so there is no account setup.
+services:
+  synapse:
+    build: ./synapse
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+      PYTHONPATH: /config/modules
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./synapse/homeserver.yaml:/config/homeserver.yaml:ro
+      - ./synapse/signing.key:/config/signing.key:ro
+      - ./synapse/modules:/config/modules:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30

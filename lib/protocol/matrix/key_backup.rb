@@ -45,9 +45,6 @@ module Protocol
       # initialization vector."
       DERIVED_LENGTH = 80
 
-      Error = Errors::KeyBackupError
-      MacError = Errors::KeyBackupMacError
-
       # Decrypt one backed-up session blob to its BackedUpSessionData.
       #
       # @parameter private_key [String] the raw 32-byte backup private key, out
@@ -55,7 +52,7 @@ module Protocol
       # @parameter session_data [Hash] the blob's `ephemeral`, `ciphertext`, `mac`.
       # @returns [Hash | Nil] the session data, or nil when the blob cannot be
       #   read at all (missing or empty fields).
-      # @raises [MacError] when the MAC does not verify.
+      # @raises [Protocol::Matrix::Errors::KeyBackupMacError] when the MAC does not verify.
       #
       # NIL RATHER THAN RAISING for an unreadable blob: a mature backup
       # routinely contains keys written by clients with slightly different
@@ -84,7 +81,7 @@ module Protocol
         aes_key, mac_key, iv = subkeys(private_key, ephemeral)
 
         unless SecretStorage.mac_equal?(expected_mac(mac_key), mac)
-          raise MacError, "backed-up session failed its MAC -- wrong backup key?"
+          raise Protocol::Matrix::Errors::KeyBackupMacError, "backed-up session failed its MAC -- wrong backup key?"
         end
 
         cipher = OpenSSL::Cipher.new("aes-256-cbc")
@@ -245,7 +242,7 @@ __END__
 
       lambda {
         B.decrypt_session(private_key, back_up(public_key, session_payload, mac_over: :ciphertext))
-      }.should.raise(Protocol::Matrix::KeyBackup::MacError)
+      }.should.raise(Protocol::Matrix::Errors::KeyBackupMacError)
     end
 
     it "refuses a blob backed up to a different key" do
@@ -254,7 +251,7 @@ __END__
 
       lambda {
         B.decrypt_session(other_private, back_up(public_key, session_payload))
-      }.should.raise(Protocol::Matrix::KeyBackup::MacError)
+      }.should.raise(Protocol::Matrix::Errors::KeyBackupMacError)
     end
 
     # One unreadable entry must not abandon the thousands after it.

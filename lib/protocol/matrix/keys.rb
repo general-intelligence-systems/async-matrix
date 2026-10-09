@@ -41,8 +41,6 @@ module Protocol
       # decrypt would have peers encrypt into a void.
       ALGORITHMS = EncryptedMessage::ALGORITHMS
 
-      Error = Errors::KeysError
-
       # The signed device identity document.
       #
       # @parameter curve25519 [String] the device's identity key.
@@ -155,7 +153,7 @@ module Protocol
             key_id:   Signing.key_id(device_id),
           )
         end
-      rescue Signing::MissingSignatureError
+      rescue Protocol::Matrix::Errors::MissingSignatureError
         false
       end
     end

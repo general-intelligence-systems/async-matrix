@@ -36,8 +36,6 @@ module Protocol
       # `signatures` object are not covered by the signature."
       EXCLUDED_FROM_SIGNATURE = %w[signatures unsigned].freeze
 
-      Error = Errors::CanonicalJsonError
-
       # @returns [String] the canonical encoding of +value+.
       def self.encode(value)
         JSON.generate(canonicalize(value))
@@ -59,7 +57,7 @@ module Protocol
         when Array
           value.map { |nested| canonicalize(nested) }
         when Float
-          raise Error, "float values are not permitted by canonical JSON: #{value.inspect}"
+          raise Protocol::Matrix::Errors::CanonicalJsonError, "float values are not permitted by canonical JSON: #{value.inspect}"
         when Integer
           check_integer(value)
         when Symbol
@@ -71,7 +69,7 @@ module Protocol
 
       def self.check_integer(value)
         if value > MAXIMUM_INTEGER || value < MINIMUM_INTEGER
-          raise Error,
+          raise Protocol::Matrix::Errors::CanonicalJsonError,
             "integer out of canonical JSON range [#{MINIMUM_INTEGER}, #{MAXIMUM_INTEGER}]: #{value}"
         end
 
@@ -155,9 +153,9 @@ __END__
 
     # "Float values are not permitted by this encoding."
     it "refuses floats, including ones that look like integers" do
-      lambda { encode({"a" => 1.5}) }.should.raise(Protocol::Matrix::CanonicalJson::Error)
-      lambda { encode({"a" => 1.0}) }.should.raise(Protocol::Matrix::CanonicalJson::Error)
-      lambda { encode({"a" => [1.0]}) }.should.raise(Protocol::Matrix::CanonicalJson::Error)
+      lambda { encode({"a" => 1.5}) }.should.raise(Protocol::Matrix::Errors::CanonicalJsonError)
+      lambda { encode({"a" => 1.0}) }.should.raise(Protocol::Matrix::Errors::CanonicalJsonError)
+      lambda { encode({"a" => [1.0]}) }.should.raise(Protocol::Matrix::Errors::CanonicalJsonError)
     end
 
     # "Numbers in the JSON must be integers in the range [-(2**53)+1, (2**53)-1]"
@@ -167,8 +165,8 @@ __END__
     end
 
     it "refuses integers outside the range" do
-      lambda { encode({"a" => 2**53}) }.should.raise(Protocol::Matrix::CanonicalJson::Error)
-      lambda { encode({"a" => -(2**53)}) }.should.raise(Protocol::Matrix::CanonicalJson::Error)
+      lambda { encode({"a" => 2**53}) }.should.raise(Protocol::Matrix::Errors::CanonicalJsonError)
+      lambda { encode({"a" => -(2**53)}) }.should.raise(Protocol::Matrix::Errors::CanonicalJsonError)
     end
 
     # ── What a signature covers ───────────────────────────────────────────────

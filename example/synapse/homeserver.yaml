@@ -1,0 +1,49 @@
+server_name: "localhost"
+pid_file: /tmp/homeserver.pid
+public_baseurl: "http://localhost:8008/"
+
+listeners:
+  - port: 8008
+    type: http
+    tls: false
+    bind_addresses: ["0.0.0.0"]
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: sqlite3
+  args:
+    database: /tmp/homeserver.db
+
+media_store_path: /tmp/media_store
+signing_key_path: /config/signing.key
+
+# Any user, any password, created on login -- so there is no user setup. A
+# throwaway rig; see /config/modules/any_password.py.
+modules:
+  - module: any_password.AnyPasswordAuthProvider
+
+registration_shared_secret: "vXw1vVyeEQi21fLZjKcPjoYo2qyDXVdIRbfechkhf64"
+macaroon_secret_key: "H96uEhb3k-QmRKhI9YyxC4BRSiRwF_BgNZJaIoPtel8"
+form_secret: "tNNR5rEuwuHa5q9XUyOkPGGPV3SZUat6iFxo9UA-BTE"
+
+enable_registration: false
+report_stats: false
+
+# Synapse 1.162 defaults to room version 12, whose room ids are hashes with no
+# ":server" part (MSC4291). matrix-nio -- and so matrix-commander -- still
+# assumes "!opaque:server" and appends the server name to any id it is given,
+# which turns a v12 id into one that does not exist. 11 keeps the classic shape.
+default_room_version: "11"
+
+# Quoted deliberately: PyYAML reads a bare `off` as False. This is the default
+# for locally-created rooms only -- it stops rooms coming up encrypted, it does
+# not forbid a client from turning encryption on afterwards. Keeping it off is
+# what lets the sync example read message bodies without touching E2EE.
+encryption_enabled_by_default_for_room_type: "off"
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+suppress_key_server_warning: true

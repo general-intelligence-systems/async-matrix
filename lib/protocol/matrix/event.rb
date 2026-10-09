@@ -3,6 +3,8 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
+require_relative "errors"
+
 module Protocol
   module Matrix
     # Represents a Matrix event, however it arrived — a /sync response, an
@@ -16,7 +18,7 @@ module Protocol
     #   event.sender         # => "@alice:example.org"
     #   event.content.body   # => "hello"
     #   event.valid?         # => true
-    #   event.valid!         # => true (or raises Schema::ValidationError)
+    #   event.valid!         # => true (or raises Protocol::Matrix::Errors::ValidationError)
     #
     class Event
       attr_reader :type,
@@ -49,13 +51,13 @@ module Protocol
       def valid? = Schema.valid?(@raw)
 
       # Validate this event against its schema.
-      # Raises Schema::ValidationError with detailed errors on failure.
+      # Raises Protocol::Matrix::Errors::ValidationError with detailed errors on failure.
       # Returns true if valid or if no schema exists.
       def valid!
         errors = Schema.validate(@raw)
 
         unless errors.empty?
-          raise Schema::ValidationError.new(
+          raise Protocol::Matrix::Errors::ValidationError.new(
             errors,
             event_type: @type,
             event_id:   @event_id,
@@ -179,7 +181,7 @@ __END__
       begin
         event.valid!
         raise "should have raised"
-      rescue Protocol::Matrix::Schema::ValidationError => e
+      rescue Protocol::Matrix::Errors::ValidationError => e
         e.message.should.include "m.room.member"
         e.message.should.include "$abc123"
         e.errors.should.not.be.empty

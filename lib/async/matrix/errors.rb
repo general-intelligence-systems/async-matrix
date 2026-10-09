@@ -7,12 +7,12 @@ require_relative "../../protocol/matrix/errors"
 
 module Async
   module Matrix
-    # One error base for the whole gem. See Protocol::Matrix::Error.
+    # One error base for the whole gem. See Protocol::Matrix::Errors::Error.
     #
     # A CONSTANT, NOT A SUBCLASS: the subclasses below are declared against
-    # Protocol::Matrix::Error directly, so `rescue Async::Matrix::Error`
+    # Protocol::Matrix::Errors::Error directly, so `rescue Async::Matrix::Error`
     # catches everything -- transport failures and format failures together.
-    Error = ::Protocol::Matrix::Error
+    Error = ::Protocol::Matrix::Errors::Error
 
     class AuthError < Error; end
 
@@ -41,8 +41,8 @@ end
 
 __END__
   describe "Async::Matrix::Error" do
-    it "is Protocol::Matrix::Error" do
-      Async::Matrix::Error.should.equal Protocol::Matrix::Error
+    it "is Protocol::Matrix::Errors::Error" do
+      Async::Matrix::Error.should.equal Protocol::Matrix::Errors::Error
     end
 
     it "stores errcode and message" do

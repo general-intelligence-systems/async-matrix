@@ -53,12 +53,6 @@ module Protocol
       # state rather than timeline, which the event itself does not say.
       SECTIONS = %i[to_device join invite leave transaction].freeze
 
-      Error = Errors::MessageBatchError
-
-      # #read after the batch was drained is fine (nil). This is for a consumer
-      # that asks for a second pass over something already consumed.
-      ConsumedError = Errors::ConsumedError
-
       # Unpack a /sync response.
       #
       # @parameter response [Hash] the parsed response body, string keys.
@@ -186,7 +180,7 @@ module Protocol
       # left rather than because iteration restarted.
       def each
         unless block_given?
-          raise ConsumedError, "MessageBatch#each requires a block; a batch is not enumerable"
+          raise Protocol::Matrix::Errors::ConsumedError, "MessageBatch#each requires a block; a batch is not enumerable"
         end
 
         while (message = read)
@@ -466,7 +460,7 @@ __END__
     it "refuses to be treated as an enumerable" do
       batch = Protocol::Matrix::MessageBatch.from_sync(sync_response)
 
-      lambda { batch.each }.should.raise(Protocol::Matrix::MessageBatch::ConsumedError)
+      lambda { batch.each }.should.raise(Protocol::Matrix::Errors::ConsumedError)
     end
 
     it "keeps size fixed as it is read" do

@@ -10,16 +10,22 @@ require_relative "../../../protocol/matrix/message_batch"
 module Async
   module Matrix
     class Client
-      # A stream of messages from the homeserver, decrypted on the way through.
+      # ONE long poll of /sync, decrypted on the way through.
       #
-      #   stream = client.sync(store: device_store)
+      #   poll = Sync.new(client, store: device_store, since: cursor)
       #
-      #   stream.each do |message|
+      #   poll.read do |message|
       #     message.decrypted?   # false means we hold no key for it YET
       #     message.type         # the real type, once decrypted
       #     message.content
-      #     checkpoint(stream.next_batch)
       #   end
+      #
+      #   checkpoint(poll.next_batch)
+      #
+      # A SINGLE REQUEST, NOT A LOOP. Polling forever is {Client#sync}, which
+      # builds one of these per round trip and carries the cursor from each to
+      # the next; this class exists for a consumer that wants to drive its own
+      # loop, or one round trip and nothing more.
       #
       # WHAT A CONSUMER SEES IS MESSAGES. /sync also carries to-device events,
       # device lists and key counts, and none of that is a message: to-device
@@ -108,20 +114,6 @@ module Async
           yielded
         end
 
-        # Poll forever, yielding every message. Stops when +stop+ says so, which
-        # defaults to never -- a sync stream has no natural end.
-        def each(stop: -> { false }, &block)
-          unless block
-            raise ArgumentError, "Client::Sync#each requires a block; a sync stream is not enumerable"
-          end
-
-          until stop.call
-            read(&block)
-          end
-
-          self
-        end
-
         private
 
           def fetch
@@ -162,7 +154,7 @@ module Async
             if @store && message.encrypted?
               @store.decrypt(message)
             end
-          rescue Protocol::Matrix::Error => error
+          rescue Protocol::Matrix::Errors::Error => error
             Console.warn(self, "Discarding undecryptable to-device message.", error: error)
             nil
           end
@@ -440,7 +432,7 @@ __END__
     it "discards an undecryptable to-device message and keeps going" do
       exploding = Object.new
       exploding.define_singleton_method(:decrypt) do |_message|
-        raise(Protocol::Matrix::EncryptedMessage::MalformedError, "nonsense")
+        raise(Protocol::Matrix::Errors::MalformedError, "nonsense")
       end
 
       sync = sync_for(
@@ -477,23 +469,6 @@ __END__
       sync.read { |_message| nil }
 
       sync.one_time_keys_count.should == {"signed_curve25519" => 12}
-    end
-
-    # ── Looping ───────────────────────────────────────────────────────────────
-
-    it "polls until told to stop" do
-      client = fake_client(response(next_batch: "s2"), response(next_batch: "s3"))
-      polls = 0
-      sync = sync_for(client)
-
-      sync.each(stop: -> { polls >= 2 }) { |_message| polls += 1 }
-
-      polls.should == 2
-      client.queried.length.should == 2
-    end
-
-    it "requires a block, because a sync stream is not enumerable" do
-      lambda { sync_for(fake_client(response)).each }.should.raise(ArgumentError)
     end
 
     # ── The batch, unprocessed ────────────────────────────────────────────────

@@ -48,7 +48,7 @@ module Async
     # names no native extension and keeps its dependency list empty; the caller
     # decides which implementation backs it.
     class DeviceStore
-      class Error < Protocol::Matrix::Error; end
+      class Error < Protocol::Matrix::Errors::Error; end
 
       # The same message, delivered twice, with a different event id.
       class ReplayError < Error; end
@@ -199,7 +199,7 @@ module Async
         when Protocol::Matrix::EncryptedMessage::OLM
           decrypt_olm(message)
         else
-          raise Protocol::Matrix::EncryptedMessage::UnsupportedAlgorithmError,
+          raise Protocol::Matrix::Errors::UnsupportedAlgorithmError,
             "unsupported algorithm: #{message.algorithm.inspect}"
         end
       end
@@ -689,7 +689,7 @@ module Async
 
         def try_session(message, session)
           message.decrypt!(session, identity_key: identity_key)
-        rescue Protocol::Matrix::EncryptedMessage::DecryptionError
+        rescue Protocol::Matrix::Errors::DecryptionError
           nil
         end
 
@@ -1210,7 +1210,7 @@ __END__
 
       lambda {
         store.decrypt(message)
-      }.should.raise(Protocol::Matrix::EncryptedMessage::UnsupportedAlgorithmError)
+      }.should.raise(Protocol::Matrix::Errors::UnsupportedAlgorithmError)
     end
     # ── Publishing ────────────────────────────────────────────────────────────
 

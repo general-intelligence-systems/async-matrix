@@ -27,11 +27,6 @@ module Protocol
     module Signing
       ED25519 = "ed25519"
 
-      Error = Errors::SigningError
-
-      # No signature from the entity and key we were told to check.
-      MissingSignatureError = Errors::MissingSignatureError
-
       # "{algorithm}:{key_id}" — for a device key the key_id is the device id.
       def self.key_id(name, algorithm: ED25519)
         "#{algorithm}:#{name}"
@@ -70,14 +65,14 @@ module Protocol
       # @parameter key [String] the public ed25519 key to verify against.
       # @parameter verifier [Object] answers
       #   `verify_signature(key, message, signature) -> bool`.
-      # @raises [MissingSignatureError] when there is no such signature to check
+      # @raises [Protocol::Matrix::Errors::MissingSignatureError] when there is no such signature to check
       #   — distinct from a signature that is present and wrong, because the two
       #   mean different things about the sender.
       def self.verify(object, key:, verifier:, user_id:, key_id:)
         signature = signature_for(object, user_id: user_id, key_id: key_id)
 
         if signature.nil?
-          raise MissingSignatureError, "no #{key_id} signature from #{user_id}"
+          raise Protocol::Matrix::Errors::MissingSignatureError, "no #{key_id} signature from #{user_id}"
         end
 
         verifier.verify_signature(key, CanonicalJson.signable_bytes(object), signature)
@@ -237,7 +232,7 @@ __END__
           user_id: "@alice:example.com",
           key_id: "ed25519:DEV",
         )
-      }.should.raise(Protocol::Matrix::Signing::MissingSignatureError)
+      }.should.raise(Protocol::Matrix::Errors::MissingSignatureError)
     end
 
     it "treats a signature from a different key as missing" do
@@ -249,7 +244,7 @@ __END__
           user_id: "@alice:example.com",
           key_id: "ed25519:DEV",
         )
-      }.should.raise(Protocol::Matrix::Signing::MissingSignatureError)
+      }.should.raise(Protocol::Matrix::Errors::MissingSignatureError)
     end
 
     it "finds a signature, or reports its absence" do
