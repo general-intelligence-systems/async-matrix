@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    async-matrix (3.0.0)
+    async-matrix (3.0.1)
       async (~> 2.46)
       async-http (~> 0.105)
       json_schemer (~> 2.5)

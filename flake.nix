@@ -61,6 +61,13 @@
 
           shellHook = ''
             export LIBCLANG_PATH="${pkgs.libclang.lib}/lib"
+
+            # Point Bundler at the REAL Gemfile, unfrozen, so `bundle lock`
+            # and `bundix -l` can relock after a version bump. bundlerEnv's
+            # own wrappers (bundle, rubocop, scampi) set both of these
+            # themselves and ignore what is exported here.
+            export BUNDLE_GEMFILE="$PWD/Gemfile"
+            export BUNDLE_FROZEN=false
           '';
         };
       }
