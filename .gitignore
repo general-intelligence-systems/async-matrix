@@ -21,6 +21,10 @@ docs/vendor/
 
 # Gems
 /.gem/
+# ruby/setup-ruby's bundler-cache installs the bundle INSIDE the checkout, and
+# scampi discovers tests with a bare `rg -l "^__END__$"` — so without this it
+# finds every gem's own co-located specs and loads them as ours.
+/vendor/bundle
 
 # Nix
 /.direnv/

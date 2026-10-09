@@ -10,6 +10,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        lib = mine.lib.${system};
 
         # Our Gemfile says `gemspec`, and async-matrix.gemspec opens
         # lib/async/matrix/version.rb for the version. bundlerEnv assembles a
@@ -41,11 +42,12 @@
         };
       in
       {
-        devShells.default = pkgs.mkShell {
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
-
+        # lib.mkRubyShell, not pkgs.mkShell: it brings bundix, pkg-config,
+        # libyaml and openssl, and regenerates gemset.nix on entry, which is
+        # what keeps the lockfile and the gem set from drifting after a bump.
+        # Only buildGemset is unusable here (it cannot pass extraConfigPaths);
+        # the shell builder is a separate helper and does not care.
+        devShells.default = lib.mkRubyShell {
           buildInputs = with pkgs; [
             gems
             gems.wrappedRuby
