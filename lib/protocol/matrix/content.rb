@@ -3,7 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-module Async
+module Protocol
   module Matrix
     # Wraps the content object of a Matrix event, providing typed access to
     # schema-defined properties via method_missing.
@@ -54,9 +54,9 @@ module Async
 end
 
 __END__
-  describe "Async::Matrix::Content" do
+  describe "Protocol::Matrix::Content" do
     it "parses msgtype, body, and membership" do
-      content = Async::Matrix::Content.new({
+      content = Protocol::Matrix::Content.new({
         "msgtype" => "m.text",
         "body" => "hello",
         "membership" => "join"
@@ -67,19 +67,19 @@ __END__
     end
 
     it "handles missing fields gracefully" do
-      content = Async::Matrix::Content.new({})
+      content = Protocol::Matrix::Content.new({})
       content.msgtype.should.be.nil
       content.body.should.be.nil
       content.membership.should.be.nil
     end
 
     it "provides hash access via []" do
-      content = Async::Matrix::Content.new({"custom_field" => "value"})
+      content = Protocol::Matrix::Content.new({"custom_field" => "value"})
       content["custom_field"].should == "value"
     end
 
     it "provides dynamic access via method_missing" do
-      content = Async::Matrix::Content.new({
+      content = Protocol::Matrix::Content.new({
         "avatar_url" => "mxc://example.org/abc",
         "displayname" => "Alice"
       })
@@ -88,18 +88,18 @@ __END__
     end
 
     it "returns nil for unknown fields via method_missing" do
-      content = Async::Matrix::Content.new({})
+      content = Protocol::Matrix::Content.new({})
       content.nonexistent.should.be.nil
     end
 
     it "returns the raw hash via to_h" do
       data = {"msgtype" => "m.text", "body" => "hi"}
-      content = Async::Matrix::Content.new(data)
+      content = Protocol::Matrix::Content.new(data)
       content.to_h.should == data
     end
 
     it "responds to keys present in the data" do
-      content = Async::Matrix::Content.new({"avatar_url" => "mxc://x/y"})
+      content = Protocol::Matrix::Content.new({"avatar_url" => "mxc://x/y"})
       content.respond_to?(:avatar_url).should == true
       content.respond_to?(:nonexistent).should == false
     end

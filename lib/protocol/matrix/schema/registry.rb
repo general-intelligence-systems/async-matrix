@@ -8,7 +8,7 @@ require "json"
 require "json_schemer"
 require "pathname"
 
-module Async
+module Protocol
   module Matrix
     module Schema
       # Loads and indexes Matrix event schemas from the official matrix-org/matrix-spec
@@ -18,7 +18,7 @@ module Async
       # process. Each schema is a JSONSchemer::Schema instance that resolves relative
       # $ref paths (e.g. core-event-schema/room_event.yaml) via a file-based resolver.
       #
-      #   registry = Async::Matrix::Schema::Registry.instance
+      #   registry = Protocol::Matrix::Schema::Registry.instance
       #   registry["m.room.message"]                         # => JSONSchemer::Schema
       #   registry.variant("m.room.message", "m.text")       # => JSONSchemer::Schema
       #   registry.event_types                                # => ["m.accepted_terms", ...]
@@ -262,13 +262,13 @@ module Async
 end
 
 __END__
-  describe "Async::Matrix::Schema::Registry" do
+  describe "Protocol::Matrix::Schema::Registry" do
     it "loads schemas from disk" do
-      Async::Matrix::Schema::Registry.instance.size.should.be > 0
+      Protocol::Matrix::Schema::Registry.instance.size.should.be > 0
     end
 
     it "has known event types" do
-      types = Async::Matrix::Schema::Registry.instance.event_types
+      types = Protocol::Matrix::Schema::Registry.instance.event_types
       types.should.include "m.room.message"
       types.should.include "m.room.member"
       types.should.include "m.room.create"
@@ -276,21 +276,21 @@ __END__
     end
 
     it "returns a JSONSchemer::Schema for a known type" do
-      schema = Async::Matrix::Schema::Registry.instance["m.room.message"]
+      schema = Protocol::Matrix::Schema::Registry.instance["m.room.message"]
       schema.should.not.be.nil
       schema.should.be.kind_of JSONSchemer::Schema
     end
 
     it "returns nil for an unknown type" do
-      Async::Matrix::Schema::Registry.instance["m.fake.event"].should.be.nil
+      Protocol::Matrix::Schema::Registry.instance["m.fake.event"].should.be.nil
     end
 
     it "has variant schemas" do
-      Async::Matrix::Schema::Registry.instance.variant_types.should.not.be.empty
+      Protocol::Matrix::Schema::Registry.instance.variant_types.should.not.be.empty
     end
 
     it "resolves variant schemas" do
-      schema = Async::Matrix::Schema::Registry.instance.variant("m.room.message", "m.text")
+      schema = Protocol::Matrix::Schema::Registry.instance.variant("m.room.message", "m.text")
       schema.should.not.be.nil
       schema.should.be.kind_of JSONSchemer::Schema
     end
@@ -304,7 +304,7 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      Async::Matrix::Schema::Registry.instance.valid?(event).should == true
+      Protocol::Matrix::Schema::Registry.instance.valid?(event).should == true
     end
 
     it "rejects m.room.message missing body" do
@@ -316,7 +316,7 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      Async::Matrix::Schema::Registry.instance.valid?(event).should == false
+      Protocol::Matrix::Schema::Registry.instance.valid?(event).should == false
     end
 
     it "is lenient with unknown event types" do
@@ -328,7 +328,7 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      Async::Matrix::Schema::Registry.instance.valid?(event).should == true
+      Protocol::Matrix::Schema::Registry.instance.valid?(event).should == true
     end
 
     it "validates m.room.member with correct membership" do
@@ -341,7 +341,7 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      Async::Matrix::Schema::Registry.instance.valid?(event).should == true
+      Protocol::Matrix::Schema::Registry.instance.valid?(event).should == true
     end
 
     it "rejects m.room.member with invalid membership" do
@@ -354,17 +354,17 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      Async::Matrix::Schema::Registry.instance.valid?(event).should == false
+      Protocol::Matrix::Schema::Registry.instance.valid?(event).should == false
     end
 
     it "returns content properties for known types" do
-      props = Async::Matrix::Schema::Registry.instance.content_properties("m.room.message")
+      props = Protocol::Matrix::Schema::Registry.instance.content_properties("m.room.message")
       props.should.include "msgtype"
       props.should.include "body"
     end
 
     it "returns empty content properties for unknown types" do
-      Async::Matrix::Schema::Registry.instance.content_properties("m.fake.type").should == []
+      Protocol::Matrix::Schema::Registry.instance.content_properties("m.fake.type").should == []
     end
 
     it "performs variant validation for m.room.message with msgtype" do
@@ -376,6 +376,6 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      Async::Matrix::Schema::Registry.instance.validate(event).should == []
+      Protocol::Matrix::Schema::Registry.instance.validate(event).should == []
     end
   end

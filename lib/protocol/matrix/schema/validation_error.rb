@@ -5,7 +5,7 @@
 
 require_relative "../error"
 
-module Async
+module Protocol
   module Matrix
     module Schema
       # Raised by Event#valid! when data fails schema validation.
@@ -17,7 +17,9 @@ module Async
       #     - content.membership = "invalid" -- must be one of: ["invite", "join", "knock", "leave", "ban"]
       #     - sender is required but missing
       #
-      class ValidationError < Async::Matrix::Error
+      # Carries an errcode, which the base supports: M_BAD_JSON is what a
+      # homeserver answers for a payload that fails its schema.
+      class ValidationError < Protocol::Matrix::Error
         attr_reader :errors, :event_type, :event_id
 
         # @param errors     [Array<Hash>] raw JSONSchemer error hashes
@@ -123,7 +125,7 @@ module Async
 end
 
 __END__
-  describe "Async::Matrix::Schema::ValidationError" do
+  describe "Protocol::Matrix::Schema::ValidationError" do
     def error_hash(overrides = {})
       {
         "data" => nil,
@@ -137,7 +139,7 @@ __END__
     end
 
     it "includes event type in header" do
-      err = Async::Matrix::Schema::ValidationError.new(
+      err = Protocol::Matrix::Schema::ValidationError.new(
         [error_hash],
         event_type: "m.room.message"
       )
@@ -145,7 +147,7 @@ __END__
     end
 
     it "includes event ID in header" do
-      err = Async::Matrix::Schema::ValidationError.new(
+      err = Protocol::Matrix::Schema::ValidationError.new(
         [error_hash],
         event_type: "m.room.member",
         event_id: "$abc123"
@@ -154,7 +156,7 @@ __END__
     end
 
     it "formats type mismatch errors" do
-      err = Async::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Schema::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/body",
           "type" => "string",
@@ -165,7 +167,7 @@ __END__
     end
 
     it "formats required errors with missing keys" do
-      err = Async::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Schema::ValidationError.new([
         error_hash(
           "data_pointer" => "/content",
           "type" => "required",
@@ -177,7 +179,7 @@ __END__
     end
 
     it "formats enum errors" do
-      err = Async::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Schema::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/membership",
           "type" => "enum",
@@ -190,7 +192,7 @@ __END__
     end
 
     it "formats pattern errors" do
-      err = Async::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Schema::ValidationError.new([
         error_hash(
           "data_pointer" => "/state_key",
           "type" => "pattern",
@@ -202,7 +204,7 @@ __END__
     end
 
     it "formats format errors" do
-      err = Async::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Schema::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/avatar_url",
           "type" => "format",
@@ -214,7 +216,7 @@ __END__
     end
 
     it "truncates long values" do
-      err = Async::Matrix::Schema::ValidationError.new([
+      err = Protocol::Matrix::Schema::ValidationError.new([
         error_hash(
           "data_pointer" => "/content/body",
           "type" => "integer",
@@ -226,7 +228,7 @@ __END__
 
     it "exposes the raw errors array" do
       raw = [error_hash]
-      err = Async::Matrix::Schema::ValidationError.new(raw)
+      err = Protocol::Matrix::Schema::ValidationError.new(raw)
       err.errors.should.equal raw
     end
   end

@@ -3,7 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-module Async
+module Protocol
   module Matrix
     # Schema-driven validation for Matrix events using the official matrix-org/matrix-spec
     # YAML schemas and the json_schemer gem.
@@ -13,14 +13,14 @@ module Async
     # spec -- just re-run `bin/fetch-matrix-schemas` to pull the latest.
     #
     #   # Look up a schema by event type
-    #   Async::Matrix::Schema["m.room.message"]  # => JSONSchemer::Schema
+    #   Protocol::Matrix::Schema["m.room.message"]  # => JSONSchemer::Schema
     #
     #   # Validate an event hash
-    #   Async::Matrix::Schema.valid?(event_hash)  # => true/false
-    #   Async::Matrix::Schema.validate(event_hash) # => [errors]
+    #   Protocol::Matrix::Schema.valid?(event_hash)  # => true/false
+    #   Protocol::Matrix::Schema.validate(event_hash) # => [errors]
     #
     #   # List all known event types
-    #   Async::Matrix::Schema.event_types  # => ["m.accepted_terms", "m.call.answer", ...]
+    #   Protocol::Matrix::Schema.event_types  # => ["m.accepted_terms", "m.call.answer", ...]
     #
     module Schema
       class << self
@@ -89,15 +89,15 @@ module Async
 end
 
 __END__
-  describe "Async::Matrix::Schema" do
+  describe "Protocol::Matrix::Schema" do
     it "looks up schemas by event type" do
-      schema = Async::Matrix::Schema["m.room.message"]
+      schema = Protocol::Matrix::Schema["m.room.message"]
       schema.should.not.be.nil
       schema.should.be.kind_of JSONSchemer::Schema
     end
 
     it "returns nil for unknown event types" do
-      Async::Matrix::Schema["m.fake.event"].should.be.nil
+      Protocol::Matrix::Schema["m.fake.event"].should.be.nil
     end
 
     it "validates event hashes" do
@@ -109,7 +109,7 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      Async::Matrix::Schema.valid?(valid_event).should == true
+      Protocol::Matrix::Schema.valid?(valid_event).should == true
     end
 
     it "returns errors for invalid events" do
@@ -121,39 +121,39 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       }
-      errors = Async::Matrix::Schema.validate(invalid_event)
+      errors = Protocol::Matrix::Schema.validate(invalid_event)
       errors.should.not.be.empty
     end
 
     it "lists event types" do
-      types = Async::Matrix::Schema.event_types
+      types = Protocol::Matrix::Schema.event_types
       types.should.be.kind_of Array
       types.should.include "m.room.message"
       types.should.include "m.room.member"
     end
 
     it "lists variant types" do
-      variants = Async::Matrix::Schema.variant_types
+      variants = Protocol::Matrix::Schema.variant_types
       variants.should.not.be.empty
     end
 
     it "looks up variant schemas" do
-      schema = Async::Matrix::Schema.variant("m.room.message", "m.text")
+      schema = Protocol::Matrix::Schema.variant("m.room.message", "m.text")
       schema.should.not.be.nil
     end
 
     it "returns content properties" do
-      props = Async::Matrix::Schema.content_properties("m.room.message")
+      props = Protocol::Matrix::Schema.content_properties("m.room.message")
       props.should.include "msgtype"
       props.should.include "body"
     end
 
     it "reports total schema count" do
-      Async::Matrix::Schema.size.should.be > 50
+      Protocol::Matrix::Schema.size.should.be > 50
     end
 
     it "parses a raw hash into a schema-aware Event" do
-      event = Async::Matrix::Schema.parse({
+      event = Protocol::Matrix::Schema.parse({
         "type" => "m.room.message",
         "content" => {"msgtype" => "m.text", "body" => "hello"},
         "event_id" => "$abc123",
@@ -161,7 +161,7 @@ __END__
         "origin_server_ts" => 1234567890,
         "room_id" => "!room:example.org"
       })
-      event.should.be.kind_of Async::Matrix::Event
+      event.should.be.kind_of Protocol::Matrix::Event
       event.type.should == "m.room.message"
       event.content.body.should == "hello"
       event.valid?.should == true

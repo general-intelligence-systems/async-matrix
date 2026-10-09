@@ -10,6 +10,12 @@ require "console"
 require "securerandom"
 require "time"
 
+# The action surface, mixed in below. Required explicitly because the library's
+# loader globs this directory in sorted order, which reaches client.rb before
+# client/ -- so `include Encryption` would resolve against nothing.
+require_relative "client/encryption"
+require_relative "client/rooms"
+
 module Async
   module Matrix
     # Async HTTP client for the Matrix Client-Server API.
@@ -36,6 +42,9 @@ module Async
       # Response size limits (bytes)
       DEFAULT_RESPONSE_SIZE_LIMIT       = 50 * 1024 * 1024  # 50 MiB for JSON API responses
       DEFAULT_ERROR_RESPONSE_SIZE_LIMIT = 512 * 1024         # 512 KiB for error bodies
+
+      include Encryption
+      include Rooms
 
       attr_reader :config
 
@@ -84,12 +93,18 @@ module Async
 
       # ── Room actions ───────────────────────────────────────────
 
-      def join_room(room_id)
-        post("#{CLIENT_PREFIX}/join/#{encode(room_id)}")
+      # Positional OR keyword: `join_room("!r:example.org")` is how this was
+      # always called, and `join_room(room_id: "!r:example.org")` is the form
+      # every other action here takes. Keeping both means the action surface is
+      # consistent without breaking callers written against 3.0.
+      def join_room(room_id = nil, **options)
+        target = room_id || options[:room_id]
+        post("#{CLIENT_PREFIX}/join/#{encode(target)}")
       end
 
-      def leave_room(room_id)
-        post("#{CLIENT_PREFIX}/rooms/#{encode(room_id)}/leave")
+      def leave_room(room_id = nil, **options)
+        target = room_id || options[:room_id]
+        post("#{CLIENT_PREFIX}/rooms/#{encode(target)}/leave")
       end
 
       # ── Profile ────────────────────────────────────────────────
@@ -106,6 +121,21 @@ module Async
 
       def whoami
         get("#{CLIENT_PREFIX}/account/whoami")
+      end
+
+      # ── Syncing ────────────────────────────────────────────────────────────
+
+      # A stream of messages from this account, decrypted by +store+.
+      #
+      #   client.sync(store: device_store).each do |message|
+      #     ...
+      #   end
+      #
+      # See Client::Sync: the stream yields room messages only, and to-device
+      # events are fed to the store on the way through, which is how room keys
+      # arrive.
+      def sync(store: nil, since: nil, timeout: Sync::DEFAULT_TIMEOUT, filter: nil)
+        Sync.new(self, store: store, since: since, timeout: timeout, filter: filter)
       end
 
       # ── Full API (runtime-generated from OpenAPI schemas) ─────
@@ -177,6 +207,16 @@ module Async
         )
       end
 
+      # Query parameters added to EVERY request this client makes.
+      #
+      # EMPTY FOR AN ORDINARY CLIENT: a user's own access token already says who
+      # the request is for. AppServiceClient overrides it, because an as_token
+      # says only "an appservice" -- without `?user_id=` the homeserver assumes
+      # the registration's sender_localpart, and without `?device_id=` the
+      # request has no device at all, which fails precisely the calls encryption
+      # depends on.
+      def default_query = {}
+
       def close
         @internet&.close
         @internet = nil
@@ -190,8 +230,38 @@ module Async
           @internet ||= Async::HTTP::Internet.new
         end
 
+        # Merge #default_query into a path that may already carry a query --
+        # Api::Chain appends its own parameters before handing the path over, so
+        # this is the single place both routes pass through.
+        #
+        # A parameter the caller already set WINS. Overwriting it would mean a
+        # client silently acting as somebody other than the caller asked for,
+        # which is worse than the request failing.
+        def apply_default_query(path)
+          missing = default_query.reject { |key, _|
+            path.match?(/[?&]#{Regexp.escape(key.to_s)}=/)
+          }
+
+          if missing.empty?
+            path
+          else
+            if path.include?("?")
+              separator = "&"
+            else
+              separator = "?"
+            end
+
+            pairs = missing.map { |key, value| "#{encode(key.to_s)}=#{encode(value.to_s)}" }
+
+            "#{path}#{separator}#{pairs.join('&')}"
+          end
+        end
+
+        # PUBLIC, declared below: Api::Chain#execute calls `@client.request` for
+        # DELETE, so leaving this private makes every DELETE through the chain
+        # raise NoMethodError.
         def request(method, path, body = nil, max_retries: nil)
-          url = "#{@base}#{path}"
+          url = "#{@base}#{apply_default_query(path)}"
           if body
             json_body = JSON.generate(body)
           else
@@ -349,6 +419,8 @@ module Async
         def encode(value)
           ERB::Util.url_encode(value)
         end
+
+        public :request
     end
   end
 end

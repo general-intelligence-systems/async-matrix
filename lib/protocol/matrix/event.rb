@@ -3,7 +3,7 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-module Async
+module Protocol
   module Matrix
     # Represents a Matrix event, however it arrived — a /sync response, an
     # application service transaction, or a hash you built yourself.
@@ -71,14 +71,25 @@ module Async
 
       # Is this a state event? (has a state_key)
       def state_event? = !@state_key.nil?
+
+      # ── The shape MessageBatch yields ───────────────────────────────────────
+      #
+      # A batch mixes plaintext and encrypted events, and a consumer should not
+      # have to ask which class it is holding before reading #type or #content.
+      # So both answer the same three questions, and for a plaintext event the
+      # answers are the trivial ones: it was never encrypted, so there is
+      # nothing left to decrypt.
+
+      def encrypted? = false
+      def decrypted? = true
     end
   end
 end
 
 __END__
-  describe "Async::Matrix::Event" do
+  describe "Protocol::Matrix::Event" do
     it "parses all event fields" do
-      event = Async::Matrix::Event.new({
+      event = Protocol::Matrix::Event.new({
         "type" => "m.room.message",
         "sender" => "@alice:example.com",
         "room_id" => "!abc:example.com",
@@ -95,43 +106,43 @@ __END__
       event.event_id.should == "$evt1"
       event.origin_server_ts.should == 1234567890
       event.unsigned.should == {"age" => 1000}
-      event.content.should.be.kind_of Async::Matrix::Content
+      event.content.should.be.kind_of Protocol::Matrix::Content
       event.content.body.should == "hi"
     end
 
     it "defaults content to empty Content when missing" do
-      event = Async::Matrix::Event.new({"type" => "m.room.message"})
-      event.content.should.be.kind_of Async::Matrix::Content
+      event = Protocol::Matrix::Event.new({"type" => "m.room.message"})
+      event.content.should.be.kind_of Protocol::Matrix::Content
       event.content.body.should.be.nil
     end
 
     it "exposes the raw hash" do
       data = {"type" => "m.room.message", "content" => {"body" => "hi", "msgtype" => "m.text"}}
-      event = Async::Matrix::Event.new(data)
+      event = Protocol::Matrix::Event.new(data)
       event.raw.should.equal data
     end
 
     it "detects state events" do
-      state = Async::Matrix::Event.new({"type" => "m.room.member", "state_key" => "@a:b"})
+      state = Protocol::Matrix::Event.new({"type" => "m.room.member", "state_key" => "@a:b"})
       state.state_event?.should == true
 
-      msg = Async::Matrix::Event.new({"type" => "m.room.message"})
+      msg = Protocol::Matrix::Event.new({"type" => "m.room.message"})
       msg.state_event?.should == false
     end
 
     it "returns the schema for known event types" do
-      event = Async::Matrix::Event.new({"type" => "m.room.message", "content" => {}})
+      event = Protocol::Matrix::Event.new({"type" => "m.room.message", "content" => {}})
       event.schema.should.not.be.nil
       event.schema.should.be.kind_of JSONSchemer::Schema
     end
 
     it "returns nil schema for unknown event types" do
-      event = Async::Matrix::Event.new({"type" => "m.custom.event", "content" => {}})
+      event = Protocol::Matrix::Event.new({"type" => "m.custom.event", "content" => {}})
       event.schema.should.be.nil
     end
 
     it "validates a correct event" do
-      event = Async::Matrix::Event.new({
+      event = Protocol::Matrix::Event.new({
         "type" => "m.room.message",
         "content" => {"msgtype" => "m.text", "body" => "hello"},
         "event_id" => "$abc123",
@@ -144,7 +155,7 @@ __END__
     end
 
     it "rejects an invalid event" do
-      event = Async::Matrix::Event.new({
+      event = Protocol::Matrix::Event.new({
         "type" => "m.room.message",
         "content" => {"msgtype" => "m.text"},
         "event_id" => "$abc123",
@@ -156,7 +167,7 @@ __END__
     end
 
     it "raises ValidationError from valid!" do
-      event = Async::Matrix::Event.new({
+      event = Protocol::Matrix::Event.new({
         "type" => "m.room.member",
         "content" => {"membership" => "invalid_state"},
         "state_key" => "@alice:example.org",
@@ -168,7 +179,7 @@ __END__
       begin
         event.valid!
         raise "should have raised"
-      rescue Async::Matrix::Schema::ValidationError => e
+      rescue Protocol::Matrix::Schema::ValidationError => e
         e.message.should.include "m.room.member"
         e.message.should.include "$abc123"
         e.errors.should.not.be.empty
@@ -176,7 +187,7 @@ __END__
     end
 
     it "is lenient with unknown event types" do
-      event = Async::Matrix::Event.new({
+      event = Protocol::Matrix::Event.new({
         "type" => "com.custom.event",
         "content" => {"anything" => "goes"},
         "event_id" => "$x",
@@ -187,7 +198,7 @@ __END__
     end
 
     it "returns content properties for known types" do
-      event = Async::Matrix::Event.new({
+      event = Protocol::Matrix::Event.new({
         "type" => "m.room.member",
         "content" => {"membership" => "join"}
       })

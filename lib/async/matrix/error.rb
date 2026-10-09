@@ -3,17 +3,17 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
+require_relative "../../protocol/matrix/error"
+
 module Async
   module Matrix
-    class Error < StandardError
-      attr_reader :errcode, :status
-
-      def initialize(errcode, message, status: nil)
-        @errcode = errcode
-        @status = status
-        super(message)
-      end
-    end
+    # One error base for the whole gem. See Protocol::Matrix::Error.
+    #
+    # A CONSTANT, NOT A SUBCLASS: the subclasses below it are declared as
+    # `class AuthError < Error`, which resolves this constant at load time, so
+    # they inherit the real class and `rescue Async::Matrix::Error` catches
+    # everything -- transport failures and format failures together.
+    Error = ::Protocol::Matrix::Error
   end
 end
 
