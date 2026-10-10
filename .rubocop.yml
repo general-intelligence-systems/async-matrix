@@ -3,6 +3,7 @@ plugins:
   - rubocop-socketry
 
 require:
+  - ./cops/each_file_has_matching_test.rb
   - ./cops/abstract_module_version_order.rb
   - ./cops/abstract_module_no_changes_comment.rb
 
@@ -132,3 +133,15 @@ AsyncMatrix/AbstractModuleNoChangesComment:
   Enabled: true
   Include:
     - "lib/async/matrix/abstract/**/*.rb"
+
+# `lib` and `test` mirror each other file for file, so that whether something is tested is answered
+# by the path. Exceptions are listed rather than assumed.
+AsyncMatrix/EachFileHasMatchingTest:
+  Enabled: true
+  Include:
+    - "lib/**/*.rb"
+    - "test/**/*.rb"
+  Exclude:
+    # Describes the shape of the project - which classes exist, and which test files are guarded -
+    # rather than a file in lib, so it has no counterpart there.
+    - "test/operations.rb"

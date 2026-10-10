@@ -4,9 +4,11 @@
 # Copyright, 2026, by Nathan K.
 
 require "async/matrix/client_context"
+require "async/matrix/operations_context"
 
 describe Async::Matrix::ClientServer::Client do
   include Async::Matrix::ClientContext
+  include Async::Matrix::OperationsContext
 
   with "#versions" do
     it "can be read without authentication" do
