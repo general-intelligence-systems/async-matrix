@@ -31,6 +31,27 @@ module Async
         end
       end
 
+      # The ways a homeserver will let a user log in.
+      class LoginFlows < Representation
+        include Versioned
+
+        # @returns [Array(Hash)] the supported login flows.
+        def flows
+          self.value[:flows]
+        end
+
+        # @returns [Array(String)] the type of each supported flow, e.g. `m.login.password`.
+        def types
+          self.flows.map{|flow| flow[:type]}
+        end
+
+        # @parameter type [String] the flow type to look for.
+        # @returns [Boolean] whether the homeserver supports that flow.
+        def supports?(type)
+          self.types.include?(type)
+        end
+      end
+
       # The identity associated with an access token.
       class Whoami < Representation
         include Versioned
@@ -45,9 +66,14 @@ module Async
           self.value[:device_id]
         end
 
+        # Whether the authenticated user is a guest.
+        #
+        # `is_guest` was only added to the response in v1.2, so before then a client cannot tell,
+        # and the layer for that version is what reads it.
+        #
         # @returns [Boolean] whether the authenticated user is a guest.
         def guest?
-          self.value[:is_guest] || false
+          false
         end
       end
     end

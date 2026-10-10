@@ -44,17 +44,13 @@ module Async
           module V1_13
           end
 
-          # v1.12 added the `via` parameter, which names servers to attempt the join through.
+          # v1.12 renamed the servers to attempt a join through from `server_name` to `via`. Both
+          # are accepted until v1.14, which removes `server_name`, so there is nothing further to
+          # do at that version.
           module V1_12
-            # Join this room, optionally by way of the given servers.
-            #
-            # @parameter via [Array(String) | nil] the servers to attempt the join through.
-            def join(via: nil, **options)
-              if via
-                @resource = @resource.with(parameters: {via: via})
-              end
-
-              super(**options)
+            # @returns [Symbol] the parameter name.
+            def join_via_parameter
+              :via
             end
           end
 
@@ -90,16 +86,33 @@ module Async
           module V1_4
           end
 
-          # No changes in v1.3.
+          # v1.3 made the `from` token optional when paging the timeline, so that a client can page
+          # from either end of the history rather than having to hold a token first.
           module V1_3
+            # @returns [Boolean] whether `from` is required.
+            def pagination_requires_from?
+              false
+            end
           end
 
           # No changes in v1.2.
           module V1_2
           end
 
-          # v1.1 added `reason` to the membership endpoints.
+          # v1.1 is the oldest version this library supports. It carries the behaviour the later
+          # layers change: `reason` on the membership endpoints, a required `from` when paging, and
+          # `server_name` for the servers to attempt a join through.
           module V1_1
+            # @returns [Boolean] whether `from` is required.
+            def pagination_requires_from?
+              true
+            end
+
+            # @returns [Symbol] the parameter name.
+            def join_via_parameter
+              :server_name
+            end
+
             # Join this room, optionally explaining why.
             #
             # @parameter reason [String | nil] the reason for joining.

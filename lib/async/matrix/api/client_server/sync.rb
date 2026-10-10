@@ -75,7 +75,7 @@ module Async
           if block_given?
             self.joined.each do |room_id, room|
               events = room.dig(:timeline, :events) or next
-  
+
               events.each do |event|
                 yield room_id.to_s, event
               end
@@ -94,9 +94,9 @@ module Async
               unless event[:type] == "m.room.message"
                 next
               end
-  
+
               content = event[:content] || {}
-  
+
               yield room_id, event[:sender], content[:body], event
             end
           else
@@ -125,7 +125,7 @@ module Async
             sync = self
             while true
               yield sync
-  
+
               sync = sync.following(**options)
             end
           else

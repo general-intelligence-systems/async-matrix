@@ -143,6 +143,72 @@ module Async
         end
       end
 
+      # The membership events of a room.
+      class Members < Representation
+        include Versioned
+        include Enumerable
+
+        # @returns [Array(Hash)] the membership events.
+        def events
+          self.value[:chunk]
+        end
+
+        # Enumerate over each membership event.
+        #
+        # @yields {|event| ...}
+        # 	@parameter event [Hash] the membership event.
+        def each(&block)
+          if block_given?
+            self.events.each(&block)
+          else
+            to_enum
+          end
+        end
+
+        # @returns [Array(String)] the user IDs the events are about.
+        def user_ids
+          self.events.map{|event| event[:state_key]}
+        end
+      end
+
+      # A single event from a room's timeline.
+      class Event < Representation
+        include Versioned
+
+        # @returns [String] the ID of the event.
+        def event_id
+          self.value[:event_id]
+        end
+
+        # @returns [String] the type of the event, e.g. `m.room.message`.
+        def type
+          self.value[:type]
+        end
+
+        # @returns [String] the fully qualified ID of the user who sent the event.
+        def sender
+          self.value[:sender]
+        end
+
+        # @returns [Hash] the content of the event.
+        def content
+          self.value[:content]
+        end
+      end
+
+      # A single state event.
+      #
+      # The endpoint returns the content alone by default, and the whole event when asked for
+      # `format: "event"`, so {#content} answers for both shapes.
+      class StateEvent < Representation
+        include Versioned
+
+        # @returns [Hash] the content of the state event.
+        def content
+          self.value[:content] || self.value
+        end
+      end
+
       # A room is a resource which has no representation of its own: the client-server API has no
       # `GET /rooms/{roomId}`, only representations of its state, timeline and membership. A room is
       # therefore a navigator which carries its own identifier, because the identifier cannot be
@@ -212,6 +278,10 @@ module Async
         # @parameter from [String | nil] the pagination token to start from.
         # @returns [Messages] the page of events.
         def messages(dir: "b", limit: DEFAULT_LIMIT, from: nil, **parameters)
+          if from.nil? and self.pagination_requires_from?
+            raise ArgumentError, "A from token is required before v1.3!"
+          end
+
           parameters[:dir] = dir
           parameters[:limit] = limit
           if from
@@ -247,9 +317,12 @@ module Async
 
         # Join this room.
         #
+        # @parameter via [Array(String) | nil] the servers to attempt the join through.
         # @returns [RoomReference] the joined room.
-        def join(**payload)
-          api::RoomReference.post(@resource.with(path: "join"), payload)
+        def join(via: nil, **payload)
+          parameters = {self.join_via_parameter => via}.compact
+
+          api::RoomReference.post(@resource.with(path: "join", parameters: parameters), payload)
         end
 
         # Leave this room.
@@ -262,8 +335,76 @@ module Async
           api::Representation.post(@resource.with(path: "forget"), payload)
         end
 
+        # The members of this room.
+        #
+        # @parameter at [String | nil] a sync token, to read the membership as it was then.
+        # @parameter membership [String | nil] only include members in this membership state.
+        # @parameter not_membership [String | nil] exclude members in this membership state.
+        # @returns [Members] the membership events.
+        def members(at: nil, membership: nil, not_membership: nil)
+          parameters = {at: at, membership: membership, not_membership: not_membership}.compact
+
+          api::Members.get(@resource.with(path: "members", parameters: parameters))
+        end
+
+        # A single event from this room.
+        #
+        # @parameter event_id [String] the ID of the event.
+        # @returns [Event] the event.
+        def event(event_id)
+          path = "event/#{::Protocol::URL::Encoding.escape(event_id)}"
+
+          api::Event.get(@resource.with(path: path))
+        end
+
+        # A single state event from this room.
+        #
+        # @parameter type [String] the event type, e.g. `m.room.name`.
+        # @parameter state_key [String] the state key, which is usually empty.
+        # @parameter format [String | nil] `content` for the content alone, `event` for the event.
+        # @returns [StateEvent] the state event.
+        def state_event(type, state_key = "", format: nil)
+          parameters = {format: format}.compact
+
+          api::StateEvent.get(@resource.with(path: self.state_path(type, state_key), parameters: parameters))
+        end
+
+        # Set a state event in this room.
+        #
+        # @parameter type [String] the event type, e.g. `m.room.name`.
+        # @parameter content [Hash] the content of the state event.
+        # @parameter state_key [String] the state key, which is usually empty.
+        # @returns [SentEvent] the sent event.
+        def set_state(type, content, state_key = "")
+          api::SentEvent.put(@resource.with(path: self.state_path(type, state_key)), content)
+        end
+
+        # Whether a `from` token must be supplied when paging the timeline. It was required until
+        # v1.3 made it optional, so that a client could page from either end of the history.
+        #
+        # @returns [Boolean] whether `from` is required.
+        def pagination_requires_from?
+          false
+        end
+
+        # The query parameter naming the servers to attempt a join through. It was `server_name`
+        # until v1.12 introduced `via`, and v1.14 removed `server_name` altogether.
+        #
+        # @returns [Symbol] the parameter name.
+        def join_via_parameter
+          :via
+        end
+
         def close
           @resource.close
+        end
+
+        private
+
+        # The path of one state event. The trailing slash an empty state key leaves behind is what
+        # the specification expects.
+        def state_path(type, state_key)
+          "state/#{::Protocol::URL::Encoding.escape(type)}/#{::Protocol::URL::Encoding.escape(state_key)}"
         end
       end
 

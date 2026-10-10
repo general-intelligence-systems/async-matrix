@@ -89,8 +89,16 @@ module Async
             module V1_4
             end
 
-            # No changes in v1.3.
+            # v1.3 made `from` optional when paging the timeline. Before it, the request is invalid
+            # without one, which is what the earlier layers enforce.
             module V1_3
+              def self.included(base)
+                base.it "pages the timeline without a from token" do
+                  room.send_message("paged without a token")
+
+                  expect(room.messages(limit: 1).events).not.to be(:empty?)
+                end
+              end
             end
 
             # No changes in v1.2.
@@ -142,6 +150,26 @@ module Async
                   room.leave
 
                   expect(client.joined_rooms.ids).not.to be(:include?, room.id)
+                end
+
+                base.it "can getMembersByRoom" do
+                  expect(room.members.user_ids).to be(:include?, self.user_id)
+                end
+
+                base.it "can getOneRoomEvent" do
+                  sent = room.send_message("fetched by id")
+
+                  expect(room.event(sent.event_id).content[:body]).to be == "fetched by id"
+                end
+
+                base.it "can setRoomStateWithKey" do
+                  expect(room.set_state("m.room.topic", {topic: "set"}).event_id).to be =~ /\A\$/
+                end
+
+                base.it "can getRoomStateWithKey" do
+                  room.set_state("m.room.topic", {topic: "read back"})
+
+                  expect(room.state_event("m.room.topic").content[:topic]).to be == "read back"
                 end
 
                 base.it "can forgetRoom" do

@@ -91,6 +91,27 @@ module Async
           self.authenticated(login.access_token)
         end
 
+        # The ways this homeserver will let a user log in. No authentication is required.
+        #
+        # @returns [LoginFlows] the supported login flows.
+        def login_flows
+          api::LoginFlows.get(self.with(path: "#{V3}/login"))
+        end
+
+        # Invalidate this client's access token, so that the device is logged out.
+        #
+        # @returns [Representation] the empty response.
+        def logout
+          api::Representation.post(self.with(path: "#{V3}/logout"), {})
+        end
+
+        # Invalidate every access token for this user, logging out all of their devices.
+        #
+        # @returns [Representation] the empty response.
+        def logout_all
+          api::Representation.post(self.with(path: "#{V3}/logout/all"), {})
+        end
+
         # @returns [Whoami] the identity associated with this client's access token.
         def whoami
           api::Whoami.get(self.with(path: "#{V3}/account/whoami"))
