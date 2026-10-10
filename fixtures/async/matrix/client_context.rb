@@ -11,9 +11,13 @@ require "async/matrix"
 
 module Async
 	module Matrix
-		# The homeserver to test against. The `examples/matrix` rig in `async-rest` provides one, with
-		# rate limiting disabled and a module which registers a user on first login.
+		# The homeserver to test against. The rig in `synapse/` provides one, with rate limiting
+		# disabled and a module which registers a user on first login.
 		HOMESERVER = ENV.fetch("MATRIX_HOMESERVER", "http://localhost:8008")
+		
+		# The specification version under test. `bin/test` runs the suite once per version, against a
+		# server which implements that version. Deliberately not `VERSION`, which is the gem's own.
+		TEST_VERSION = ENV.fetch("MATRIX_VERSION", LATEST)
 		
 		TEST_PASSWORD = "password"
 		
@@ -24,7 +28,7 @@ module Async
 		ClientContext = Sus::Shared("a matrix client") do
 			include Sus::Fixtures::Async::ReactorContext
 			
-			let(:unauthenticated) {Async::Matrix::Client[Async::Matrix::LATEST].open(Async::Matrix::HOMESERVER)}
+			let(:unauthenticated) {Async::Matrix::Client[Async::Matrix::TEST_VERSION].open(Async::Matrix::HOMESERVER)}
 			
 			# A fresh user and room for each test, so that tests cannot interfere with each other. The
 			# rig registers a user on first login, so this needs no setup.

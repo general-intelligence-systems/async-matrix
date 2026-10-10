@@ -1,3 +1,48 @@
 #!/usr/bin/env bash
 
-bundle exec sus
+# Run the test suite against a Matrix specification version, on the Synapse which implements it.
+# The compose file has a service per version, carrying its own image and configuration.
+#
+#   bin/test --all
+#   bin/test v1.11 v1.12
+
+set -o errexit
+set -o nounset
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+compose="$root/synapse/docker-compose.yml"
+
+# The versions which can be tested, generated from the compose file by the Matrix API Versions
+# workflow. Adding a service there is all that is needed to add a version.
+mapfile -t versions < "$root/MATRIX_API_VERSIONS.txt"
+
+trap 'docker compose --file "$compose" down' EXIT
+
+run_tests() {
+  local version="$1"
+  
+  if [[ ! " ${versions[*]} " == *" $version "* ]]; then
+    echo "Unknown version $version, expected one of: ${versions[*]}" >&2
+    return 1
+  fi
+  
+  docker compose --file "$compose" down
+  docker compose --file "$compose" up --detach --wait "$version"
+  
+  MATRIX_VERSION="$version" bundle exec sus
+}
+
+if [ $# -eq 0 ]; then
+  echo "Usage: $0 --all | <version>..." >&2
+  exit 1
+fi
+
+if [[ " $* " == *" --all "* ]]; then
+  chosen=("${versions[@]}")
+else
+  chosen=("$@")
+fi
+
+for version in "${chosen[@]}"; do
+  run_tests "$version"
+done

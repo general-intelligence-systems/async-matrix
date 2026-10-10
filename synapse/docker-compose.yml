@@ -1,26 +1,181 @@
-# The test rig: one Synapse, at whichever Matrix specification version is under test.
+# The test rig: one service per Matrix specification version, each running the Synapse which
+# implements that version. The images are built and published by flake.nix in this directory.
 #
-# The image is built and published by flake.nix in this directory, so the version is selected by
-# interpolation rather than by editing this file:
+#   docker compose up --detach --wait v1.11
 #
-# 	MATRIX_VERSION=v1.11 docker compose up -d --wait synapse
+# Only one runs at a time - they all bind the same port - so bin/test brings each up in turn. The
+# service name is the specification version, so starting the right server is just naming it.
 #
-# bin/test drives this across every version in turn.
+# A version mounts its own homeserver.<version>.yaml when it needs one, because an older Synapse
+# rejects settings a newer one accepts: 1.54.0 knows room versions up to 9 and refuses to start on
+# default_room_version 11. Everything else shares homeserver.yaml.
+
+x-synapse: &synapse
+  environment:
+    SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+    PYTHONPATH: /config/modules
+  ports:
+    - "${SYNAPSE_PORT:-8008}:8008"
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
+    interval: 3s
+    timeout: 3s
+    retries: 30
+
+x-volumes:
+  signing-key: &signing-key ./signing.key:/config/signing.key:ro
+  modules: &modules ./modules:/config/modules:ro
+  homeserver: &homeserver ./homeserver.yaml:/config/homeserver.yaml:ro
 
 services:
-  synapse:
-    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-${MATRIX_VERSION:-v1.12}
-    environment:
-      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
-      PYTHONPATH: /config/modules
-    ports:
-      - "${SYNAPSE_PORT:-8008}:8008"
+  v1.1:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.1
     volumes:
-      - ./homeserver.yaml:/config/homeserver.yaml:ro
-      - ./signing.key:/config/signing.key:ro
-      - ./modules:/config/modules:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
-      interval: 3s
-      timeout: 3s
-      retries: 30
+      - ./homeserver.v1_1.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.2:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.2
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.3:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.3
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.4:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.4
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.5:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.5
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.6:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.6
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.7:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.7
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.8:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.8
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.9:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.9
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.10:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.10
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.11:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.11
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.12:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.12
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.13:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.13
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.14:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.14
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.15:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.15
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.16:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.16
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.17:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.17
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.18:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.18
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules
+
+  v1.19:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.19
+    volumes:
+      - *homeserver
+      - *signing-key
+      - *modules

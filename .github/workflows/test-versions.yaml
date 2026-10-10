@@ -1,0 +1,76 @@
+name: Test Versions
+
+# Runs the suite once per Matrix specification version, each against the Synapse which implements
+# that version. The images come from the Synapse Images workflow, and synapse/docker-compose.yml
+# has a service per version, so a job is just `bin/test v1.11`.
+
+on:
+  push:
+    branches:
+      - async-rest
+  pull_request:
+    branches:
+      - async-rest
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  versions:
+    name: Resolve versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{steps.resolve.outputs.matrix}}
+    steps:
+    - uses: actions/checkout@v5
+    
+    # MATRIX_API_VERSIONS.txt is generated from the compose file by the Matrix API Versions
+    # workflow, and is what bin/test reads too.
+    - id: resolve
+      name: Resolve versions from MATRIX_API_VERSIONS.txt
+      run: |
+        if [ ! -s MATRIX_API_VERSIONS.txt ]; then
+          echo "::error::MATRIX_API_VERSIONS.txt is missing or empty."
+          exit 1
+        fi
+        
+        cat MATRIX_API_VERSIONS.txt
+        
+        echo "matrix=$(jq -R -s -c 'split("\n") | map(select(length > 0))' < MATRIX_API_VERSIONS.txt)" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: ${{matrix.version}}
+    needs: versions
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{fromJSON(needs.versions.outputs.matrix)}}
+    
+    steps:
+    - uses: actions/checkout@v5
+    
+    - uses: DeterminateSystems/nix-installer-action@main
+    
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{github.actor}}
+        password: ${{secrets.GITHUB_TOKEN}}
+    
+    - name: Test
+      timeout-minutes: 20
+      env:
+        IMAGE_OWNER: ${{github.repository_owner}}
+      run: nix develop --command bin/test ${{matrix.version}}
+    
+    - name: Homeserver logs
+      if: failure()
+      run: docker compose --file synapse/docker-compose.yml logs --no-color | tail -100
