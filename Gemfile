@@ -16,3 +16,9 @@ group :test do
 
   gem "bake-test"
 end
+
+# bin/update-spec reads the matrix-spec submodules, whose schemas are full of $ref - including
+# pointers into other documents. json_schemer resolves them.
+group :maintenance do
+	gem "json_schemer"
+end

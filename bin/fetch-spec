@@ -19,8 +19,9 @@ cd "$root"
 
 repository="https://github.com/matrix-org/matrix-spec.git"
 
-# The only directories we read: the client-server API schemas, and the event schemas they reference.
-paths=(data/api/client-server data/event-schemas)
+# The only directories we read. The whole of data/api is needed, not just client-server: some
+# client-server schemas reference the identity and application-service definitions.
+paths=(data/api data/event-schemas data/schemas)
 
 if [ $# -eq 0 ]; then
 	mapfile -t versions < MATRIX_API_VERSIONS.txt

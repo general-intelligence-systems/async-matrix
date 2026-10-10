@@ -1,0 +1,329 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+# Generates the specification manifests in lib/async/matrix/abstract, one beside each Ruby file, so
+# that the two can be read side by side: the manifest has the same shape as the code it describes.
+#
+#   bin/update-spec              # every version in MATRIX_API_VERSIONS.txt
+#   bin/update-spec v1.18 v1.19  # only rebuild these versions' deltas
+#
+# A manifest holds the whole surface at the newest version, which is what the class body
+# implements, followed by one entry per specification version holding only what that version
+# changed, which is what the version layer implements. An empty entry means the specification
+# changed nothing, so an empty layer beside it is correct.
+#
+# Every operation in the client-server API appears in exactly one manifest. Those which no class
+# implements yet get a manifest with no Ruby beside it, which is the map of what is left to build.
+#
+# The specifications come from the submodules in ./data, one per released version, so this needs no
+# network. Run bin/fetch-spec first.
+
+require "yaml"
+require "uri"
+require "json_schemer"
+
+ROOT = File.expand_path("..", __dir__)
+DATA = File.join(ROOT, "data")
+OUTPUT = File.join(ROOT, "lib", "async", "matrix", "abstract")
+
+METHODS = %w[get put post delete patch].freeze
+
+# The specification describes five APIs. Each is namespaced, both here and in lib, because they are
+# separate protocols which happen to share a repository: a client implements client-server, a bridge
+# implements application-service, and nothing should be able to confuse the two.
+#
+# The directory is named as the specification names it; the namespace is the Ruby spelling of it.
+APIS = {
+  "client-server" => "client_server",
+  "server-server" => "server_server",
+  "identity" => "identity",
+  "application-service" => "application_service",
+  "push-gateway" => "push_gateway",
+}.freeze
+
+# The specification files each existing manifest covers, so that a manifest sits beside the Ruby it
+# describes. Anything not claimed here is generated into a manifest named after its specification
+# file, which keeps coverage complete without inventing names for concepts we have not modelled.
+GROUPS = {
+  "client_server" => {
+    "rooms" => %w[
+      rooms.yaml room_send.yaml room_state.yaml create_room.yaml joining.yaml leaving.yaml
+      message_pagination.yaml list_joined_rooms.yaml
+     ],
+    "sync" => %w[sync.yaml],
+    "session" => %w[login.yaml logout.yaml whoami.yaml],
+  },
+}.freeze
+
+def versions
+  File.readlines(File.join(ROOT, "MATRIX_API_VERSIONS.txt"), chomp: true).reject(&:empty?)
+end
+
+def directory_for(version, api)
+  File.join(DATA, "matrix-spec-#{version}", "data", "api", api)
+end
+
+# One line, so a manifest stays readable next to the code.
+def sentence(text)
+  return nil unless text
+
+  line = text.to_s.split.join(" ")
+  line = line.split(". ").first + "." if line.include?(". ")
+
+  line.length > 140 ? "#{line[0, 137]}..." : line
+end
+
+# Follow every $ref, which json_schemer resolves against the document's base URI - including the
+# `#/components/...` pointers the specification uses for shared parameters.
+def dereference(node, schema, base, seen = [], depth = 0)
+  return node if depth > 24
+
+  case node
+  when Hash
+    if reference = node["$ref"]
+      uri = URI.join(base, reference)
+      return node.reject{|key, _| key == "$ref"} if seen.include?(uri.to_s)
+
+      begin
+        target = schema.resolve_ref(uri)
+      rescue => error
+        warn "  could not resolve #{reference}: #{error.class}"
+        return node.reject{|key, _| key == "$ref"}
+      end
+
+      resolved = dereference(target.value, schema, uri, seen + [uri.to_s], depth + 1)
+      rest = node.reject{|key, _| key == "$ref"}.transform_values do |value|
+        dereference(value, schema, base, seen, depth + 1)
+      end
+
+      return resolved.is_a?(Hash) ? resolved.merge(rest) : resolved
+    end
+
+    node.transform_values{|value| dereference(value, schema, base, seen, depth + 1)}
+  when Array
+    node.map{|value| dereference(value, schema, base, seen, depth + 1)}
+  else
+    node
+  end
+end
+
+# A schema as a field tree: the names, types and requiredness needed to write the call.
+def fields(schema, depth = 0)
+  return nil unless schema.is_a?(Hash)
+  return nil if depth > 14
+
+  %w[allOf oneOf anyOf].each do |keyword|
+    next unless (entries = schema[keyword])
+
+    merged = {}
+    entries.each do |entry|
+      part = fields(entry, depth)
+      merged.merge!(part) if part.is_a?(Hash)
+    end
+
+    return merged unless merged.empty?
+  end
+
+  if schema["type"] == "array"
+    inner = fields(schema["items"], depth + 1)
+    return inner ? [inner] : "array"
+  end
+
+  properties = schema["properties"]
+  patterns = schema["patternProperties"]
+
+  # A map keyed by something the specification does not name - a room ID, a user ID. Up to v1.10
+  # these were `additionalProperties`; from v1.11 they are `patternProperties` with a key pattern.
+  # Both describe the same thing, and without handling both, everything inside them is lost.
+  additional = schema["additionalProperties"]
+  additional = nil unless additional.is_a?(Hash)
+
+  return nil unless properties || patterns || additional
+
+  required = Array(schema["required"])
+  out = {}
+
+  properties&.each do |name, value|
+    next unless value.is_a?(Hash)
+
+    entry = {"type" => value["type"] || "object"}
+    entry["required"] = true if required.include?(name)
+    entry["description"] = sentence(value["description"]) if value["description"]
+    entry["enum"] = value["enum"] if value["enum"]
+
+    nested = fields(value, depth + 1)
+    entry["fields"] = nested if nested
+
+    out[name] = entry
+  end
+
+  # A keyed map is always `(*)`, whichever construct expressed it, with the key pattern kept as
+  # metadata. Otherwise the switch from `additionalProperties` to `patternProperties` at v1.11
+  # reads as 127 fields removed and 131 added, when nothing about the API changed.
+  patterns&.each do |pattern, value|
+    next unless value.is_a?(Hash)
+
+    entry = {"type" => value["type"] || "object", "keyed_by" => pattern}
+    nested = fields(value, depth + 1)
+    entry["fields"] = nested if nested
+
+    out[patterns.size == 1 ? "(*)" : "(#{pattern})"] = entry
+  end
+
+  if additional
+    entry = {"type" => additional["type"] || "object", "keyed_by" => "*"}
+    nested = fields(additional, depth + 1)
+    entry["fields"] = nested if nested
+
+    out["(*)"] = entry
+  end
+
+  out.empty? ? nil : out
+end
+
+# Every operation in a version, keyed by operationId.
+def operations(version, api)
+  directory = directory_for(version, api)
+
+  return {} unless File.directory?(directory)
+
+  base = URI("file://#{directory}/")
+  resolver = proc{|uri| YAML.safe_load_file(uri.path, aliases: true)}
+
+  found = {}
+
+  Dir.children(directory).grep(/\.yaml\z/).sort.each do |name|
+    document = YAML.safe_load_file(File.join(directory, name), aliases: true)
+    next unless document.is_a?(Hash) && document["paths"]
+
+    schema = JSONSchemer.schema(document, base_uri: base, ref_resolver: resolver)
+
+    # The specification was Swagger 2.0 up to v1.7 and OpenAPI 3.1 from v1.8. The two describe
+    # the same API in different shapes, so both are normalised here - otherwise the delta at
+    # v1.8 reports every operation as rewritten, which says nothing about the API.
+    prefix = if document["swagger"]
+      document["basePath"].to_s
+    else
+      document.dig("servers", 0, "variables", "basePath", "default").to_s
+    end
+
+    document["paths"].each do |route, item|
+      next unless item.is_a?(Hash)
+
+      item.each do |method, operation|
+        next unless METHODS.include?(method) && operation.is_a?(Hash)
+
+        resolved = dereference(operation, schema, base)
+        identifier = resolved["operationId"] || "#{method}:#{route}"
+
+        entry = {
+          "source" => name,
+          "method" => method.upcase,
+          "path" => prefix + route,
+        }
+        entry["summary"] = sentence(resolved["summary"]) if resolved["summary"]
+
+        security = resolved["security"]
+        entry["authentication"] = !(security.nil? || security == [{}])
+
+        parameters = {}
+        Array(resolved["parameters"]).each do |parameter|
+          next unless parameter.is_a?(Hash) && parameter["name"]
+
+          place = parameter["in"] || "query"
+
+          # Swagger 2.0 puts the body in a parameter; OpenAPI 3.1 has requestBody.
+          if place == "body"
+            request = fields(parameter["schema"])
+            entry["request"] = request if request
+            next
+          end
+
+          shape = parameter["schema"] || parameter
+          field = {"type" => shape["type"] || "string"}
+          field["required"] = true if parameter["required"]
+          field["description"] = sentence(parameter["description"]) if parameter["description"]
+          field["enum"] = shape["enum"] if shape["enum"]
+
+          nested = fields(shape, 1)
+          field["fields"] = nested if nested
+
+          (parameters[place] ||= {})[parameter["name"]] = field
+        end
+        entry["parameters"] = parameters unless parameters.empty?
+
+        unless entry.key?("request")
+          body = resolved.dig("requestBody", "content", "application/json", "schema")
+          request = body && fields(body)
+          entry["request"] = request if request
+        end
+
+        responses = {}
+        Hash(resolved["responses"]).each do |status, response|
+          next unless response.is_a?(Hash)
+
+          schema_for = response["schema"] || response.dig("content", "application/json", "schema")
+          responses[status.to_s] = (schema_for && fields(schema_for)) || sentence(response["description"])
+        end
+        entry["responses"] = responses unless responses.empty?
+
+        found[identifier] = entry
+      end
+    end
+  end
+
+  found
+end
+
+selected = ARGV.empty? ? versions : ARGV
+
+total = 0
+
+selected.each do |version|
+  warn version
+
+  APIS.each do |api, namespace|
+    catalogue = operations(version, api)
+    next if catalogue.empty?
+
+    total += catalogue.size
+
+    claimed = (GROUPS[namespace] || {}).each_with_object({}) do |(manifest, sources), out|
+      sources.each{|source| out[source] = manifest}
+    end
+
+    manifests = {}
+    catalogue.each do |identifier, entry|
+      manifest = claimed[entry["source"]] || File.basename(entry["source"], ".yaml")
+      (manifests[manifest] ||= {})[identifier] = entry
+    end
+
+    manifests.sort.each do |manifest, entries|
+      # Every schema for an API sits in one directory, beside the Ruby which implements it.
+      directory = File.join(OUTPUT, namespace, "schemas")
+
+      require "fileutils"
+      FileUtils.mkdir_p(directory)
+
+      out = {
+        "api" => api,
+        "version" => version,
+        "generated_from" => "data/matrix-spec-#{version}/data/api/#{api}",
+        "sources" => entries.values.map{|entry| entry["source"]}.uniq.sort,
+        "operations" => entries.sort.to_h,
+      }
+
+      File.write(
+        File.join(directory, "#{manifest}-#{version}.yaml"),
+        "# Generated by bin/update-spec from data/matrix-spec-#{version}. Do not edit.\n" + YAML.dump(out)
+      )
+    end
+
+    warn format("  %-20s %3d operations across %2d manifests", namespace, catalogue.size, manifests.size)
+  end
+end
+
+warn "\n#{total} operations written for #{selected.size} versions."
