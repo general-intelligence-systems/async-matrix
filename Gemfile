@@ -14,6 +14,10 @@ group :test do
   gem "rubocop"
   gem "rubocop-socketry"
 
+  # Local/CommentStructure parses comments with decode, so that an annotation is whatever decode
+  # recognises as one rather than whatever a regular expression here happens to match.
+  gem "decode"
+
   gem "bake-test"
 end
 

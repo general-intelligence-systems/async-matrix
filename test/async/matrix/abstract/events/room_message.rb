@@ -1,0 +1,120 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+require "async/matrix/client_context"
+
+# The cases for the message events, layered by specification version exactly as the implementation
+# is: a case lives in the version which introduced the thing it exercises, and the version under
+# test decides which layers apply.
+#
+# `CASES` applies the layers up to the version under test, in the same ascending order the library
+# uses, so the concrete test includes one thing rather than knowing about versions at all.
+
+module Async
+  module Matrix
+    module Testing
+      module Abstract
+        module Events
+          module RoomMessage
+            # No changes in v1.19.
+            module V1_19
+            end
+
+            # No changes in v1.18.
+            module V1_18
+            end
+
+            # No changes in v1.17.
+            module V1_17
+            end
+
+            # No changes in v1.16.
+            module V1_16
+            end
+
+            # No changes in v1.15.
+            module V1_15
+            end
+
+            # No changes in v1.14.
+            module V1_14
+            end
+
+            # No changes in v1.13.
+            module V1_13
+            end
+
+            # No changes in v1.12.
+            module V1_12
+            end
+
+            # No changes in v1.11.
+            module V1_11
+            end
+
+            # v1.10 added the formatting fields to the media messages, and the original filename
+            # alongside them, so that an upload can carry a caption.
+            module V1_10
+              def self.included(base)
+                base.it "reads the caption fields the media messages gained" do
+                  image = client.api::ImageMessage.new({msgtype: "m.image", body: "cat.png", filename: "cat.png", format: "org.matrix.custom.html", formatted_body: "<b>cat</b>"})
+
+                  expect(image.filename).to be == "cat.png"
+                  expect(image.format).to be == "org.matrix.custom.html"
+                  expect(image.formatted_body).to be == "<b>cat</b>"
+                end
+              end
+            end
+
+            # No changes in v1.9.
+            module V1_9
+            end
+
+            # No changes in v1.8.
+            module V1_8
+            end
+
+            # No changes in v1.7.
+            module V1_7
+            end
+
+            # No changes in v1.6.
+            module V1_6
+            end
+
+            # No changes in v1.5.
+            module V1_5
+            end
+
+            # No changes in v1.4.
+            module V1_4
+            end
+
+            # No changes in v1.3.
+            module V1_3
+            end
+
+            # No changes in v1.2.
+            module V1_2
+            end
+
+            # No changes in v1.1.
+            module V1_1
+            end
+
+            # The cases required at the version under test.
+            CASES = Sus::Shared("message event cases") do
+              Async::Matrix::Versions.layers_for(Async::Matrix::TEST_VERSION).each do |name|
+                if RoomMessage.const_defined?(name, false)
+                  include RoomMessage.const_get(name, false)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end

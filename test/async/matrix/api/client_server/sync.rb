@@ -41,11 +41,11 @@ describe Async::Matrix::ClientServer::Sync do
 
       expect(sync).not.to be_nil
 
-      # Room IDs are symbols in the parsed payload, and are converted back to strings:
-      events = sync.each_event.select{|room_id, _| room_id == room.id}
+      # Room IDs are symbols in the parsed payload, and the envelope is given the string form:
+      events = sync.each_event.select{|event| event.room_id == room.id}
 
       expect(events).not.to be(:empty?)
-      expect(events.first.first).to be_a(String)
+      expect(events.first.room_id).to be_a(String)
     end
 
     it "enumerates messages" do
@@ -57,9 +57,9 @@ describe Async::Matrix::ClientServer::Sync do
 
       expect(sync).not.to be_nil
 
-      messages = sync.each_message.select{|room_id, _, _, _| room_id == room.id}
+      messages = sync.each_message.select{|message| message.room_id == room.id}
 
-      expect(messages.map{|_, _, message, _| message}).to be(:include?, body)
+      expect(messages.map{|message| message.content.body}).to be(:include?, body)
     end
   end
 
@@ -81,7 +81,7 @@ describe Async::Matrix::ClientServer::Sync do
 
       following = sync.following(timeout: 10_000)
 
-      expect(following.each_message.map{|_, _, message, _| message}).to be(:include?, body)
+      expect(following.each_message.map{|message| message.content.body}).to be(:include?, body)
     ensure
       writer&.wait
     end

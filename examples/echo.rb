@@ -35,14 +35,17 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
       client.join(room_id.to_s)
     end
 
-    sync.each_message do |room_id, sender, body, event|
-      # Don't reply to ourselves, or we will talk forever:
-      next if sender == me
-      next if body.nil?
+    sync.each_message do |message|
+      case message
+      in {sender: ^me}
+        # Don't reply to ourselves, or we will talk forever.
+      in {room_id:, sender:, content: Async::Matrix::Events::TextMessage(body:)}
+        Console.info(self, "Received a message.", room_id: room_id, sender: sender, body: body)
 
-      Console.info(self, "Received a message.", room_id: room_id, sender: sender, body: body)
-
-      client.room(room_id).send_message("You said: #{body}")
+        client.room(room_id).send(Async::Matrix::Events::TextMessage.build(body: "You said: #{body}"))
+      in {sender:, content: Async::Matrix::Events::Message(msgtype:)}
+        Console.info(self, "Ignoring a message we do not handle.", sender: sender, msgtype: msgtype)
+      end
     end
   end
 end

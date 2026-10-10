@@ -58,7 +58,7 @@ module Async
         sync = client.sync(timeout: 0)
 
         attempts.times do
-          if sync.each_message.any?{|_, _, message, _| message == body}
+          if sync.each_message.any?{|message| message.content.body == body}
             return sync
           end
 

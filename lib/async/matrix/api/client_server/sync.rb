@@ -68,16 +68,17 @@ module Async
         # Note that the room IDs are symbols, because the JSON parser symbolizes all names, so they
         # are converted back to strings here.
         #
-        # @yields {|room_id, event| ...}
-        #   @parameter room_id [String] the ID of the room the event occurred in.
-        #   @parameter event [Hash] the event.
+        # @yields {|event| ...}
+        #   @parameter event [Events::Envelope] the event, which names the room it came from.
         def each_event
           if block_given?
             self.joined.each do |room_id, room|
               events = room.dig(:timeline, :events) or next
 
               events.each do |event|
-                yield room_id.to_s, event
+                # `/sync` groups events by room rather than naming the room on each one, so the
+                # envelope is told which room it came from:
+                yield self.events.wrap(event, room_id: room_id.to_s)
               end
             end
           else
@@ -87,17 +88,16 @@ module Async
 
         # Enumerate over every message in this batch.
         #
-        # @yields {|room_id, sender, body, event| ...}
+        # @yields {|event| ...}
+        #   @parameter event [Events::Envelope] the message, whose content is an {Events::Message}.
         def each_message
           if block_given?
-            self.each_event do |room_id, event|
-              unless event[:type] == "m.room.message"
+            self.each_event do |event|
+              unless event.content.is_a?(Events::Message)
                 next
               end
 
-              content = event[:content] || {}
-
-              yield room_id, event[:sender], content[:body], event
+              yield event
             end
           else
             to_enum(:each_message)

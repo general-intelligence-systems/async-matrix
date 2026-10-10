@@ -11,6 +11,7 @@ require:
   - ./cops/each_file_has_matching_test.rb
   - ./cops/abstract_module_version_order.rb
   - ./cops/abstract_module_no_changes_comment.rb
+  - ./cops/comment_structure.rb
 
 AllCops:
   DisabledByDefault: true
@@ -150,9 +151,10 @@ AsyncMatrix/EachFileHasMatchingTest:
     - "lib/**/*.rb"
     - "test/**/*.rb"
   Exclude:
-    # Describes the shape of the project - which classes exist, and which test files are guarded -
-    # rather than a file in lib, so it has no counterpart there.
+    # Describe the shape of the project - which classes exist, and which test files are guarded -
+    # rather than a file in lib, so they have no counterpart there.
     - "test/operations.rb"
+    - "test/events.rb"
 
 # House style, shared with ratalada.
 
@@ -174,4 +176,10 @@ Local/NoReturn:
 
 # Requires `tap` where a method assigns a local on its first line and returns it on its last.
 Local/UseTap:
+  Enabled: true
+
+# A comment's summary, and the summary of each of its annotations, is one line however long: the
+# shape async-rest documents itself with, where summary paragraphs reach 544 characters and none is
+# wrapped. Parsed by decode, so an annotation is whatever decode recognises as one.
+Local/CommentStructure:
   Enabled: true

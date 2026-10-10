@@ -89,13 +89,18 @@ module Async
           self.value[:chunk]
         end
 
-        # Enumerate over the events in this page.
+        # Enumerate over the events in this page, each wrapped in the envelope its framing calls
+        # for. {#events} is the raw form, for anything the event classes do not name.
         #
         # @yields {|event| ...}
-        #   @parameter event [Hash] the event.
+        #   @parameter event [Events::Envelope] the event.
         def each(&block)
           if block_given?
-            self.events.each(&block)
+            registry = Events.registry(self.version)
+
+            self.events.each do |event|
+              yield registry.wrap(event)
+            end
           else
             to_enum
           end
@@ -301,6 +306,18 @@ module Async
           path = "send/#{::Protocol::URL::Encoding.escape(type)}/#{::Protocol::URL::Encoding.escape(transaction_id)}"
 
           api::SentEvent.put(@resource.with(path: path), content)
+        end
+
+        # Send an event described by one of the {Async::Matrix::Events} classes, which names both
+        # the type for the path and the content for the body.
+        #
+        # 	room.send(Async::Matrix::Events::TextMessage.build(body: "Hello!"))
+        #
+        # @parameter content [Events::Content] the content to send.
+        # @parameter transaction_id [String] a unique ID which makes this request idempotent.
+        # @returns [SentEvent] the sent event.
+        def send(content, transaction_id: self.class.transaction_id)
+          self.send_event(content.type, content.to_h, transaction_id: transaction_id)
         end
 
         # Send a message into the room.
