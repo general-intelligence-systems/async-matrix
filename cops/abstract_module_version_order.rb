@@ -93,12 +93,12 @@ module RuboCop
             concepts.each do |concept|
               layers = self.child_modules(concept).filter_map do |child|
                 name = self.module_name(child)
-  
+
                 if name.to_s.start_with?("V")
                   [name, child]
                 end
               end
-  
+
               self.check_completeness(concept, layers)
               self.check_order(layers)
             end

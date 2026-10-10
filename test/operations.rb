@@ -14,7 +14,7 @@ require "async/matrix/client_context"
 describe Async::Matrix do
   ROOT = File.expand_path("..", __dir__)
 
-  SCHEMAS = File.join("lib", "async", "matrix", "abstract", "client_server", "schemas")
+  SCHEMAS = File.join("lib", "async", "matrix", "abstract", "api", "client_server", "schemas")
 
   CLASSES = File.join("lib", "async", "matrix", "api", "client_server")
 

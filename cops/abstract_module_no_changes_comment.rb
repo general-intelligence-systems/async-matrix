@@ -54,7 +54,7 @@ module RuboCop
                     corrector.replace(comment.source_range, expected)
                   else
                     indentation = " " * node.loc.keyword.column
-      
+
                     corrector.insert_before(node.loc.keyword, "#{expected}\n#{indentation}")
                   end
                 end
@@ -79,7 +79,7 @@ module RuboCop
 
           if match
             if self.abstract?(node)
-              return "v#{match[1]}.#{match[2]}"
+              "v#{match[1]}.#{match[2]}"
             else
               nil
             end

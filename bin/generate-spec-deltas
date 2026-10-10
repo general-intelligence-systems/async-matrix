@@ -22,7 +22,7 @@
 require "yaml"
 
 ROOT = File.expand_path("..", __dir__)
-ABSTRACT = File.join(ROOT, "lib", "async", "matrix", "abstract")
+ABSTRACT = File.join(ROOT, "lib", "async", "matrix", "abstract", "api")
 
 # Keys which describe rather than define, so a reworded sentence is not a change.
 IGNORED = %w[description summary source keyed_by].freeze
@@ -39,7 +39,9 @@ def leaves(node, trail = [], out = {})
   case node
   when Hash
     node.each do |key, value|
-      next if IGNORED.include?(key)
+      if IGNORED.include?(key)
+        next
+      end
 
       leaves(value, key == "fields" ? trail : trail + [key.to_s], out)
     end
@@ -58,21 +60,30 @@ def leaves(node, trail = [], out = {})
 end
 
 def delta(before, after)
-  return {"introduced" => true} if before.nil?
-  return {"removed" => true} if after.nil?
-
-  previous = leaves(before)
-  current = leaves(after)
-
-  added = (current.keys - previous.keys).sort
-  removed = (previous.keys - current.keys).sort
-  changed = (current.keys & previous.keys).reject{|path| previous[path] == current[path]}.sort
-
-  out = {}
-  out["added"] = added.to_h{|path| [path, current[path]]} unless added.empty?
-  out["removed"] = removed.to_h{|path| [path, previous[path]]} unless removed.empty?
-  out["changed"] = changed.to_h{|path| [path, {"from" => previous[path], "to" => current[path]}]} unless changed.empty?
-  out
+  if before.nil?
+    {"introduced" => true}
+  else
+    if after.nil?
+      {"removed" => true}
+    else
+      previous = leaves(before)
+      current = leaves(after)
+      added = (current.keys - previous.keys).sort
+      removed = (previous.keys - current.keys).sort
+      changed = (current.keys & previous.keys).reject{|path| previous[path] == current[path]}.sort
+      out = {}
+      unless added.empty?
+        out["added"] = added.to_h{|path| [path, current[path]]}
+      end
+      unless removed.empty?
+        out["removed"] = removed.to_h{|path| [path, previous[path]]}
+      end
+      unless changed.empty?
+        out["changed"] = changed.to_h{|path| [path, {"from" => previous[path], "to" => current[path]}]}
+      end
+      out
+    end
+  end
 end
 
 all = versions
@@ -84,7 +95,9 @@ end.flat_map do |api|
   Dir.children(File.join(ABSTRACT, api, "schemas")).filter_map do |file|
     match = /\A(?<name>.+)-(?<version>v\d+\.\d+)\.yaml\z/.match(file)
 
-    "#{api}/#{match[:name]}" if match
+    if match
+      "#{api}/#{match[:name]}"
+    end
   end.uniq
 end.sort
 
@@ -94,7 +107,9 @@ unless ARGV.empty?
   end
 end
 
-abort "No manifests found in #{ABSTRACT}. Run bin/update-spec first." if manifests.empty?
+if manifests.empty?
+  abort "No manifests found in #{ABSTRACT}. Run bin/update-spec first."
+end
 
 changed_total = 0
 
@@ -114,7 +129,11 @@ manifests.each do |manifest|
 
   all.reverse_each do |version|
     index = all.index(version)
-    before = index.zero? ? nil : catalogue[all[index - 1]]
+    if index.zero?
+      before = nil
+    else
+      before = catalogue[all[index - 1]]
+    end
     after = catalogue[version]
 
     # A version with no manifest at all - the endpoints did not exist yet:
@@ -128,7 +147,9 @@ manifests.each do |manifest|
     (Array(before&.keys) | after.keys).sort.each do |identifier|
       difference = delta(before && before[identifier], after[identifier])
 
-      changes[identifier] = difference unless difference.empty?
+      unless difference.empty?
+        changes[identifier] = difference
+      end
     end
 
     deltas[version] = changes
@@ -144,7 +165,9 @@ manifests.each do |manifest|
   # `<name>-v1.12.deltas.yaml` says what it has to implement, or says the specification changed
   # nothing and the empty layer is correct.
   all.each do |version|
-    next if catalogue[version].nil?
+    if catalogue[version].nil?
+      next
+    end
 
     out = {
       "api" => api,

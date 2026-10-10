@@ -11,7 +11,7 @@ module Async
   module Matrix
     # What {OperationsContext} needs to know: which operations a test owes, and which cases it has.
     module Operations
-      SCHEMAS = File.expand_path("../../../lib/async/matrix/abstract/client_server/schemas", __dir__)
+      SCHEMAS = File.expand_path("../../../lib/async/matrix/abstract/api/client_server/schemas", __dir__)
 
       # A case is named exactly `can <operation>`, so that ordinary English - `can page backwards
       # through the timeline` - is not mistaken for naming an operation called `page`.

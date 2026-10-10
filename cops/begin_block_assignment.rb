@@ -24,12 +24,12 @@ module RuboCop
 
         private
 
-          def check(node)
-            rhs = node.children.last
-            if rhs.is_a?(RuboCop::AST::Node) && rhs.type == :kwbegin
-              add_offense(node)
-            end
+        def check(node)
+          rhs = node.children.last
+          if rhs.is_a?(RuboCop::AST::Node) && rhs.type == :kwbegin
+            add_offense(node)
           end
+        end
       end
     end
   end

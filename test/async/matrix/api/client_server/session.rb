@@ -8,7 +8,7 @@ require "securerandom"
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
-require_relative "../../abstract/client_server/session"
+require_relative "../../abstract/api/client_server/session"
 
 describe Async::Matrix::ClientServer::Login do
   include Async::Matrix::ClientContext

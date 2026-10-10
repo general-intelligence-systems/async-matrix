@@ -6,6 +6,12 @@
 #   bin/test              # the latest version
 #   bin/test --all        # every version
 #   bin/test v1.11 v1.12  # just these
+#   bin/test --keep       # and leave the homeserver running afterwards
+#
+# Only one homeserver runs at a time - they all bind the same port - so each version is brought up
+# in turn and taken down at the end. `--keep` leaves it running, and reuses it when it is already
+# the version wanted, which is what you want while iterating: the suite then costs seconds rather
+# than a container start, and a run of `sus` by hand afterwards has something to talk to.
 
 set -o errexit
 set -o nounset
@@ -17,7 +23,50 @@ compose="$root/synapse/docker-compose.yml"
 # workflow. Adding a service there is all that is needed to add a version.
 mapfile -t versions < "$root/MATRIX_API_VERSIONS.txt"
 
-trap 'docker compose --file "$compose" down' EXIT
+all="no"
+keep="no"
+chosen=()
+
+for argument in "$@"; do
+  case "$argument" in
+    --all)
+      all="yes"
+      ;;
+    --keep)
+      keep="yes"
+      ;;
+    -*)
+      echo "Unknown option $argument." >&2
+      exit 1
+      ;;
+    *)
+      chosen+=("$argument")
+      ;;
+  esac
+done
+
+# Reported on the way out either way, so that it is said even when the suite fails:
+if [ "$keep" = "yes" ]; then
+  trap 'echo "The homeserver is still running. Stop it with: docker compose --file synapse/docker-compose.yml down" >&2' EXIT
+else
+  trap 'docker compose --file "$compose" down' EXIT
+fi
+
+# The version whose homeserver is running, if one is.
+running() {
+  docker compose --file "$compose" ps --services --filter status=running 2>/dev/null | head -1
+}
+
+start() {
+  local version="$1"
+  
+  if [ "$keep" = "yes" ] && [ "$(running)" = "$version" ]; then
+    echo "Reusing the $version homeserver, which is already running." >&2
+  else
+    docker compose --file "$compose" down
+    docker compose --file "$compose" up --detach --wait "$version"
+  fi
+}
 
 run_tests() {
   local version="$1"
@@ -27,19 +76,16 @@ run_tests() {
     return 1
   fi
   
-  docker compose --file "$compose" down
-  docker compose --file "$compose" up --detach --wait "$version"
+  start "$version"
   
   MATRIX_VERSION="$version" bundle exec sus
 }
 
-if [[ " $* " == *" --all "* ]]; then
+if [ "$all" = "yes" ]; then
   chosen=("${versions[@]}")
-elif [ $# -eq 0 ]; then
+elif [ "${#chosen[@]}" -eq 0 ]; then
   # No version asked for: the latest one.
   chosen=("${versions[-1]}")
-else
-  chosen=("$@")
 fi
 
 for version in "${chosen[@]}"; do

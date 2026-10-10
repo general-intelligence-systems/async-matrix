@@ -30,52 +30,52 @@ module RuboCop
 
         private
 
-          # Two shapes are left for a human. A modifier that is not the whole
-          # statement (`x = (foo if bar)`) would unwrap into a conditional
-          # assignment — trading this offence for a NoConditionalAssignment one.
-          # A heredoc body's content lives on the lines BELOW the node, outside
-          # `source`, so re-indenting the node would strip it.
-          def safe_to_unwrap?(node)
-            own_line?(node) && !contains_heredoc?(node)
-          end
+        # Two shapes are left for a human. A modifier that is not the whole
+        # statement (`x = (foo if bar)`) would unwrap into a conditional
+        # assignment — trading this offence for a NoConditionalAssignment one.
+        # A heredoc body's content lives on the lines BELOW the node, outside
+        # `source`, so re-indenting the node would strip it.
+        def safe_to_unwrap?(node)
+          own_line?(node) && !contains_heredoc?(node)
+        end
 
-          def own_line?(node)
-            line = processed_source.lines[node.first_line - 1].to_s
-            line[0...node.loc.column].strip.empty?
-          end
+        def own_line?(node)
+          line = processed_source.lines[node.first_line - 1].to_s
+          line[0...node.loc.column].strip.empty?
+        end
 
-          def contains_heredoc?(node)
-            node.each_descendant(:str, :dstr, :xstr).any? { |n| n.respond_to?(:heredoc?) && n.heredoc? }
-          end
+        def contains_heredoc?(node)
+          node.each_descendant(:str, :dstr, :xstr).any?{|n| n.respond_to?(:heredoc?) && n.heredoc?}
+        end
 
-          def block_form(node)
-            indent = " " * node.loc.column
-            body   = node.if_branch || node.else_branch
+        def block_form(node)
+          indent = " " * node.loc.column
+          body   = node.if_branch || node.else_branch
 
-            "#{node.keyword} #{node.condition.source}\n" \
-              "#{reindent(body, indent)}\n" \
-              "#{indent}end"
-          end
+          "#{node.keyword} #{node.condition.source}\n" \
+            "#{reindent(body, indent)}\n" \
+            "#{indent}end"
+        end
 
-          # Move the body to a new indent. Only line 1 is positioned absolutely —
-          # `source` has already stripped its leading whitespace. Lines 2..n
-          # still carry their ORIGINAL absolute indentation, so they get shifted
-          # by the delta, which keeps a multi-line body's internal shape intact.
-          def reindent(node, indent)
-            target = indent.length + 2
-            delta  = target - node.loc.column
-            lines  = node.source.lines
+        # Move the body to a new indent. Only line 1 is positioned absolutely —
+        # `source` has already stripped its leading whitespace. Lines 2..n
+        # still carry their ORIGINAL absolute indentation, so they get shifted
+        # by the delta, which keeps a multi-line body's internal shape intact.
+        def reindent(node, indent)
+          target = indent.length + 2
+          delta  = target - node.loc.column
+          lines  = node.source.lines
 
-            rest = lines[1..].to_a.map { |line|
-              if delta.negative?
-                line.chomp.sub(/\A {0,#{-delta}}/, "")
-              else
-                "#{' ' * delta}#{line.chomp}"
-              end
-            }
+          rest = lines[1..].to_a.map{|line|
+            if delta.negative?
+              line.chomp.sub(/\A {0,#{-delta}}/, "")
+            else
+              "#{' ' * delta}#{line.chomp}"
+            end
+          }
 
-            [("#{' ' * target}#{lines.first.chomp}")].concat(rest).join("\n")
-          end
+          [("#{' ' * target}#{lines.first.chomp}")].concat(rest).join("\n")
+        end
       end
     end
   end

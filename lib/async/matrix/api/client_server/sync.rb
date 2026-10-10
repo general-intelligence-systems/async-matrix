@@ -7,7 +7,7 @@ require_relative "../../paths"
 require_relative "../../representation"
 require_relative "rooms"
 require_relative "../../versioned"
-require_relative "../../abstract/client_server/sync"
+require_relative "../../abstract/api/client_server/sync"
 
 module Async
   module Matrix

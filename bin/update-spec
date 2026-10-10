@@ -27,7 +27,7 @@ require "json_schemer"
 
 ROOT = File.expand_path("..", __dir__)
 DATA = File.join(ROOT, "data")
-OUTPUT = File.join(ROOT, "lib", "async", "matrix", "abstract")
+OUTPUT = File.join(ROOT, "lib", "async", "matrix", "abstract", "api")
 
 METHODS = %w[get put post delete patch].freeze
 
@@ -68,217 +68,283 @@ end
 
 # One line, so a manifest stays readable next to the code.
 def sentence(text)
-  return nil unless text
-
-  line = text.to_s.split.join(" ")
-  line = line.split(". ").first + "." if line.include?(". ")
-
-  line.length > 140 ? "#{line[0, 137]}..." : line
+  if text
+    line = text.to_s.split.join(" ")
+    if line.include?(". ")
+      line = line.split(". ").first + "."
+    end
+    line.length > 140 ? "#{line[0, 137]}..." : line
+  else
+    nil
+  end
 end
 
 # Follow every $ref, which json_schemer resolves against the document's base URI - including the
 # `#/components/...` pointers the specification uses for shared parameters.
 def dereference(node, schema, base, seen = [], depth = 0)
-  return node if depth > 24
-
-  case node
-  when Hash
-    if reference = node["$ref"]
-      uri = URI.join(base, reference)
-      return node.reject{|key, _| key == "$ref"} if seen.include?(uri.to_s)
-
-      begin
-        target = schema.resolve_ref(uri)
-      rescue => error
-        warn "  could not resolve #{reference}: #{error.class}"
-        return node.reject{|key, _| key == "$ref"}
-      end
-
-      resolved = dereference(target.value, schema, uri, seen + [uri.to_s], depth + 1)
-      rest = node.reject{|key, _| key == "$ref"}.transform_values do |value|
-        dereference(value, schema, base, seen, depth + 1)
-      end
-
-      return resolved.is_a?(Hash) ? resolved.merge(rest) : resolved
-    end
-
-    node.transform_values{|value| dereference(value, schema, base, seen, depth + 1)}
-  when Array
-    node.map{|value| dereference(value, schema, base, seen, depth + 1)}
-  else
+  if depth > 24
     node
+  else
+    case node
+    when Hash
+      if reference = node["$ref"]
+        uri = URI.join(base, reference)
+        if seen.include?(uri.to_s)
+          node.reject{|key, _| key == "$ref"}
+        else
+          begin
+            target = schema.resolve_ref(uri)
+          rescue => error
+            warn "  could not resolve #{reference}: #{error.class}"
+            node.reject{|key, _| key == "$ref"}
+          else
+            resolved = dereference(target.value, schema, uri, seen + [uri.to_s], depth + 1)
+            rest = node.reject{|key, _| key == "$ref"}.transform_values do |value|
+              dereference(value, schema, base, seen, depth + 1)
+            end
+
+            resolved.is_a?(Hash) ? resolved.merge(rest) : resolved
+          end
+        end
+      else
+        node.transform_values{|value| dereference(value, schema, base, seen, depth + 1)}
+      end
+    when Array
+      node.map{|value| dereference(value, schema, base, seen, depth + 1)}
+    else
+      node
+    end
   end
 end
 
 # A schema as a field tree: the names, types and requiredness needed to write the call.
 def fields(schema, depth = 0)
-  return nil unless schema.is_a?(Hash)
-  return nil if depth > 14
+  if schema.is_a?(Hash) && depth <= 14
+    combined = %w[allOf oneOf anyOf].filter_map do |keyword|
+      entries = schema[keyword]
+      unless entries
+        next
+      end
 
-  %w[allOf oneOf anyOf].each do |keyword|
-    next unless (entries = schema[keyword])
+      merged = {}
+      entries.each do |entry|
+        part = fields(entry, depth)
+        if part.is_a?(Hash)
+          merged.merge!(part)
+        end
+      end
 
-    merged = {}
-    entries.each do |entry|
-      part = fields(entry, depth)
-      merged.merge!(part) if part.is_a?(Hash)
+      merged.empty? ? nil : merged
+    end.first
+
+    if combined
+      combined
+    elsif schema["type"] == "array"
+      inner = fields(schema["items"], depth + 1)
+      inner ? [inner] : "array"
+    else
+      properties = schema["properties"]
+      patterns = schema["patternProperties"]
+
+      # A map keyed by something the specification does not name - a room ID, a user ID. Up to v1.10
+      # these were `additionalProperties`; from v1.11 they are `patternProperties` with a key pattern.
+      # Both describe the same thing, and without handling both, everything inside them is lost.
+      additional = schema["additionalProperties"]
+      unless additional.is_a?(Hash)
+        additional = nil
+      end
+
+      if properties || patterns || additional
+        required = Array(schema["required"])
+        out = {}
+
+        properties&.each do |name, value|
+          unless value.is_a?(Hash)
+            next
+          end
+
+          entry = {"type" => value["type"] || "object"}
+          if required.include?(name)
+            entry["required"] = true
+          end
+          if value["description"]
+            entry["description"] = sentence(value["description"])
+          end
+          if value["enum"]
+            entry["enum"] = value["enum"]
+          end
+
+          nested = fields(value, depth + 1)
+          if nested
+            entry["fields"] = nested
+          end
+
+          out[name] = entry
+        end
+
+        # A keyed map is always `(*)`, whichever construct expressed it, with the key pattern kept as
+        # metadata. Otherwise the switch from `additionalProperties` to `patternProperties` at v1.11
+        # reads as 127 fields removed and 131 added, when nothing about the API changed.
+        patterns&.each do |pattern, value|
+          unless value.is_a?(Hash)
+            next
+          end
+
+          entry = {"type" => value["type"] || "object", "keyed_by" => pattern}
+          nested = fields(value, depth + 1)
+          if nested
+            entry["fields"] = nested
+          end
+
+          out[patterns.size == 1 ? "(*)" : "(#{pattern})"] = entry
+        end
+
+        if additional
+          entry = {"type" => additional["type"] || "object", "keyed_by" => "*"}
+          nested = fields(additional, depth + 1)
+          if nested
+            entry["fields"] = nested
+          end
+
+          out["(*)"] = entry
+        end
+
+        out.empty? ? nil : out
+      else
+        nil
+      end
     end
-
-    return merged unless merged.empty?
+  else
+    nil
   end
-
-  if schema["type"] == "array"
-    inner = fields(schema["items"], depth + 1)
-    return inner ? [inner] : "array"
-  end
-
-  properties = schema["properties"]
-  patterns = schema["patternProperties"]
-
-  # A map keyed by something the specification does not name - a room ID, a user ID. Up to v1.10
-  # these were `additionalProperties`; from v1.11 they are `patternProperties` with a key pattern.
-  # Both describe the same thing, and without handling both, everything inside them is lost.
-  additional = schema["additionalProperties"]
-  additional = nil unless additional.is_a?(Hash)
-
-  return nil unless properties || patterns || additional
-
-  required = Array(schema["required"])
-  out = {}
-
-  properties&.each do |name, value|
-    next unless value.is_a?(Hash)
-
-    entry = {"type" => value["type"] || "object"}
-    entry["required"] = true if required.include?(name)
-    entry["description"] = sentence(value["description"]) if value["description"]
-    entry["enum"] = value["enum"] if value["enum"]
-
-    nested = fields(value, depth + 1)
-    entry["fields"] = nested if nested
-
-    out[name] = entry
-  end
-
-  # A keyed map is always `(*)`, whichever construct expressed it, with the key pattern kept as
-  # metadata. Otherwise the switch from `additionalProperties` to `patternProperties` at v1.11
-  # reads as 127 fields removed and 131 added, when nothing about the API changed.
-  patterns&.each do |pattern, value|
-    next unless value.is_a?(Hash)
-
-    entry = {"type" => value["type"] || "object", "keyed_by" => pattern}
-    nested = fields(value, depth + 1)
-    entry["fields"] = nested if nested
-
-    out[patterns.size == 1 ? "(*)" : "(#{pattern})"] = entry
-  end
-
-  if additional
-    entry = {"type" => additional["type"] || "object", "keyed_by" => "*"}
-    nested = fields(additional, depth + 1)
-    entry["fields"] = nested if nested
-
-    out["(*)"] = entry
-  end
-
-  out.empty? ? nil : out
 end
 
 # Every operation in a version, keyed by operationId.
 def operations(version, api)
   directory = directory_for(version, api)
 
-  return {} unless File.directory?(directory)
+  if File.directory?(directory)
+    base = URI("file://#{directory}/")
+    resolver = proc{|uri| YAML.safe_load_file(uri.path, aliases: true)}
+    found = {}
+    Dir.children(directory).grep(/\.yaml\z/).sort.each do |name|
+      document = YAML.safe_load_file(File.join(directory, name), aliases: true)
+      unless document.is_a?(Hash) && document["paths"]
+        next
+      end
 
-  base = URI("file://#{directory}/")
-  resolver = proc{|uri| YAML.safe_load_file(uri.path, aliases: true)}
+      schema = JSONSchemer.schema(document, base_uri: base, ref_resolver: resolver)
 
-  found = {}
+      # The specification was Swagger 2.0 up to v1.7 and OpenAPI 3.1 from v1.8. The two describe
+      # the same API in different shapes, so both are normalised here - otherwise the delta at
+      # v1.8 reports every operation as rewritten, which says nothing about the API.
+      if document["swagger"]
+        prefix = document["basePath"].to_s
+      else
+        prefix = document.dig("servers", 0, "variables", "basePath", "default").to_s
+      end
 
-  Dir.children(directory).grep(/\.yaml\z/).sort.each do |name|
-    document = YAML.safe_load_file(File.join(directory, name), aliases: true)
-    next unless document.is_a?(Hash) && document["paths"]
+      document["paths"].each do |route, item|
+        unless item.is_a?(Hash)
+          next
+        end
 
-    schema = JSONSchemer.schema(document, base_uri: base, ref_resolver: resolver)
-
-    # The specification was Swagger 2.0 up to v1.7 and OpenAPI 3.1 from v1.8. The two describe
-    # the same API in different shapes, so both are normalised here - otherwise the delta at
-    # v1.8 reports every operation as rewritten, which says nothing about the API.
-    prefix = if document["swagger"]
-      document["basePath"].to_s
-    else
-      document.dig("servers", 0, "variables", "basePath", "default").to_s
-    end
-
-    document["paths"].each do |route, item|
-      next unless item.is_a?(Hash)
-
-      item.each do |method, operation|
-        next unless METHODS.include?(method) && operation.is_a?(Hash)
-
-        resolved = dereference(operation, schema, base)
-        identifier = resolved["operationId"] || "#{method}:#{route}"
-
-        entry = {
-          "source" => name,
-          "method" => method.upcase,
-          "path" => prefix + route,
-        }
-        entry["summary"] = sentence(resolved["summary"]) if resolved["summary"]
-
-        security = resolved["security"]
-        entry["authentication"] = !(security.nil? || security == [{}])
-
-        parameters = {}
-        Array(resolved["parameters"]).each do |parameter|
-          next unless parameter.is_a?(Hash) && parameter["name"]
-
-          place = parameter["in"] || "query"
-
-          # Swagger 2.0 puts the body in a parameter; OpenAPI 3.1 has requestBody.
-          if place == "body"
-            request = fields(parameter["schema"])
-            entry["request"] = request if request
+        item.each do |method, operation|
+          unless METHODS.include?(method) && operation.is_a?(Hash)
             next
           end
 
-          shape = parameter["schema"] || parameter
-          field = {"type" => shape["type"] || "string"}
-          field["required"] = true if parameter["required"]
-          field["description"] = sentence(parameter["description"]) if parameter["description"]
-          field["enum"] = shape["enum"] if shape["enum"]
+          resolved = dereference(operation, schema, base)
+          identifier = resolved["operationId"] || "#{method}:#{route}"
 
-          nested = fields(shape, 1)
-          field["fields"] = nested if nested
+          entry = {
+            "source" => name,
+            "method" => method.upcase,
+            "path" => prefix + route,
+          }
+          if resolved["summary"]
+            entry["summary"] = sentence(resolved["summary"])
+          end
 
-          (parameters[place] ||= {})[parameter["name"]] = field
+          security = resolved["security"]
+          entry["authentication"] = !(security.nil? || security == [{}])
+
+          parameters = {}
+          Array(resolved["parameters"]).each do |parameter|
+            unless parameter.is_a?(Hash) && parameter["name"]
+              next
+            end
+
+            place = parameter["in"] || "query"
+
+            # Swagger 2.0 puts the body in a parameter; OpenAPI 3.1 has requestBody.
+            if place == "body"
+              request = fields(parameter["schema"])
+              if request
+                entry["request"] = request
+              end
+              next
+            end
+
+            shape = parameter["schema"] || parameter
+            field = {"type" => shape["type"] || "string"}
+            if parameter["required"]
+              field["required"] = true
+            end
+            if parameter["description"]
+              field["description"] = sentence(parameter["description"])
+            end
+            if shape["enum"]
+              field["enum"] = shape["enum"]
+            end
+
+            nested = fields(shape, 1)
+            if nested
+              field["fields"] = nested
+            end
+
+            (parameters[place] ||= {})[parameter["name"]] = field
+          end
+          unless parameters.empty?
+            entry["parameters"] = parameters
+          end
+
+          unless entry.key?("request")
+            body = resolved.dig("requestBody", "content", "application/json", "schema")
+            request = body && fields(body)
+            if request
+              entry["request"] = request
+            end
+          end
+
+          responses = {}
+          Hash(resolved["responses"]).each do |status, response|
+            unless response.is_a?(Hash)
+              next
+            end
+
+            schema_for = response["schema"] || response.dig("content", "application/json", "schema")
+            responses[status.to_s] = (schema_for && fields(schema_for)) || sentence(response["description"])
+          end
+          unless responses.empty?
+            entry["responses"] = responses
+          end
+
+          found[identifier] = entry
         end
-        entry["parameters"] = parameters unless parameters.empty?
-
-        unless entry.key?("request")
-          body = resolved.dig("requestBody", "content", "application/json", "schema")
-          request = body && fields(body)
-          entry["request"] = request if request
-        end
-
-        responses = {}
-        Hash(resolved["responses"]).each do |status, response|
-          next unless response.is_a?(Hash)
-
-          schema_for = response["schema"] || response.dig("content", "application/json", "schema")
-          responses[status.to_s] = (schema_for && fields(schema_for)) || sentence(response["description"])
-        end
-        entry["responses"] = responses unless responses.empty?
-
-        found[identifier] = entry
       end
     end
+    found
+  else
+    {}
   end
-
-  found
 end
 
-selected = ARGV.empty? ? versions : ARGV
+if ARGV.empty?
+  selected = versions
+else
+  selected = ARGV
+end
 
 total = 0
 
@@ -287,7 +353,9 @@ selected.each do |version|
 
   APIS.each do |api, namespace|
     catalogue = operations(version, api)
-    next if catalogue.empty?
+    if catalogue.empty?
+      next
+    end
 
     total += catalogue.size
 

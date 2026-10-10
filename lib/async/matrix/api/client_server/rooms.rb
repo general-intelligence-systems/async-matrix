@@ -10,7 +10,7 @@ require "protocol/url/encoding"
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "../../versioned"
-require_relative "../../abstract/client_server/rooms"
+require_relative "../../abstract/api/client_server/rooms"
 
 module Async
   module Matrix
