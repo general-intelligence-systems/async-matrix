@@ -9,7 +9,6 @@ on:
   push:
     paths:
       - synapse/docker-compose.yml
-      - .github/workflows/matrix-api-versions.yaml
   workflow_dispatch:
 
 permissions:
