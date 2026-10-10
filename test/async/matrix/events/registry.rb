@@ -14,8 +14,7 @@ describe Async::Matrix::Events::Registry do
       expect(registry.content_class("m.room.message", {msgtype: "m.image"})).to be_equal(Async::Matrix::Events::ImageMessage)
     end
 
-    # The specification declares a bare `m.room.message` alongside its variants, which is what an
-    # unrecognised `msgtype` is read as: the body is still there to be shown.
+    # The specification declares a bare `m.room.message` alongside its variants, which is what an unrecognised `msgtype` is read as: the body is still there to be shown.
     it "falls back to the type itself for an unknown variant" do
       expect(registry.content_class("m.room.message", {msgtype: "m.beeps"})).to be_equal(Async::Matrix::Events::Message)
     end
@@ -35,8 +34,7 @@ describe Async::Matrix::Events::Registry do
       expect(event.room_id).to be == "!r:localhost"
     end
 
-    # A homeserver will send types this library has never heard of, so the framing is taken from
-    # what the event itself carries.
+    # A homeserver will send types this library has never heard of, so the framing is taken from what the event itself carries.
     it "frames an unknown type by what it carries" do
       state = registry.wrap({type: "com.example.thing", state_key: "", content: {}})
       timeline = registry.wrap({type: "com.example.thing", event_id: "$1", content: {}})

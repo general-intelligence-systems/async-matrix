@@ -5,9 +5,7 @@
 
 require "async/matrix/events"
 
-# The field groups are shared between event types rather than inherited, because the specification
-# does not relate the types which carry them: an image is not a kind of file, they simply describe
-# an upload the same way.
+# The field groups are shared between event types rather than inherited, because the specification does not relate the types which carry them: an image is not a kind of file, they simply describe an upload the same way.
 describe Async::Matrix::Events::Captions do
   with "the formatting fields" do
     let(:content) {Async::Matrix::Events::TextMessage.new({format: "org.matrix.custom.html", formatted_body: "<b>hi</b>"})}

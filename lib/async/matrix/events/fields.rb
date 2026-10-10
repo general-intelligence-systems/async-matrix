@@ -16,6 +16,10 @@ module Async
         def filename = @value[:filename]
       end
 
+      module Relates
+        def relates_to = @value[:"m.relates_to"]
+      end
+
       module Attachment
         def url = @value[:url]
 

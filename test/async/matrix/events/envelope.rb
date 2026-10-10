@@ -50,8 +50,7 @@ describe Async::Matrix::Events::Envelope do
       end
     end
 
-    # Six event types declare content fields which collide with envelope names, so the two are
-    # never merged into one namespace.
+    # Six event types declare content fields which collide with envelope names, so the two are never merged into one namespace.
     it "does not merge the content into its own fields" do
       expect(event.deconstruct_keys(nil).keys).not.to be(:include?, :body)
       expect(event.deconstruct_keys(nil)[:content]).to be_equal(content)

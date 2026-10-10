@@ -20,10 +20,23 @@ module Async
       # a type end to end can be told from one which describes a detail of it.
       PATTERN = /\Acan\s+(?<type>\S+)\z/
 
-      # A content field whose name is already a Ruby method, and the accessor which reads it
-      # instead. `methods` would override `Object#methods`, which is what introspection calls.
+      # A content field whose name cannot be an accessor, and the one which reads it instead.
+      #
+      # Three kinds appear. A name every object answers to - `methods`, `hash` - would be overridden.
+      # A name this library already uses would read the wrong thing: `type` is the event type and
+      # `version` is the specification version, so `m.room.create` and the call events need their
+      # own. And a name which is not an identifier at all - the dotted fields, and the `(*)` of
+      # content keyed by a pattern, which is read by iterating it.
       RENAMED = {
         "methods" => :verification_methods,
+        "method" => :verification_method,
+        "hash" => :hash_method,
+        "type" => :room_type,
+        "version" => :voip_version,
+        "m.relates_to" => :relates_to,
+        "m.federate" => :federate,
+        "m.topic" => :m_topic,
+        "(*)" => :each,
       }.freeze
 
       class << self

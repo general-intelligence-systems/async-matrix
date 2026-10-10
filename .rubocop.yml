@@ -12,6 +12,7 @@ require:
   - ./cops/abstract_module_version_order.rb
   - ./cops/abstract_module_no_changes_comment.rb
   - ./cops/comment_structure.rb
+  - ./cops/single_line_methods_for_events.rb
 
 AllCops:
   DisabledByDefault: true
@@ -217,3 +218,11 @@ Local/CommentStructure:
       - "fixtures/**/*.rb"
     Exclude:
       - "lib/async/matrix/abstract/**/*.rb"
+
+# A method whose body is a single expression is written as an endless method, so the body sits
+# beside the name. The event classes are generated one reader per field, so they are where the shape
+# is worth enforcing; elsewhere a method may be laid out for its own reasons.
+Local/SingleLineMethodsForEvents:
+  Enabled: true
+  Include:
+    - "lib/async/matrix/events/**/*.rb"
