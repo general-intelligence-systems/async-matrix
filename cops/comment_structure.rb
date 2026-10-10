@@ -3,21 +3,46 @@
 # Checks the structure of a comment, which decode parses into three parts: the summary, the
 # annotations, and the summary belonging to each annotation.
 #
-#   # A resource is an abstract reference to some named entity.   <- summary
-#   #
-#   # Any information that can be named can be a resource.        <- summary, second paragraph
-#   # @parameter endpoint [Endpoint] used to connect.             <- annotation + its summary
+#   # Connect to the given endpoint, returning the HTTP client and reference.   <- summary
+#   # @parameter endpoint [Endpoint] used to connect to the remote system.      <- annotation
+#   # @returns [Tuple(Client, Reference)] the client and reference.
 #
-# A paragraph of either kind occupies exactly one line, however long that line becomes. In
-# async-rest the summary paragraphs run to 544 characters and none of them is wrapped; the same
-# holds for async-discord. Wrapping is what this cop bans, because a paragraph split over several
-# comment lines reads as several paragraphs to anything which parses it, and because re-wrapping
-# after an edit produces a diff which touches lines nobody changed.
+# Four things are checked, each measured against how async-rest, async-discord and async-ollama
+# document themselves:
 #
-# The parsing is decode's own - `Decode::Language::Ruby::Generic::TAGS` - so an annotation is
-# whatever decode recognises as one. A directive it does not recognise is not an annotation and is
-# read as summary text, which is the behaviour to want here: `@param` is not a tag, so a line
-# carrying it is prose that happens to begin with an at sign.
+# A paragraph occupies one line. None of the 99 summary paragraphs in those three projects is
+# wrapped, and async-rest's run to 544 characters.
+#
+# A summary is short, and no longer than the code it describes earns. Across 76 documented methods
+# the median summary is 4 to 9 words whatever the length of the method, so the allowance starts at
+# ten words and grows by three per line of body, to a ceiling of thirty.
+#
+# A module's summary is ten words or fewer. The only commented module in async-rest is exactly ten.
+#
+# A documented method says what it takes and returns. A summary with no annotations describes the
+# method in prose and leaves the signature undocumented, which is what annotations are for. A
+# method with no comment at all is not this cop's business: that is documentation coverage, which
+# decode reports on separately.
+#
+# Nothing here is corrected automatically. A comment which breaks these rules has to be rewritten
+# rather than reflowed, and a correction which only moved the words around would hide that.
+#
+# Each check is configured on its own, because they are not all worth applying everywhere:
+#
+#   Local/CommentStructure:
+#     Annotations:
+#       Include:
+#         - "lib/**/*.rb"
+#     Length:
+#       Exclude:
+#         - "bin/**/*"
+#     Wrapping:
+#       Enabled: true
+#
+# A check with no `Include` runs everywhere; given one, it runs only where a path matches. `Exclude`
+# then removes paths from whatever is left. `Annotations` defaults to `lib` alone: a script in `bin`
+# and a case in `test` have no interface for anyone else to call, so annotating them documents
+# nothing.
 
 require "decode/language/ruby/generic"
 
@@ -25,15 +50,25 @@ module RuboCop
   module Cop
     module Local
       class CommentStructure < Base
-        extend AutoCorrector
+        MSG_WRAPPED_SUMMARY = "Do not wrap a summary paragraph: a paragraph is one line, however long."
 
-        MSG_SUMMARY = "Do not wrap a summary paragraph; a paragraph is one line, however long."
+        MSG_WRAPPED_ANNOTATION = "Do not wrap the summary of `@%<directive>s`: an annotation's summary is one line."
 
-        MSG_ANNOTATION = "Do not wrap the summary of `@%<directive>s`; an annotation's summary is one line."
+        MSG_TOO_LONG = "This summary is %<words>d words; %<allowed>d is the most %<subject>s may have."
+
+        MSG_NO_ANNOTATIONS = "This method is described in prose but its parameters and return value are not: document them with annotations, or say nothing."
 
         TAGS = Decode::Language::Ruby::Generic::TAGS
 
-        # The lines which say what the file is rather than what the code does.
+        # Each check, and the paths it applies to when the configuration names none.
+        CHECKS = {
+          "Wrapping" => nil,
+          "Length" => nil,
+          "Annotations" => ["lib/**/*.rb"].freeze,
+        }.freeze
+
+        GLOB = File::FNM_PATHNAME | File::FNM_EXTGLOB
+
         HEADER = /\A#\s*(frozen_string_literal:|Released under|Copyright,|!)/
 
         TERMINAL = [".", ":", "?", "!"].freeze
@@ -42,15 +77,117 @@ module RuboCop
         FREEFORM = [Decode::Comment::Example].freeze
 
         def on_new_investigation
-          self.blocks.each do |block|
-            self.check(block)
+          if self.applies?("Wrapping")
+            self.blocks.each do |block|
+              self.check_wrapping(block)
+            end
           end
+        end
+
+        def on_module(node)
+          if self.applies?("Length")
+            self.check_summary(node, "a module summary", self.cop_config.fetch("ModuleWords", 10))
+          end
+        end
+
+        def on_class(node)
+          if self.applies?("Length")
+            self.check_summary(node, "a class summary", self.cop_config.fetch("MaximumWords", 30))
+          end
+        end
+
+        def on_def(node)
+          self.check_method(node)
+        end
+
+        def on_defs(node)
+          self.check_method(node)
         end
 
         private
 
-        # Consecutive comment lines, as decode would be given them: a block is what documents one
-        # thing, so a wrap can only happen inside one.
+        # Whether a check applies to the file being inspected.
+        def applies?(check)
+          configuration = self.cop_config[check] || {}
+
+          if configuration["Enabled"] == false
+            false
+          else
+            path = ::RuboCop::PathUtil.relative_path(processed_source.file_path.to_s)
+
+            included = configuration["Include"] || CHECKS.fetch(check)
+            excluded = configuration["Exclude"] || []
+
+            self.matches?(path, included, true) and !self.matches?(path, excluded, false)
+          end
+        end
+
+        # @parameter default [Boolean] what an absent or empty list of patterns means.
+        def matches?(path, patterns, default)
+          if patterns.nil? or patterns.empty?
+            default
+          else
+            patterns.any?{|pattern| File.fnmatch?(pattern, path, GLOB)}
+          end
+        end
+
+        def check_method(node)
+          lines = node.loc.last_line - node.loc.line + 1
+          base = self.cop_config.fetch("BaseWords", 10)
+          per_line = self.cop_config.fetch("WordsPerLine", 3)
+          ceiling = self.cop_config.fetch("MaximumWords", 30)
+
+          allowed = [base + (per_line * lines), ceiling].min
+
+          if self.applies?("Length")
+            self.check_summary(node, "a summary of #{lines} #{lines == 1 ? "line" : "lines"} of code", allowed)
+          end
+
+          if self.applies?("Annotations")
+            self.check_annotations(node)
+          end
+        end
+
+        # The comment which documents a declaration, as the parts decode reads it as.
+        def parts_of(node)
+          comments = processed_source.ast_with_comments[node]
+
+          if comments.nil? or comments.empty?
+            nil
+          else
+            self.parse(comments.reject{|comment| comment.text.match?(HEADER)})
+          end
+        end
+
+        def check_summary(node, subject, allowed)
+          parts = self.parts_of(node)
+
+          if parts
+            summary = parts.map(&:first).grep(Decode::Comment::Text)
+            words = summary.sum{|text| text.line.split.size}
+
+            if words > allowed
+              message = format(MSG_TOO_LONG, words: words, allowed: allowed, subject: subject)
+
+              add_offense(summary.first ? self.comment_for(node, parts, summary.first) : node, message: message)
+            end
+          end
+        end
+
+        def check_annotations(node)
+          parts = self.parts_of(node)
+
+          if parts and parts.any?{|part, _| part.is_a?(Decode::Comment::Text)}
+            annotations = parts.map(&:first).reject{|part| part.is_a?(Decode::Comment::Text)}
+
+            if annotations.empty?
+              add_offense(node.loc.name, message: MSG_NO_ANNOTATIONS)
+            end
+          end
+        end
+
+        # Consecutive comment lines: a block is what documents one thing, so a wrap can only
+        # happen inside one.
         def blocks
           found = []
           current = []
@@ -68,40 +205,37 @@ module RuboCop
             end
           end
 
-          found << current unless current.empty?
+          unless current.empty?
+            found << current
+          end
 
           found
         end
 
-        # Walk the nodes decode parses out of the block, alongside the lines each one consumed, so
-        # that an offence can be reported where it is rather than where the block starts.
-        def check(block)
+        def check_wrapping(block)
           nodes = self.parse(block)
 
           nodes.each_with_index do |(node, lines), index|
-            case node
-            when Decode::Comment::Text
+            if node.is_a?(Decode::Comment::Text)
               following = nodes[index + 1]&.first
 
               if following.is_a?(Decode::Comment::Text) and !self.terminated?(node.line)
-                self.report(lines.first, block, MSG_SUMMARY)
+                add_offense(block[lines.first.first], message: MSG_WRAPPED_SUMMARY)
               end
-            else
-              unless FREEFORM.include?(node.class)
-                summary = lines.drop(1).reject{|line| self.annotation?(line.last)}
+            elsif !FREEFORM.include?(node.class)
+              summary = lines.drop(1).reject{|line| line.last.strip.start_with?("@")}
 
-                if summary.size > 1
-                  message = format(MSG_ANNOTATION, directive: node.directive)
+              if summary.size > 1
+                message = format(MSG_WRAPPED_ANNOTATION, directive: node.directive)
 
-                  self.report(summary.first, block, message)
-                end
+                add_offense(block[summary.first.first], message: message)
               end
             end
           end
         end
 
-        # decode consumes the lines it parses, so they are handed over through something which
-        # records what it gave away: that is what maps a node back onto its source.
+        # decode consumes the lines it parses and does not report where they came from, so they are
+        # handed over through something which records what it gave away.
         def parse(block)
           source = Consumable.new(block.each_with_index.map{|comment, index| [index, self.text_of(comment)]})
           nodes = []
@@ -122,37 +256,21 @@ module RuboCop
           comment.text.sub(/\A#\s?/, "")
         end
 
-        def annotation?(text)
-          text.strip.start_with?("@")
+        def comment_for(node, parts, text)
+          entry = parts.find{|part, _| part.equal?(text)}
+          comments = processed_source.ast_with_comments[node]
+
+          if entry and comments[entry.last.first.first]
+            comments[entry.last.first.first]
+          else
+            node
+          end
         end
 
         def terminated?(line)
           text = line.strip
 
           text.empty? or TERMINAL.any?{|mark| text.end_with?(mark)}
-        end
-
-        # Join the wrapped line onto the one which follows it, which is the whole correction.
-        def report(entry, block, message)
-          comment = block[entry.first]
-          following = block[entry.first + 1]
-
-          add_offense(comment, message: message) do |corrector|
-            if following
-              gap = Parser::Source::Range.new(
-                processed_source.buffer,
-                comment.loc.expression.end_pos,
-                following.loc.expression.begin_pos + self.hash_width(following),
-              )
-
-              corrector.replace(gap, " ")
-            end
-          end
-        end
-
-        # How much of the following comment is the `#` and the space after it.
-        def hash_width(comment)
-          comment.text[/\A#\s?/].length
         end
 
         # What decode shifts lines off, which remembers them.

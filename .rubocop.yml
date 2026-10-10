@@ -178,8 +178,42 @@ Local/NoReturn:
 Local/UseTap:
   Enabled: true
 
-# A comment's summary, and the summary of each of its annotations, is one line however long: the
-# shape async-rest documents itself with, where summary paragraphs reach 544 characters and none is
-# wrapped. Parsed by decode, so an annotation is whatever decode recognises as one.
+# How a comment is built: measured against how async-rest, async-discord and async-ollama document
+# themselves, and parsed by decode so that an annotation is whatever decode recognises as one.
+#
+# A paragraph is one line however long - none of the 99 summary paragraphs in those projects is
+# wrapped, and async-rest's reach 544 characters. A summary is short, and no longer than the code it
+# describes earns: ten words, plus three per line of body, to a ceiling of thirty, which fits all 76
+# of their documented methods bar one. A module gets ten words, which is exactly what the one
+# commented module in async-rest uses. And a method described in prose documents its signature with
+# annotations rather than leaving it to the reader.
+#
+# Nothing is corrected automatically: a comment which breaks these has to be rewritten.
 Local/CommentStructure:
   Enabled: true
+
+  # The word allowances: ten words, plus three per line of method body, to a ceiling of thirty. A
+  # module gets ten whatever its size.
+  MaximumWords: 30
+  BaseWords: 10
+  WordsPerLine: 3
+  ModuleWords: 10
+
+  # Each check is scoped on its own. No `Include` means everywhere; an `Include` narrows it, and
+  # `Exclude` then removes paths from what is left.
+  Wrapping:
+    Enabled: true
+
+  Length:
+    Enabled: true
+
+  # Annotations document an interface, so they are asked for where there is one. A script in `bin`
+  # and a case in `test` are called by nobody, and the generated layers under `abstract` carry the
+  # annotations of the methods they override.
+  Annotations:
+    Enabled: true
+    Include:
+      - "lib/**/*.rb"
+      - "fixtures/**/*.rb"
+    Exclude:
+      - "lib/async/matrix/abstract/**/*.rb"
