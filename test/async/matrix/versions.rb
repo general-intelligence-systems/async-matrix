@@ -145,11 +145,12 @@ describe Async::Matrix::Abstract do
       expect(Async::Matrix::ClientServer::Sync.method(:start).owner).to be_equal(Async::Matrix::ClientServer::Sync.singleton_class)
     end
 
-    # Abstract::Room::V1_1 adds `reason`, and Abstract::Room::V1_12 adds `via` on top of it.
+    # Abstract::Room::V1_1 names the servers to join through `server_name`, and
+    # Abstract::Room::V1_12 renames it to `via`, so both layers define the same method.
     it "stacks layers so that the newest wins" do
       room = Async::Matrix::ClientServer::Client["v1.19"].api::Room
 
-      expect(room.instance_method(:join).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_12)
+      expect(room.instance_method(:join_via_parameter).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_12)
 
       ancestors = room.ancestors
 
@@ -160,10 +161,12 @@ describe Async::Matrix::Abstract do
     it "reaches the earlier implementation through super" do
       room = Async::Matrix::ClientServer::Client["v1.11"].api::Room
 
-      # v1.12 is not applied, so join comes from the v1.1 layer:
-      expect(room.instance_method(:join).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_1)
+      # v1.12 is not applied, so the parameter name comes from the v1.1 layer:
+      expect(room.instance_method(:join_via_parameter).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_1)
 
-      # ...and that layer's super reaches the unversioned class:
+      # ...and `join`, which v1.1 overrides to carry `reason`, reaches the unversioned class
+      # through super:
+      expect(room.instance_method(:join).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_1)
       expect(room.instance_method(:join).super_method.owner).to be_equal(Async::Matrix::ClientServer::Room)
     end
   end
