@@ -38,14 +38,26 @@ jobs:
     
     - uses: DeterminateSystems/nix-installer-action@main
     
-    # Ask the flake which versions it defines, rather than repeating them here:
+    # Ask the flake which versions it defines, rather than repeating them here.
+    #
+    # This evaluates the attribute directly rather than using `nix flake show --json`, whose
+    # top-level shape is not the same across Nix builds: on the runner it returned no `packages`
+    # key at all, and jq failed with "null (null) has no keys".
     - id: resolve
       name: Resolve versions from the flake
       working-directory: synapse
       run: |
+        set -o pipefail
+        
         requested="${{github.event.inputs.versions}}"
         
-        defined=$(nix flake show --json | jq -r '.packages["x86_64-linux"] | keys | .[]')
+        defined=$(nix eval --json '.#packages.x86_64-linux' --apply builtins.attrNames \
+          | jq -r 'sort_by(.[3:] | tonumber) | .[]')
+        
+        if [ -z "$defined" ]; then
+          echo "::error::The flake defined no versions."
+          exit 1
+        fi
         
         if [ -z "$requested" ] || [ "$requested" = "all" ]; then
           selected="$defined"
