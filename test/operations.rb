@@ -20,7 +20,9 @@ describe Async::Matrix do
 
   # One per schema manifest, named after it.
   REQUIRED = Dir.glob(File.join(ROOT, SCHEMAS, "*-#{Async::Matrix::TEST_VERSION}.yaml")).filter_map do |path|
-    next if path.end_with?(".deltas.yaml")
+    if path.end_with?(".deltas.yaml")
+      next
+    end
 
     File.basename(path).delete_suffix("-#{Async::Matrix::TEST_VERSION}.yaml").tr("-", "_")
   end.sort.freeze

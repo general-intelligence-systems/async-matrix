@@ -42,24 +42,28 @@ module RuboCop
         MSG = "An empty version layer must say so: `%<expected>s`."
 
         def on_module(node)
-          return unless version = self.version_for(node)
-
-          # A layer which implements something explains itself:
-          return unless node.body.nil?
-
-          expected = format(COMMENT, version: version)
-          comment = processed_source.comment_at_line(node.first_line - 1)
-
-          return if comment and comment.text == expected
-
-          add_offense(node.identifier, message: format(MSG, expected: expected)) do |corrector|
-            if comment
-              corrector.replace(comment.source_range, expected)
+          if version = self.version_for(node)
+            if node.body.nil?
+              expected = format(COMMENT, version: version)
+              comment = processed_source.comment_at_line(node.first_line - 1)
+              if comment and comment.text == expected
+                nil
+              else
+                add_offense(node.identifier, message: format(MSG, expected: expected)) do |corrector|
+                  if comment
+                    corrector.replace(comment.source_range, expected)
+                  else
+                    indentation = " " * node.loc.keyword.column
+      
+                    corrector.insert_before(node.loc.keyword, "#{expected}\n#{indentation}")
+                  end
+                end
+              end
             else
-              indentation = " " * node.loc.keyword.column
-
-              corrector.insert_before(node.loc.keyword, "#{expected}\n#{indentation}")
+              nil
             end
+          else
+            nil
           end
         end
 
@@ -73,10 +77,15 @@ module RuboCop
         def version_for(node)
           match = /\AV(\d+)_(\d+)\z/.match(node.identifier.short_name.to_s)
 
-          return nil unless match
-          return nil unless self.abstract?(node)
-
-          return "v#{match[1]}.#{match[2]}"
+          if match
+            if self.abstract?(node)
+              return "v#{match[1]}.#{match[2]}"
+            else
+              nil
+            end
+          else
+            nil
+          end
         end
 
         # Only layers below `Abstract` are version layers, so that a module which merely looks like

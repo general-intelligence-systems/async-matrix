@@ -46,9 +46,11 @@ module Async
         # @yields {|event| ...}
         #   @parameter event [Hash] the state event.
         def each(&block)
-          return to_enum unless block_given?
-
-          self.value.each(&block)
+          if block_given?
+            self.value.each(&block)
+          else
+            to_enum
+          end
         end
 
         # Find a single state event.
@@ -92,9 +94,11 @@ module Async
         # @yields {|event| ...}
         #   @parameter event [Hash] the event.
         def each(&block)
-          return to_enum unless block_given?
-
-          self.events.each(&block)
+          if block_given?
+            self.events.each(&block)
+          else
+            to_enum
+          end
         end
 
         # @returns [Boolean] whether this page is empty.
@@ -116,10 +120,11 @@ module Async
         #
         # @returns [Messages | nil] the following page, or nil if this is the last one.
         def following
-          return nil unless from = self.finish
-
-          # The resource already carries `dir` and `limit`, and parameters are merged:
-          self.class.get(@resource.with(parameters: {from: from}))
+          if from = self.finish
+            self.class.get(@resource.with(parameters: {from: from}))
+          else
+            nil
+          end
         end
       end
 
@@ -209,7 +214,9 @@ module Async
         def messages(dir: "b", limit: DEFAULT_LIMIT, from: nil, **parameters)
           parameters[:dir] = dir
           parameters[:limit] = limit
-          parameters[:from] = from if from
+          if from
+            parameters[:from] = from
+          end
 
           api::Messages.get(@resource.with(path: "messages", parameters: parameters))
         end
@@ -276,10 +283,12 @@ module Async
         # @yields {|room| ...}
         #   @parameter room [Room] the room.
         def each
-          return to_enum unless block_given?
-
-          self.ids.each do |id|
-            yield api::Room.for(@resource, id)
+          if block_given?
+            self.ids.each do |id|
+              yield api::Room.for(@resource, id)
+            end
+          else
+            to_enum
           end
         end
 

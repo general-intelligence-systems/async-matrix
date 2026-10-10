@@ -155,7 +155,9 @@ module Async
             # The cases required at the version under test.
             CASES = Sus::Shared("room cases") do
               Async::Matrix::Versions.layers_for(Async::Matrix::TEST_VERSION).each do |name|
-                include Rooms.const_get(name, false) if Rooms.const_defined?(name, false)
+                if Rooms.const_defined?(name, false)
+                  include Rooms.const_get(name, false)
+                end
               end
             end
           end

@@ -88,7 +88,7 @@ module Async
 
           # Note: the login representation shares this client's connection, so it must not be
           # closed here - see {Client#close}.
-          return self.authenticated(login.access_token)
+          self.authenticated(login.access_token)
         end
 
         # @returns [Whoami] the identity associated with this client's access token.
@@ -116,7 +116,7 @@ module Async
         def create_room(**payload)
           created = api::RoomReference.post(self.with(path: "#{V3}/createRoom"), payload)
 
-          return self.room(created.room_id)
+          self.room(created.room_id)
         end
 
         # Join a room, by ID or alias.
@@ -128,7 +128,7 @@ module Async
 
           joined = api::RoomReference.post(self.with(path: path), payload)
 
-          return self.room(joined.room_id)
+          self.room(joined.room_id)
         end
 
         # Begin syncing.

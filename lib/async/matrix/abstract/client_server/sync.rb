@@ -34,7 +34,9 @@ module Async
             module ClassMethods
               # @parameter use_state_after [Boolean] request `state_after` instead of `state`.
               def start(resource, use_state_after: false, **options)
-                options[:use_state_after] = true if use_state_after
+                if use_state_after
+                  options[:use_state_after] = true
+                end
 
                 super(resource, **options)
               end

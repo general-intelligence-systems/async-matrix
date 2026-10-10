@@ -50,7 +50,9 @@ module Async
             #
             # @parameter via [Array(String) | nil] the servers to attempt the join through.
             def join(via: nil, **options)
-              @resource = @resource.with(parameters: {via: via}) if via
+              if via
+                @resource = @resource.with(parameters: {via: via})
+              end
 
               super(**options)
             end
@@ -102,7 +104,9 @@ module Async
             #
             # @parameter reason [String | nil] the reason for joining.
             def join(reason: nil, **payload)
-              payload[:reason] = reason if reason
+              if reason
+                payload[:reason] = reason
+              end
 
               super(**payload)
             end
@@ -111,7 +115,9 @@ module Async
             #
             # @parameter reason [String | nil] the reason for leaving.
             def leave(reason: nil, **payload)
-              payload[:reason] = reason if reason
+              if reason
+                payload[:reason] = reason
+              end
 
               super(**payload)
             end

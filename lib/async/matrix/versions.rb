@@ -52,11 +52,15 @@ module Async
         # @raises [UnsupportedVersionError] if the version is not supported.
         def normalize(version)
           version = version.to_s
-          version = "v#{version}" unless version.start_with?("v")
+          unless version.start_with?("v")
+            version = "v#{version}"
+          end
 
-          raise UnsupportedVersionError, version unless VERSIONS.include?(version)
+          unless VERSIONS.include?(version)
+            raise UnsupportedVersionError, version
+          end
 
-          return version
+          version
         end
 
         # The name of the module which carries a version's implementation.
@@ -117,29 +121,28 @@ module Async
         private
 
         def build(version, namespace)
-          api = Module.new
-          api.const_set(:SPEC_VERSION, version)
+          Module.new.tap do |api|
+            api.const_set(:SPEC_VERSION, version)
 
-          layers = self.layers_for(version)
-          abstract = self.abstract_for(namespace)
+            layers = self.layers_for(version)
+            abstract = self.abstract_for(namespace)
 
-          self.classes(namespace).each do |name, klass|
-            api.const_set(name, self.derive(klass, name, version, layers, api, abstract))
-          end
+            self.classes(namespace).each do |name, klass|
+              api.const_set(name, self.derive(klass, name, version, layers, api, abstract))
+            end
 
-          # Anything which is not versioned - the wrapper, the errors, the paths - is shared, so
-          # that `api::Whatever` resolves uniformly whether or not it is versioned:
-          [namespace, Matrix].each do |source|
-            source.constants(false).each do |name|
-              value = source.const_get(name)
+            # Anything which is not versioned - the wrapper, the errors, the paths - is shared, so
+            # that `api::Whatever` resolves uniformly whether or not it is versioned:
+            [namespace, Matrix].each do |source|
+              source.constants(false).each do |name|
+                value = source.const_get(name)
 
-              if value.is_a?(Module) and !api.const_defined?(name, false)
-                api.const_set(name, value)
+                if value.is_a?(Module) and !api.const_defined?(name, false)
+                  api.const_set(name, value)
+                end
               end
             end
           end
-
-          return api
         end
 
         # The layers for a namespace: {Async::Matrix::ClientServer} is layered from
@@ -150,7 +153,9 @@ module Async
         def abstract_for(namespace)
           name = namespace.name.split("::").last.to_sym
 
-          Abstract.const_get(name, false) if Abstract.const_defined?(name, false)
+          if Abstract.const_defined?(name, false)
+            Abstract.const_get(name, false)
+          end
         end
 
         # Derive a version of the given class, by including each applicable layer in order.
@@ -160,28 +165,31 @@ module Async
         # earlier one, and `super` walks back down through the previous implementations and
         # finally into the unversioned class itself.
         def derive(klass, name, version, layers, api, abstract)
-          derived = Class.new(klass)
-          derived.const_set(:API, api)
+          Class.new(klass).tap do |derived|
+            derived.const_set(:API, api)
 
-          if abstract&.const_defined?(name, false)
-            abstract = abstract.const_get(name, false)
+            if abstract&.const_defined?(name, false)
+              concept = abstract.const_get(name, false)
 
-            layers.each do |layer_name|
-              next unless abstract.const_defined?(layer_name, false)
+              layers.each do |layer_name|
+                unless concept.const_defined?(layer_name, false)
+                  next
+                end
 
-              layer = abstract.const_get(layer_name, false)
+                layer = concept.const_get(layer_name, false)
 
-              derived.include(layer)
-              derived.extend(layer::ClassMethods) if layer.const_defined?(:ClassMethods, false)
+                derived.include(layer)
+                if layer.const_defined?(:ClassMethods, false)
+                  derived.extend(layer::ClassMethods)
+                end
+              end
             end
+
+            # An anonymous class has no name, which makes failures hard to read:
+            label = "#{klass}[#{version.inspect}]"
+            derived.define_singleton_method(:to_s){label}
+            derived.define_singleton_method(:inspect){label}
           end
-
-          # An anonymous class has no name, which makes failures hard to read:
-          label = "#{klass}[#{version.inspect}]"
-          derived.define_singleton_method(:to_s){label}
-          derived.define_singleton_method(:inspect){label}
-
-          return derived
         end
       end
     end

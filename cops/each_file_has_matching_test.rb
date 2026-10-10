@@ -38,16 +38,20 @@ module RuboCop
         def on_new_investigation
           path = processed_source.file_path
 
-          return unless path
-          return unless File.extname(path) == ".rb"
-
-          library = cop_config.fetch("LibraryRoot", "lib")
-          test = cop_config.fetch("TestRoot", "test")
-
-          if relative = self.relative_to(path, library)
-            self.require_counterpart(path, relative, test, MSG_MISSING_TEST)
-          elsif relative = self.relative_to(path, test)
-            self.require_counterpart(path, relative, library, MSG_MISSING_FILE)
+          if path
+            if File.extname(path) == ".rb"
+              library = cop_config.fetch("LibraryRoot", "lib")
+              test = cop_config.fetch("TestRoot", "test")
+              if relative = self.relative_to(path, library)
+                self.require_counterpart(path, relative, test, MSG_MISSING_TEST)
+              elsif relative = self.relative_to(path, test)
+                self.require_counterpart(path, relative, library, MSG_MISSING_FILE)
+              end
+            else
+              nil
+            end
+          else
+            nil
           end
         end
 
@@ -65,9 +69,11 @@ module RuboCop
 
           index = segments.rindex(root)
 
-          return nil unless index
-
-          [File.join(segments[0...index]), File.join(segments[(index + 1)..])]
+          if index
+            [File.join(segments[0...index]), File.join(segments[(index + 1)..])]
+          else
+            nil
+          end
         end
 
         def require_counterpart(path, found, root, message)
@@ -75,9 +81,11 @@ module RuboCop
 
           expected = File.join(project, root, relative)
 
-          return if File.exist?(expected)
-
-          add_global_offense(format(message, expected: self.readable(expected, project)))
+          if File.exist?(expected)
+            nil
+          else
+            add_global_offense(format(message, expected: self.readable(expected, project)))
+          end
         end
 
         # The expected path, relative to the project, since an absolute path in a message is noise.

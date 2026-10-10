@@ -36,7 +36,9 @@ module Async
         # @returns [Sync] the first batch.
         def self.start(resource, since: nil, timeout: DEFAULT_TIMEOUT, **parameters)
           parameters[:timeout] = timeout
-          parameters[:since] = since if since
+          if since
+            parameters[:since] = since
+          end
 
           self.get(resource.with(path: self.path, parameters: parameters))
         end
@@ -70,14 +72,16 @@ module Async
         #   @parameter room_id [String] the ID of the room the event occurred in.
         #   @parameter event [Hash] the event.
         def each_event
-          return to_enum(:each_event) unless block_given?
-
-          self.joined.each do |room_id, room|
-            events = room.dig(:timeline, :events) or next
-
-            events.each do |event|
-              yield room_id.to_s, event
+          if block_given?
+            self.joined.each do |room_id, room|
+              events = room.dig(:timeline, :events) or next
+  
+              events.each do |event|
+                yield room_id.to_s, event
+              end
             end
+          else
+            to_enum(:each_event)
           end
         end
 
@@ -85,14 +89,18 @@ module Async
         #
         # @yields {|room_id, sender, body, event| ...}
         def each_message
-          return to_enum(:each_message) unless block_given?
-
-          self.each_event do |room_id, event|
-            next unless event[:type] == "m.room.message"
-
-            content = event[:content] || {}
-
-            yield room_id, event[:sender], content[:body], event
+          if block_given?
+            self.each_event do |room_id, event|
+              unless event[:type] == "m.room.message"
+                next
+              end
+  
+              content = event[:content] || {}
+  
+              yield room_id, event[:sender], content[:body], event
+            end
+          else
+            to_enum(:each_message)
           end
         end
 
@@ -113,14 +121,15 @@ module Async
         # @yields {|sync| ...}
         #   @parameter sync [Sync] the batch.
         def each(**options)
-          return to_enum(:each, **options) unless block_given?
-
-          sync = self
-
-          while true
-            yield sync
-
-            sync = sync.following(**options)
+          if block_given?
+            sync = self
+            while true
+              yield sync
+  
+              sync = sync.following(**options)
+            end
+          else
+            to_enum(:each, **options)
           end
         end
       end

@@ -74,7 +74,9 @@ module RuboCop
 
             versions = File.readlines(path, chomp: true).reject(&:empty?)
 
-            raise "#{path} is empty." if versions.empty?
+            if versions.empty?
+              raise "#{path} is empty."
+            end
 
             versions
           end
@@ -86,21 +88,22 @@ module RuboCop
         end
 
         def on_module(node)
-          return unless self.abstract?(node)
-
-          # Abstract holds one module per Matrix API, and each of those holds one module per
-          # concept: Abstract > ClientServer > Room > V1_19.
-          concepts = self.child_modules(node).flat_map{|namespace| self.child_modules(namespace)}
-
-          concepts.each do |concept|
-            layers = self.child_modules(concept).filter_map do |child|
-              name = self.module_name(child)
-
-              [name, child] if name.to_s.start_with?("V")
+          if self.abstract?(node)
+            concepts = self.child_modules(node).flat_map{|namespace| self.child_modules(namespace)}
+            concepts.each do |concept|
+              layers = self.child_modules(concept).filter_map do |child|
+                name = self.module_name(child)
+  
+                if name.to_s.start_with?("V")
+                  [name, child]
+                end
+              end
+  
+              self.check_completeness(concept, layers)
+              self.check_order(layers)
             end
-
-            self.check_completeness(concept, layers)
-            self.check_order(layers)
+          else
+            nil
           end
         end
 
@@ -122,11 +125,16 @@ module RuboCop
         # The modules declared directly inside the given module.
         def child_modules(node)
           body = node.body
-          return [] unless body
-
-          children = body.begin_type? ? body.children : [body]
-
-          children.select{|child| child.is_a?(::RuboCop::AST::Node) && child.module_type?}
+          if body
+            if body.begin_type?
+              children = body.children
+            else
+              children = [body]
+            end
+            children.select{|child| child.is_a?(::RuboCop::AST::Node) && child.module_type?}
+          else
+            []
+          end
         end
 
         def check_completeness(concept, layers)
@@ -152,7 +160,9 @@ module RuboCop
           known = layers.select{|name, _| self.expected_layers.include?(name)}
 
           known.each_cons(2) do |(previous, _), (name, node)|
-            next if self.expected_layers.index(name) > self.expected_layers.index(previous)
+            if self.expected_layers.index(name) > self.expected_layers.index(previous)
+              next
+            end
 
             add_offense(node.identifier, message: format(MSG_ORDER,
               layer: name,

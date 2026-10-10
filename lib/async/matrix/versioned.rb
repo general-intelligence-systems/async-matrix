@@ -50,7 +50,9 @@ module Async
         def version
           api = self.api
 
-          api::SPEC_VERSION if api.const_defined?(:SPEC_VERSION, false)
+          if api.const_defined?(:SPEC_VERSION, false)
+            api::SPEC_VERSION
+          end
         end
       end
 

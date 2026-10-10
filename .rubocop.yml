@@ -3,6 +3,11 @@ plugins:
   - rubocop-socketry
 
 require:
+  - ./cops/begin_block_assignment.rb
+  - ./cops/no_conditional_assignment.rb
+  - ./cops/no_modifier_if.rb
+  - ./cops/no_return.rb
+  - ./cops/use_tap.rb
   - ./cops/each_file_has_matching_test.rb
   - ./cops/abstract_module_version_order.rb
   - ./cops/abstract_module_no_changes_comment.rb
@@ -148,3 +153,25 @@ AsyncMatrix/EachFileHasMatchingTest:
     # Describes the shape of the project - which classes exist, and which test files are guarded -
     # rather than a file in lib, so it has no counterpart there.
     - "test/operations.rb"
+
+# House style, shared with ratalada.
+
+# Bans assigning a `begin...end` expression; the assignment goes inside the block.
+Local/BeginBlockAssignment:
+  Enabled: true
+
+# Bans assigning an `if` / `case` expression; assign inside each branch instead.
+Local/NoConditionalAssignment:
+  Enabled: true
+
+# Bans modifier `if` / `unless`, so a guard cannot hide off the right edge of a long line.
+Local/NoModifierIf:
+  Enabled: true
+
+# Bans `return`. The method's last expression is its return value, and guards are structural.
+Local/NoReturn:
+  Enabled: true
+
+# Requires `tap` where a method assigns a local on its first line and returns it on its last.
+Local/UseTap:
+  Enabled: true

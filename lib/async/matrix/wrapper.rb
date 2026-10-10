@@ -45,12 +45,16 @@ module Async
 
           response = resource.call(request)
 
-          break unless response.status == 429
+          unless response.status == 429
+            break
+          end
 
           delay = self.retry_delay(response)
 
           # The server asked us to wait longer than we are willing to: report it to the caller.
-          break if delay.nil?
+          if delay.nil?
+            break
+          end
 
           response.close
 
@@ -83,7 +87,7 @@ module Async
           raise RequestError.new(response.status, errcode, message)
         end
 
-        return response
+        response
       end
 
       # How long to wait before retrying a rate limited request.
@@ -98,11 +102,13 @@ module Async
           delay = self.retry_after_duration(retry_after)
         elsif retry_after_ms = payload&.fetch(:retry_after_ms, nil)
           delay = retry_after_ms / 1000.0
-        else
-          return nil
         end
 
-        return delay if delay <= MAXIMUM_RETRY_DELAY
+        # Nothing said how long to wait, or it asked for longer than we are willing to: the caller
+        # is told about the rate limit instead.
+        if delay and delay <= MAXIMUM_RETRY_DELAY
+          delay
+        end
       end
 
       # Extract the Matrix error code and message from an unsuccessful response.
@@ -113,13 +119,13 @@ module Async
         payload = response.read
 
         if payload.is_a?(Hash)
-          return payload[:errcode], payload[:error]
+          [payload[:errcode], payload[:error]]
         else
-          return nil, payload&.to_s
+          [nil, payload&.to_s]
         end
       rescue => error
         # The body was not readable or was not valid JSON - the status is still meaningful:
-        return nil, error.message
+        [nil, error.message]
       end
 
       # Read a JSON payload from the response, leaving the response readable by the caller.
@@ -127,15 +133,16 @@ module Async
       # @parameter response [Protocol::HTTP::Response] the response to read.
       # @returns [Hash | nil] the parsed payload, if it was valid JSON.
       private def read_payload(response)
-        return nil unless body = response.body
-        return nil unless buffer = body.join
+        if body = response.body
+          if buffer = body.join
+            # `join` consumes the body, so replace it with an equivalent buffered body:
+            response.body = ::Protocol::HTTP::Body::Buffered.new([buffer])
 
-        # `join` consumes the body, so replace it with an equivalent buffered body:
-        response.body = ::Protocol::HTTP::Body::Buffered.new([buffer])
-
-        return ::JSON.parse(buffer, symbolize_names: true)
+            ::JSON.parse(buffer, symbolize_names: true)
+          end
+        end
       rescue ::JSON::ParserError
-        return nil
+        nil
       end
     end
   end

@@ -38,7 +38,9 @@ module Async
         # operation belonging to another concept's schema.
         def defined
           @defined ||= Dir.glob(File.join(SCHEMAS, "*-#{Async::Matrix::TEST_VERSION}.yaml")).each_with_object([]) do |path, found|
-            next if path.end_with?(".deltas.yaml")
+            if path.end_with?(".deltas.yaml")
+              next
+            end
 
             found.concat((YAML.safe_load_file(path)["operations"] || {}).keys)
           end.freeze
@@ -59,7 +61,9 @@ module Async
         def operation(description)
           match = PATTERN.match(description.to_s)
 
-          match[:operation] if match and self.defined.include?(match[:operation])
+          if match and self.defined.include?(match[:operation])
+            match[:operation]
+          end
         end
       end
     end
