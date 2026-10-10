@@ -8,9 +8,14 @@ require "securerandom"
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/client_server/rooms"
+
 describe Async::Matrix::ClientServer::Room do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
+
+  # The cases for the operations, layered by version.
+  include Async::Matrix::Testing::Abstract::ClientServer::Rooms::CASES
 
   with "#create_room" do
     it "creates a room which appears in the joined rooms" do
