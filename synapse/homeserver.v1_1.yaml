@@ -1,13 +1,10 @@
 # Synapse configuration for Matrix specification v1.1, which is served by Synapse 1.54.0.
 #
-# Identical to homeserver.yaml except for default_room_version: 1.54.0 knows room versions up to 9
-# and refuses to start on one it does not recognise:
+# Generated from homeserver.yaml, which it matches except for default_room_version:
+# Synapse 1.54.0 knows room versions up to 9 and refuses to start on one
+# it does not recognise.
 #
-#   Error in configuration:
-#     Unknown default_room_version: 11, known room versions: ['1', ... '9', ...]
-#
-# bin/test mounts homeserver.<version>.yaml when one exists for the version under test, and
-# homeserver.yaml otherwise, so a version only needs a file here when it differs.
+# Do not edit by hand: edit homeserver.yaml and regenerate.
 
 server_name: "localhost"
 pid_file: /tmp/homeserver.pid

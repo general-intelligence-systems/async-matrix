@@ -6,9 +6,13 @@
 # Only one runs at a time - they all bind the same port - so bin/test brings each up in turn. The
 # service name is the specification version, so starting the right server is just naming it.
 #
-# A version mounts its own homeserver.<version>.yaml when it needs one, because an older Synapse
-# rejects settings a newer one accepts: 1.54.0 knows room versions up to 9 and refuses to start on
-# default_room_version 11. Everything else shares homeserver.yaml.
+# Each version mounts its own homeserver.<version>.yaml, generated from homeserver.yaml: an older
+# Synapse rejects settings a newer one accepts, so the configuration is versioned alongside the
+# server. MATRIX_API_VERSIONS.txt is generated from the services below.
+
+# A fixed project name, so that `docker compose down` finds the rig whatever directory it is run
+# from, rather than deriving a different project per working directory.
+name: async-matrix
 
 x-synapse: &synapse
   environment:
@@ -25,7 +29,6 @@ x-synapse: &synapse
 x-volumes:
   signing-key: &signing-key ./signing.key:/config/signing.key:ro
   modules: &modules ./modules:/config/modules:ro
-  homeserver: &homeserver ./homeserver.yaml:/config/homeserver.yaml:ro
 
 services:
   v1.1:
@@ -40,7 +43,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.2
     volumes:
-      - *homeserver
+      - ./homeserver.v1_2.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -48,7 +51,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.3
     volumes:
-      - *homeserver
+      - ./homeserver.v1_3.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -56,7 +59,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.4
     volumes:
-      - *homeserver
+      - ./homeserver.v1_4.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -64,7 +67,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.5
     volumes:
-      - *homeserver
+      - ./homeserver.v1_5.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -72,7 +75,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.6
     volumes:
-      - *homeserver
+      - ./homeserver.v1_6.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -80,7 +83,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.7
     volumes:
-      - *homeserver
+      - ./homeserver.v1_7.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -88,7 +91,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.8
     volumes:
-      - *homeserver
+      - ./homeserver.v1_8.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -96,7 +99,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.9
     volumes:
-      - *homeserver
+      - ./homeserver.v1_9.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -104,7 +107,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.10
     volumes:
-      - *homeserver
+      - ./homeserver.v1_10.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -112,7 +115,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.11
     volumes:
-      - *homeserver
+      - ./homeserver.v1_11.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -120,7 +123,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.12
     volumes:
-      - *homeserver
+      - ./homeserver.v1_12.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -128,7 +131,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.13
     volumes:
-      - *homeserver
+      - ./homeserver.v1_13.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -136,7 +139,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.14
     volumes:
-      - *homeserver
+      - ./homeserver.v1_14.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -144,7 +147,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.15
     volumes:
-      - *homeserver
+      - ./homeserver.v1_15.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -152,7 +155,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.16
     volumes:
-      - *homeserver
+      - ./homeserver.v1_16.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -160,7 +163,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.17
     volumes:
-      - *homeserver
+      - ./homeserver.v1_17.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -168,7 +171,7 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.18
     volumes:
-      - *homeserver
+      - ./homeserver.v1_18.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
 
@@ -176,6 +179,6 @@ services:
     <<: *synapse
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.19
     volumes:
-      - *homeserver
+      - ./homeserver.v1_19.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules

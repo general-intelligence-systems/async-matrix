@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# Lint the project, including the custom cops in cops/.
+#
+#   bin/rubocop                 # report
+#   bin/rubocop --autocorrect   # and correct what can be corrected
+#   bin/rubocop lib/async       # just these paths
+
+set -o errexit
+set -o nounset
+
+# The custom cops read MATRIX_API_VERSIONS.txt, which is not part of RuboCop's cache key: a change
+# to it would otherwise be masked by a cached result from before the change.
+bundle exec rubocop --cache false "$@"

@@ -8,7 +8,7 @@ require_relative "matrix/client"
 
 # @namespace
 module Async
-	# @namespace
-	module Matrix
-	end
+  # @namespace
+  module Matrix
+  end
 end

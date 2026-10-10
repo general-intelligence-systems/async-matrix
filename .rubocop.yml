@@ -4,14 +4,16 @@ plugins:
 
 require:
   - ./cops/abstract_module_version_order.rb
+  - ./cops/abstract_module_no_changes_comment.rb
 
 AllCops:
   DisabledByDefault: true
 
 # Socketry specific rules:
 
+# Indenting blank lines means trailing whitespace once indentation is spaces rather than tabs:
 Layout/ConsistentBlankLineIndentation:
-  Enabled: true
+  Enabled: false
 
 Layout/BlockDelimiterSpacing:
   Enabled: true
@@ -23,14 +25,14 @@ Style/GlobalExceptionVariables:
 
 Layout/IndentationStyle:
   Enabled: true
-  EnforcedStyle: tabs
+  EnforcedStyle: spaces
 
 Layout/InitialIndentation:
   Enabled: true
 
 Layout/IndentationWidth:
   Enabled: true
-  Width: 1
+  Width: 2
 
 Layout/IndentationConsistency:
   Enabled: true
@@ -104,6 +106,9 @@ Layout/ArgumentAlignment:
 Layout/ClosingParenthesisIndentation:
   Enabled: true
 
+Layout/TrailingWhitespace:
+  Enabled: true
+
 Style/FrozenStringLiteralComment:
   Enabled: true
 
@@ -114,28 +119,16 @@ Style/StringLiterals:
 # Project specific rules:
 
 # Every version layer must be declared, even when it changed nothing, and declared highest first.
-# Add a version here when `Async::Matrix::VERSIONS` gains one.
+# The versions come from MATRIX_API_VERSIONS.txt, which is generated from the compose file, so a
+# version only has to be added in one place.
 AsyncMatrix/AbstractModuleVersionOrder:
   Enabled: true
   Include:
     - "lib/async/matrix/abstract/*.rb"
-  Versions:
-    - v1.1
-    - v1.2
-    - v1.3
-    - v1.4
-    - v1.5
-    - v1.6
-    - v1.7
-    - v1.8
-    - v1.9
-    - v1.10
-    - v1.11
-    - v1.12
-    - v1.13
-    - v1.14
-    - v1.15
-    - v1.16
-    - v1.17
-    - v1.18
-    - v1.19
+
+# An empty version layer must say which version it stands for, so that a reader can tell "nothing
+# changed here" from "somebody left this unfinished".
+AsyncMatrix/AbstractModuleNoChangesComment:
+  Enabled: true
+  Include:
+    - "lib/async/matrix/abstract/*.rb"
