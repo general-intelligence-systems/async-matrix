@@ -5,7 +5,7 @@
 
 require "async/matrix/client_context"
 
-describe Async::Matrix::Client do
+describe Async::Matrix::ClientServer::Client do
   include Async::Matrix::ClientContext
 
   with "#versions" do

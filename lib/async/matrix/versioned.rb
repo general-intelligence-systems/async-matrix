@@ -18,8 +18,27 @@ module Async
           if self.const_defined?(:API)
             self::API
           else
-            Matrix
+            self.namespace
           end
+        end
+
+        # The API namespace this class belongs to: the module which holds it, which is one of the
+        # Matrix APIs, e.g. {Async::Matrix::ClientServer}.
+        #
+        # @returns [Module] the namespace.
+        def namespace
+          @namespace ||= begin
+            parts = self.unversioned.name.split("::")
+
+            Object.const_get(parts[0..-2].join("::"))
+          end
+        end
+
+        # The class this one was built from, which is this class when it is not versioned.
+        #
+        # @returns [Class] the unversioned class.
+        def unversioned
+          self.const_defined?(:API) ? self.superclass : self
         end
 
         # The specification version this class implements.

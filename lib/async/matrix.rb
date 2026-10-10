@@ -4,7 +4,7 @@
 # Copyright, 2026, by Nathan K.
 
 require_relative "matrix/version"
-require_relative "matrix/client"
+require_relative "matrix/api/client_server/client"
 
 # @namespace
 module Async

@@ -7,12 +7,12 @@ require "securerandom"
 
 require "async/matrix/client_context"
 
-describe Async::Matrix::Room do
+describe Async::Matrix::ClientServer::Room do
   include Async::Matrix::ClientContext
 
   with "#create_room" do
     it "creates a room which appears in the joined rooms" do
-      expect(room).to be_a(Async::Matrix::Room)
+      expect(room).to be_a(Async::Matrix::ClientServer::Room)
       expect(room.id).to be =~ /\A!/
 
       expect(client.joined_rooms).to be(:include?, room.id)
@@ -24,7 +24,7 @@ describe Async::Matrix::Room do
       rooms = client.joined_rooms.to_a
 
       expect(rooms).not.to be(:empty?)
-      expect(rooms.first).to be_a(Async::Matrix::Room)
+      expect(rooms.first).to be_a(Async::Matrix::ClientServer::Room)
 
       # The room resource is derived with an absolute path, replacing `/joined_rooms`:
       expect(rooms.first.resource.path.to_s).to be =~ %r{\A/_matrix/client/v3/rooms/}
@@ -60,7 +60,7 @@ describe Async::Matrix::Room do
     end
 
     it "is idempotent for the same transaction id" do
-      transaction_id = Async::Matrix::Room.transaction_id
+      transaction_id = Async::Matrix::ClientServer::Room.transaction_id
       content = {msgtype: "m.text", body: "once"}
 
       first = room.send_event("m.room.message", content, transaction_id: transaction_id)
@@ -81,7 +81,7 @@ describe Async::Matrix::Room do
 
       following = first.following
 
-      expect(following).to be_a(Async::Matrix::Messages)
+      expect(following).to be_a(Async::Matrix::ClientServer::Messages)
       expect(following.events.size).to be == 2
 
       # The following page continues from where the first one ended:

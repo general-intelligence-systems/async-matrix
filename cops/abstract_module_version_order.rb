@@ -88,7 +88,11 @@ module RuboCop
         def on_module(node)
           return unless self.abstract?(node)
 
-          self.child_modules(node).each do |concept|
+          # Abstract holds one module per Matrix API, and each of those holds one module per
+          # concept: Abstract > ClientServer > Room > V1_19.
+          concepts = self.child_modules(node).flat_map{|namespace| self.child_modules(namespace)}
+
+          concepts.each do |concept|
             layers = self.child_modules(concept).filter_map do |child|
               name = self.module_name(child)
 

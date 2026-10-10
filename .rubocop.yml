@@ -124,11 +124,11 @@ Style/StringLiterals:
 AsyncMatrix/AbstractModuleVersionOrder:
   Enabled: true
   Include:
-    - "lib/async/matrix/abstract/*.rb"
+    - "lib/async/matrix/abstract/**/*.rb"
 
 # An empty version layer must say which version it stands for, so that a reader can tell "nothing
 # changed here" from "somebody left this unfinished".
 AsyncMatrix/AbstractModuleNoChangesComment:
   Enabled: true
   Include:
-    - "lib/async/matrix/abstract/*.rb"
+    - "lib/async/matrix/abstract/**/*.rb"

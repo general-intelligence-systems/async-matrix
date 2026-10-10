@@ -88,11 +88,11 @@ module Async
         #
         # @parameter version [String | Symbol] e.g. `"v1.19"` or `"1.19"`.
         # @returns [Module] a module containing one class per versioned class.
-        def [](version)
+        def [](version, namespace = Matrix::ClientServer)
           version = self.normalize(version)
 
           @apis ||= {}
-          @apis[version] ||= self.build(version)
+          @apis[[namespace, version]] ||= self.build(version, namespace)
         end
 
         # @returns [Array(String)] the versions which have been built so far.
@@ -104,9 +104,9 @@ module Async
         # {Versioned}. There is no registry to keep in step: a class opts in by including it.
         #
         # @returns [Hash] the unversioned classes, keyed by constant name.
-        def classes
-          Matrix.constants(false).each_with_object({}) do |name, classes|
-            value = Matrix.const_get(name)
+        def classes(namespace)
+          namespace.constants(false).each_with_object({}) do |name, classes|
+            value = namespace.const_get(name)
 
             if value.is_a?(Class) and value.include?(Versioned)
               classes[name] = value
@@ -116,27 +116,41 @@ module Async
 
         private
 
-        def build(version)
+        def build(version, namespace)
           api = Module.new
           api.const_set(:SPEC_VERSION, version)
 
           layers = self.layers_for(version)
+          abstract = self.abstract_for(namespace)
 
-          self.classes.each do |name, klass|
-            api.const_set(name, self.derive(klass, name, version, layers, api))
+          self.classes(namespace).each do |name, klass|
+            api.const_set(name, self.derive(klass, name, version, layers, api, abstract))
           end
 
           # Anything which is not versioned - the wrapper, the errors, the paths - is shared, so
           # that `api::Whatever` resolves uniformly whether or not it is versioned:
-          Matrix.constants(false).each do |name|
-            value = Matrix.const_get(name)
+          [namespace, Matrix].each do |source|
+            source.constants(false).each do |name|
+              value = source.const_get(name)
 
-            if value.is_a?(Module) and !api.const_defined?(name, false)
-              api.const_set(name, value)
+              if value.is_a?(Module) and !api.const_defined?(name, false)
+                api.const_set(name, value)
+              end
             end
           end
 
           return api
+        end
+
+        # The layers for a namespace: {Async::Matrix::ClientServer} is layered from
+        # {Async::Matrix::Abstract::ClientServer}.
+        #
+        # @parameter namespace [Module] an API namespace.
+        # @returns [Module | nil] the module holding that namespace's layers.
+        def abstract_for(namespace)
+          name = namespace.name.split("::").last.to_sym
+
+          Abstract.const_get(name, false) if Abstract.const_defined?(name, false)
         end
 
         # Derive a version of the given class, by including each applicable layer in order.
@@ -145,12 +159,12 @@ module Async
         # layer is found first: layering in ascending order means a later version overrides an
         # earlier one, and `super` walks back down through the previous implementations and
         # finally into the unversioned class itself.
-        def derive(klass, name, version, layers, api)
+        def derive(klass, name, version, layers, api, abstract)
           derived = Class.new(klass)
           derived.const_set(:API, api)
 
-          if Abstract.const_defined?(name, false)
-            abstract = Abstract.const_get(name, false)
+          if abstract&.const_defined?(name, false)
+            abstract = abstract.const_get(name, false)
 
             layers.each do |layer_name|
               next unless abstract.const_defined?(layer_name, false)

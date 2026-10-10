@@ -7,7 +7,7 @@ require "securerandom"
 
 require "async/matrix/client_context"
 
-describe Async::Matrix::Sync do
+describe Async::Matrix::ClientServer::Sync do
   include Async::Matrix::ClientContext
 
   with "an initial sync" do

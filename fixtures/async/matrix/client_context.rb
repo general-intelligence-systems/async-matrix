@@ -28,7 +28,7 @@ module Async
     ClientContext = Sus::Shared("a matrix client") do
       include Sus::Fixtures::Async::ReactorContext
 
-      let(:unauthenticated) {Async::Matrix::Client[Async::Matrix::TEST_VERSION].open(Async::Matrix::HOMESERVER)}
+      let(:unauthenticated) {Async::Matrix::ClientServer::Client[Async::Matrix::TEST_VERSION].open(Async::Matrix::HOMESERVER)}
 
       # A fresh user and room for each test, so that tests cannot interfere with each other. The
       # rig registers a user on first login, so this needs no setup.
