@@ -1,8 +1,8 @@
-name: Matrix API Versions
+name: Update Matrix Versions List
 
 # MATRIX_API_VERSIONS.txt is the list of Matrix specification versions which can be tested, one per
 # line. It is generated from synapse/docker-compose.yml, which has a service per version, so adding
-# a service is the only thing needed to add a version: bin/test and the Test Versions workflow both
+# a service is the only thing needed to add a version: bin/test and the Test workflow both
 # read the generated file.
 
 on:

@@ -1,4 +1,4 @@
-name: Synapse Images
+name: Build Test Images
 
 # Builds one Synapse image per Matrix specification version and pushes it to GHCR, so that
 # bin/test can run the suite for a version against a server which implements it.
@@ -17,14 +17,14 @@ on:
     paths:
       - synapse/flake.nix
       - synapse/flake.lock
-      - .github/workflows/synapse-images.yaml
+      - .github/workflows/build-test-images.yaml
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: synapse-images-${{github.ref}}
+  group: build-test-images-${{github.ref}}
   cancel-in-progress: false
 
 jobs:

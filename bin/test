@@ -13,7 +13,7 @@ set -o nounset
 root="$(cd "$(dirname "$0")/.." && pwd)"
 compose="$root/synapse/docker-compose.yml"
 
-# The versions which can be tested, generated from the compose file by the Matrix API Versions
+# The versions which can be tested, generated from the compose file by the Update Matrix Versions List
 # workflow. Adding a service there is all that is needed to add a version.
 mapfile -t versions < "$root/MATRIX_API_VERSIONS.txt"
 

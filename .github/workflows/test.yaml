@@ -1,7 +1,7 @@
-name: Test Versions
+name: Test
 
 # Runs the suite across two dimensions: the Ruby version it runs on, and the Matrix specification
-# version it talks to. The images come from the Synapse Images workflow, and
+# version it talks to. The images come from the Build Test Images workflow, and
 # synapse/docker-compose.yml has a service per specification version, so a job is just
 # `bin/test v1.11`.
 #
@@ -37,7 +37,7 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     
-    # MATRIX_API_VERSIONS.txt is generated from the compose file by the Matrix API Versions
+    # MATRIX_API_VERSIONS.txt is generated from the compose file by the Update Matrix Versions List
     # workflow, and is what bin/test reads too.
     - id: resolve
       name: Resolve versions from MATRIX_API_VERSIONS.txt
