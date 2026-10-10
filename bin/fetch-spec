@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+# Initializes the matrix-spec submodules: one per released specification version, each pinned to its
+# tag, in ./data.
+#
+#   bin/fetch-spec              # every version in MATRIX_API_VERSIONS.txt
+#   bin/fetch-spec v1.18 v1.19  # just these
+#
+# A released specification version is a frozen tag, so a submodule per version is a fixed reference
+# rather than something which drifts. They are declared shallow, so each is one commit rather than
+# the whole history, and only the directories we read are checked out: the spec repository is mostly
+# a website, which is 122MB checked out in full against 58MB like this.
+
+set -o errexit
+set -o nounset
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+repository="https://github.com/matrix-org/matrix-spec.git"
+
+# The only directories we read: the client-server API schemas, and the event schemas they reference.
+paths=(data/api/client-server data/event-schemas)
+
+if [ $# -eq 0 ]; then
+	mapfile -t versions < MATRIX_API_VERSIONS.txt
+else
+	versions=("$@")
+fi
+
+for version in "${versions[@]}"; do
+	submodule="data/matrix-spec-$version"
+	
+	if ! git config --file .gitmodules --get "submodule.$submodule.path" > /dev/null 2>&1; then
+		echo "There is no submodule for $version. Add one with:" >&2
+		echo >&2
+		echo "  git clone --depth 1 --branch $version $repository $submodule" >&2
+		echo "  git submodule add $repository $submodule" >&2
+		echo "  git config --file .gitmodules submodule.$submodule.shallow true" >&2
+		
+		exit 1
+	fi
+	
+	git submodule update --init --depth 1 -- "$submodule"
+	
+	# Sparse checkout is local to a clone rather than something the parent repository records, so it
+	# is applied here instead of being inherited.
+	git -C "$submodule" sparse-checkout set --cone "${paths[@]}"
+	
+	printf "%-6s %s  %s endpoints\n" \
+		"$version" \
+		"$(git -C "$submodule" rev-parse --short HEAD)" \
+		"$(find "$submodule/data/api/client-server" -maxdepth 1 -name '*.yaml' | wc -l)"
+done
