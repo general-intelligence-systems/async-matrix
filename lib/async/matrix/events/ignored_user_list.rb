@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/ignored_user_list"
 
 module Async
   module Matrix

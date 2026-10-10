@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/forwarded_room_key"
 
 module Async
   module Matrix

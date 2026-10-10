@@ -3,6 +3,8 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "readers"
+
 module Async
   module Matrix
     module Events
@@ -17,7 +19,9 @@ module Async
       end
 
       module Relates
-        def relates_to = @value[:"m.relates_to"]
+        extend Readers
+
+        reads "m.relates_to"
       end
 
       module Attachment

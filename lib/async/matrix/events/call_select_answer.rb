@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/call_select_answer"
 
 module Async
   module Matrix

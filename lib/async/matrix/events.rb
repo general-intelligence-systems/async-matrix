@@ -5,6 +5,7 @@
 
 require_relative "versions"
 
+require_relative "events/readers"
 require_relative "events/content"
 require_relative "events/envelope"
 require_relative "events/fields"

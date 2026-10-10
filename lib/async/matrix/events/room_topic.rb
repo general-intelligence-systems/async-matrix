@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/room_topic"
 
 module Async
   module Matrix
@@ -17,8 +18,6 @@ module Async
         end
 
         def topic = @value[:topic]
-
-        def m_topic = @value[:"m.topic"]
       end
     end
   end

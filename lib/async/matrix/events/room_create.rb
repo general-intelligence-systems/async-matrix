@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/room_create"
 
 module Async
   module Matrix
@@ -18,15 +19,11 @@ module Async
 
         def creator = @value[:creator]
 
-        def federate = @value[:"m.federate"]
+        reads "m.federate"
 
         def room_version = @value[:room_version]
 
-        def room_type = @value[:type]
-
         def predecessor = @value[:predecessor]
-
-        def additional_creators = @value[:additional_creators]
       end
     end
   end

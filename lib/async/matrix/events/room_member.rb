@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/room_member"
 
 module Async
   module Matrix
@@ -23,8 +24,6 @@ module Async
         def membership = @value[:membership]
 
         def is_direct = @value[:is_direct]
-
-        def join_authorised_via_users_server = @value[:join_authorised_via_users_server]
 
         def reason = @value[:reason]
 

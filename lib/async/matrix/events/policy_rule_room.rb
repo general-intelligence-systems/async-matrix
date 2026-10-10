@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/policy_rule_room"
 
 module Async
   module Matrix

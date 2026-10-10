@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/room_key"
 
 module Async
   module Matrix
@@ -23,8 +24,6 @@ module Async
         def session_id = @value[:session_id]
 
         def session_key = @value[:session_key]
-
-        def shared_history = @value[:shared_history]
       end
     end
   end

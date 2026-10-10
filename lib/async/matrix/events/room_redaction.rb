@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/room_redaction"
 
 module Async
   module Matrix
@@ -15,8 +16,6 @@ module Async
 
           def framing = :room_event
         end
-
-        def redacts = @value[:redacts]
 
         def reason = @value[:reason]
       end

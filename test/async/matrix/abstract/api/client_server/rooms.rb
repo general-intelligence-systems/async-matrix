@@ -5,13 +5,7 @@
 
 require "async/matrix/operations_context"
 
-# The cases for the room operations, layered by specification version exactly as the implementation
-# is: a case lives in the version which introduced the thing it exercises, and the version under
-# test decides which layers apply. A case named `can <operationId>` is what
-# {Async::Matrix::OperationsContext} requires, and it must reach the homeserver.
-#
-# `CASES` applies the layers up to the version under test, in the same ascending order the library
-# uses, so the concrete test includes one thing rather than knowing about versions at all.
+# Cases for the rooms operations, layered by version.
 
 module Async
   module Matrix
@@ -47,8 +41,7 @@ module Async
             module V1_13
             end
 
-            # v1.12 added the `via` parameter to joining. The operation already had a case, so this
-            # is a case for the parameter rather than for the operation.
+            # v1.12 added the `via` parameter to joining.
             module V1_12
               def self.included(base)
                 base.it "joins through the servers named by via" do
@@ -89,8 +82,7 @@ module Async
             module V1_4
             end
 
-            # v1.3 made `from` optional when paging the timeline. Before it, the request is invalid
-            # without one, which is what the earlier layers enforce.
+            # v1.3 made `from` optional when paging the timeline.
             module V1_3
               def self.included(base)
                 base.it "pages the timeline without a from token" do
@@ -105,8 +97,7 @@ module Async
             module V1_2
             end
 
-            # v1.1 is the oldest version this library supports, and every room operation already
-            # exists at it, so it carries the cases for all of them.
+            # v1.1 is the oldest version, and carries every room case.
             module V1_1
               def self.included(base)
                 base.it "can createRoom" do
@@ -138,7 +129,7 @@ module Async
                 end
 
                 base.it "can joinRoomById" do
-                  # Joining a room you are already in succeeds, and is the simplest way to exercise it.
+                  # Joining a room you are in succeeds, which is the simplest way to exercise it.
                   expect(room.join.room_id).to be == room.id
                 end
 

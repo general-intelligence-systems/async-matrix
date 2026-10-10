@@ -4,11 +4,14 @@
 # Copyright, 2026, by Nathan K.
 
 require_relative "../versioned"
+require_relative "readers"
 
 module Async
   module Matrix
     module Events
       class Content
+        extend Readers
+
         include Versioned
 
         class << self

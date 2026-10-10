@@ -5,13 +5,7 @@
 
 require "async/matrix/operations_context"
 
-# The cases for the sync operations, layered by specification version exactly as the
-# implementation is: a case lives in the version which introduced the thing it exercises, and the
-# version under test decides which layers apply. A case named `can <operationId>` is what
-# {Async::Matrix::OperationsContext} requires, and it must reach the homeserver.
-#
-# `CASES` applies the layers up to the version under test, in the same ascending order the library
-# uses, so the concrete test includes one thing rather than knowing about versions at all.
+# Cases for the sync operations, layered by version.
 
 module Async
   module Matrix
@@ -31,15 +25,13 @@ module Async
             module V1_17
             end
 
-            # v1.16 added `use_state_after`, and the `state_after` field it asks the server to return in
-            # place of `state`.
+            # v1.16 added `use_state_after`, which returns `state_after`.
             module V1_16
               def self.included(base)
                 base.it "asks for the state after the timeline" do
                   room
 
-                  # The versioned class, reached through the client, so that the layer under test
-                  # is the one which runs:
+                  # The versioned class, so the layer under test is the one which runs:
                   sync = client.api::Sync.start(client, timeout: 0, use_state_after: true)
 
                   expect(sync.state_after(room.id)).not.to be_nil
@@ -99,7 +91,7 @@ module Async
 
                   sync = client.sync(timeout: 0)
 
-                  # A room with no threads reports no counts, which is still the field being understood:
+                  # A room with no threads reports no counts, which still reads the field:
                   expect(sync.unread_thread_notifications(room.id)).to be_nil | be_a(Hash)
                 end
               end
@@ -113,7 +105,7 @@ module Async
             module V1_2
             end
 
-            # v1.1 is the oldest version this library supports, and syncing already exists at it.
+            # v1.1 is the oldest version, and syncing exists at it.
             module V1_1
               def self.included(base)
                 base.it "can sync" do

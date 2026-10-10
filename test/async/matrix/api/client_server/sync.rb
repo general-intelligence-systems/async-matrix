@@ -67,8 +67,7 @@ describe Async::Matrix::ClientServer::Sync do
     it "is woken by an event sent while the request is in flight" do
       body = "woke the long poll"
 
-      # Create the room first: otherwise the long poll is woken by the room creation itself, and
-      # returns a batch which does not contain the message yet.
+      # Create the room first: otherwise the long poll is woken by the room creation itself, and returns a batch which does not contain the message yet.
       room
 
       # Establish a current cursor, so the long poll is woken rather than returning immediately:

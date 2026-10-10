@@ -226,3 +226,7 @@ Local/SingleLineMethodsForEvents:
   Enabled: true
   Include:
     - "lib/async/matrix/events/**/*.rb"
+    # The layers read fields the same way the classes do, and the cases they carry are blocks
+    # rather than single expressions, so the rule reaches them without asking anything of them.
+    - "lib/async/matrix/abstract/events/**/*.rb"
+    - "test/async/matrix/abstract/events/**/*.rb"

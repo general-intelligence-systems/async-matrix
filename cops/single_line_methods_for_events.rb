@@ -10,20 +10,11 @@ module RuboCop
     module Local
       # Requires a method whose body is a single expression to use the endless method form.
       #
-      # A method which returns one expression does not need `def ... end`: the endless form says the
-      # same thing on the line it is defined on, so the body sits beside the name rather than a level
-      # below it. Only a method which can be rewritten without changing what it means is flagged: its
-      # signature has to be on one line, and its body a single expression on one line.
-      #
-      # The check is confined to the event classes by `Include` in `.rubocop.yml`, since that is where
-      # the house style is settled.
-      #
       # @example
       #   # bad
       #   def event_type
       #     "m.room.message"
       #   end
-      #
       #   # good
       #   def event_type = "m.room.message"
       class SingleLineMethodsForEvents < Base
@@ -31,29 +22,33 @@ module RuboCop
 
         MSG = "A method whose body is one expression must use the endless form: `def name = expression`."
 
-        # Expressions which can follow ` = ` unchanged. Anything with its own `end`, or with lower
-        # precedence than the assignment, is left as a block: what it would parse as is not what it
-        # says as a body.
+        # Expressions which can follow ` = ` unchanged. Anything with its own `end`, or with lower precedence than the assignment, is left as a block: what it would parse as is not what it says as a body.
         ACCEPTED_BODIES = %i[
           array const csend cvar dstr dsym erange false float gvar hash int irange ivar lvar nil
           rational regexp self send str sym true xstr
         ].freeze
 
         def on_def(node)
-          check(node)
+          if rewriteable?(node)
+            report(node)
+          end
         end
         alias on_defs on_def
 
         private
 
-        def check(node)
-          return if node.endless?
-          return if setter?(node.method_name)
-          return if node.body.nil?
-          return unless ACCEPTED_BODIES.include?(node.body.type)
-          return unless single_line?(node)
-          return if heredoc?(node.body)
+        # A method is rewritten only when it is not endless, not a setter, and has one non-heredoc body expression on one line.
+        def rewriteable?(node)
+          !node.endless? &&
+            !setter?(node.method_name) &&
+            !node.body.nil? &&
+            ACCEPTED_BODIES.include?(node.body.type) &&
+            single_line?(node) &&
+            !heredoc?(node.body)
+        end
 
+        # The offense is reported either way; the correction is withheld when a comment sits inside the method, since replacing the method would take the comment with it.
+        def report(node)
           if comment?(node)
             add_offense(node)
           else
@@ -68,8 +63,7 @@ module RuboCop
           name == :[]= || /\A[a-zA-Z_]\w*=\z/.match?(name.to_s)
         end
 
-        # The body on one line, and the signature on one line too, so that the rewritten method is
-        # still a single line.
+        # The body on one line, and the signature on one line too, so that the rewritten method is still a single line.
         def single_line?(node)
           body = node.body
 
@@ -93,8 +87,7 @@ module RuboCop
           end
         end
 
-        # A heredoc's content sits on the lines below its opening token, outside `body.source`, so
-        # rewriting it would separate the body from the text it contains.
+        # A heredoc's content lives below its opening token, outside `body.source`.
         def heredoc?(body)
           body.each_node(:str, :dstr, :xstr).any?(&:heredoc?)
         end
@@ -106,25 +99,31 @@ module RuboCop
         end
 
         def endless_form(node)
-          "#{endless_signature(node)} = #{node.body.source}"
+          "#{signature(node)} = #{node.body.source}"
         end
 
-        def endless_signature(node)
-          name = if node.receiver
-            "def #{node.receiver.source}.#{node.method_name}"
-          else
-            "def #{node.method_name}"
-          end
+        def signature(node)
+          "#{receiver_prefix(node)}#{node.method_name}#{arguments_suffix(node)}"
+        end
 
+        def receiver_prefix(node)
+          if node.receiver
+            "def #{node.receiver.source}."
+          else
+            "def "
+          end
+        end
+
+        # Bare arguments are ambiguous before ` = `; parenthesize them.
+        def arguments_suffix(node)
           arguments = node.arguments&.source.to_s
 
           if arguments.empty?
-            name
+            ""
           elsif arguments.start_with?("(")
-            "#{name}#{arguments}"
+            arguments
           else
-            # Bare arguments are ambiguous before ` = `; parenthesize them.
-            "#{name}(#{arguments})"
+            "(#{arguments})"
           end
         end
       end

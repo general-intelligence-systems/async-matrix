@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/key_verification_cancel"
 
 module Async
   module Matrix

@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/call_hangup"
 
 module Async
   module Matrix
@@ -19,8 +20,6 @@ module Async
         def call_id = @value[:call_id]
 
         def voip_version = @value[:version]
-
-        def party_id = @value[:party_id]
       end
     end
   end

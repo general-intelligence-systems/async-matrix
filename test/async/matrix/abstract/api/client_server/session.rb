@@ -5,13 +5,7 @@
 
 require "async/matrix/operations_context"
 
-# The cases for the session operations, layered by specification version exactly as the
-# implementation is: a case lives in the version which introduced the thing it exercises, and the
-# version under test decides which layers apply. A case named `can <operationId>` is what
-# {Async::Matrix::OperationsContext} requires, and it must reach the homeserver.
-#
-# `CASES` applies the layers up to the version under test, in the same ascending order the library
-# uses, so the concrete test includes one thing rather than knowing about versions at all.
+# Cases for the session operations, layered by version.
 
 module Async
   module Matrix
@@ -83,7 +77,7 @@ module Async
             module V1_4
             end
 
-            # v1.3 added refresh tokens, which the server only issues when the client asks for one.
+            # v1.3 added refresh tokens, issued on request.
             module V1_3
               def self.included(base)
                 base.it "reports a refresh token when one is issued" do
@@ -104,8 +98,7 @@ module Async
               end
             end
 
-            # v1.1 is the oldest version this library supports, and every session operation already
-            # exists at it, so it carries the cases for all of them.
+            # v1.1 is the oldest version, and carries every session case.
             module V1_1
               def self.included(base)
                 base.it "can getLoginFlows" do
@@ -121,7 +114,7 @@ module Async
                 end
 
                 base.it "can logout" do
-                  # A fresh session, so that logging out does not invalidate the one the suite shares:
+                  # A fresh session, so logging out does not invalidate the one the suite shares:
                   session = unauthenticated.logged_in("logout-#{SecureRandom.hex(4)}", Async::Matrix::TEST_PASSWORD)
 
                   expect(session.logout.value).to be_a(Hash)

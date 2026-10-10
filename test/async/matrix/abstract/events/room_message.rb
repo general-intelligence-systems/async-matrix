@@ -5,19 +5,12 @@
 
 require "async/matrix/client_context"
 
-# The cases for the message events, layered by specification version exactly as the implementation
-# is: a case lives in the version which introduced the thing it exercises, and the version under
-# test decides which layers apply.
-#
-# `CASES` applies the layers up to the version under test, in the same ascending order the library
-# uses, so the concrete test includes one thing rather than knowing about versions at all.
-
 module Async
   module Matrix
     module Testing
       module Abstract
         module Events
-          module RoomMessage
+          module Message
             # No changes in v1.19.
             module V1_19
             end
@@ -54,8 +47,7 @@ module Async
             module V1_11
             end
 
-            # v1.10 added the formatting fields to the media messages, and the original filename
-            # alongside them, so that an upload can carry a caption.
+            # v1.10 added formatting fields and filename to media messages.
             module V1_10
               def self.included(base)
                 base.it "reads the caption fields the media messages gained" do
@@ -104,11 +96,10 @@ module Async
             module V1_1
             end
 
-            # The cases required at the version under test.
-            CASES = Sus::Shared("message event cases") do
+            CASES = Sus::Shared("message cases") do
               Async::Matrix::Versions.layers_for(Async::Matrix::TEST_VERSION).each do |name|
-                if RoomMessage.const_defined?(name, false)
-                  include RoomMessage.const_get(name, false)
+                if Message.const_defined?(name, false)
+                  include Message.const_get(name, false)
                 end
               end
             end

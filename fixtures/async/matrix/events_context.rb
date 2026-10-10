@@ -33,9 +33,6 @@ module Async
         "hash" => :hash_method,
         "type" => :room_type,
         "version" => :voip_version,
-        "m.relates_to" => :relates_to,
-        "m.federate" => :federate,
-        "m.topic" => :m_topic,
         "(*)" => :each,
       }.freeze
 

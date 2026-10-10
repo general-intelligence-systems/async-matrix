@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/room_join_rules"
 
 module Async
   module Matrix
@@ -17,8 +18,6 @@ module Async
         end
 
         def join_rule = @value[:join_rule]
-
-        def allow = @value[:allow]
       end
     end
   end

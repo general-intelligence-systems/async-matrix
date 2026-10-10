@@ -5,6 +5,7 @@
 
 require_relative "content"
 require_relative "fields"
+require_relative "../abstract/events/image_pack_rooms"
 
 module Async
   module Matrix

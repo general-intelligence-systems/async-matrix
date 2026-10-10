@@ -19,8 +19,7 @@ describe Async::Matrix::Events do
       expect(subject["v1.9"]::ImageMessage.instance_methods).not.to be(:include?, :filename)
     end
 
-    # `m.file` named its upload before the other media messages did, so the version which added
-    # the caption fields did not add a filename to it.
+    # `m.file` named its upload before the other media messages did, so the version which added the caption fields did not add a filename to it.
     it "leaves a type alone where the version changed something else" do
       expect(subject["v1.9"]::FileMessage.instance_methods).to be(:include?, :filename)
       expect(subject["v1.9"]::FileMessage.instance_methods).not.to be(:include?, :format)
