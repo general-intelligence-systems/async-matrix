@@ -5,11 +5,15 @@
 
 require_relative "paths"
 require_relative "representation"
+require_relative "versioned"
+require_relative "abstract/session"
 
 module Async
 	module Matrix
 		# The response to logging in.
 		class Login < Representation
+			include Versioned
+			
 			# @returns [String] the access token to authenticate subsequent requests with.
 			def access_token
 				self.value[:access_token]
@@ -28,6 +32,8 @@ module Async
 		
 		# The identity associated with an access token.
 		class Whoami < Representation
+			include Versioned
+			
 			# @returns [String] the fully qualified ID of the authenticated user.
 			def user_id
 				self.value[:user_id]

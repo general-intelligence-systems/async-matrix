@@ -8,6 +8,8 @@ require "async/rest/resource"
 require "protocol/url/encoding"
 
 require_relative "version"
+require_relative "versions"
+require_relative "versioned"
 require_relative "paths"
 require_relative "representation"
 require_relative "session"
@@ -22,6 +24,24 @@ module Async
 		# is versioned per-endpoint. An unauthenticated client can discover the server's capabilities
 		# and log in; {#authenticated} derives a client which carries an access token.
 		class Client < Async::REST::Resource
+			include Versioned
+			
+			class << self
+				# The client for a given specification version.
+				#
+				# 	Async::Matrix::Client["v1.19"].open(url)
+				#
+				# The client it returns builds the matching version of every other class, so a `v1.5`
+				# client hands back `v1.5` rooms and syncs. The classes for a version are built once and
+				# cached, so this is cheap to call and the result is always the same class.
+				#
+				# @parameter version [String | Symbol] e.g. `"v1.19"` or `"1.19"`.
+				# @returns [Class(Client)] the client for that version.
+				def [](version)
+					Versions[version]::Client
+				end
+			end
+			
 			# The default homeserver to connect to.
 			ENDPOINT = Async::HTTP::Endpoint.parse("http://localhost:8008")
 			
@@ -30,7 +50,7 @@ module Async
 			
 			# @returns [Representation] the specification versions supported by the homeserver.
 			def versions
-				Representation.get(self.with(path: "/_matrix/client/versions"))
+				api::Representation.get(self.with(path: "/_matrix/client/versions"))
 			end
 			
 			# Derive a client which authenticates using the given access token.
@@ -54,7 +74,7 @@ module Async
 				payload[:identifier] = {type: "m.id.user", user: user}
 				payload[:password] = password
 				
-				Login.post(self.with(path: "#{V3}/login"), payload)
+				api::Login.post(self.with(path: "#{V3}/login"), payload)
 			end
 			
 			# Log in using a password, and derive an authenticated client from the result.
@@ -72,12 +92,12 @@ module Async
 			
 			# @returns [Whoami] the identity associated with this client's access token.
 			def whoami
-				Whoami.get(self.with(path: "#{V3}/account/whoami"))
+				api::Whoami.get(self.with(path: "#{V3}/account/whoami"))
 			end
 			
 			# @returns [JoinedRooms] the rooms this user has joined.
 			def joined_rooms
-				JoinedRooms.new(self.with(path: "#{V3}/joined_rooms"))
+				api::JoinedRooms.new(self.with(path: "#{V3}/joined_rooms"))
 			end
 			
 			# A room, by ID. No request is made.
@@ -85,7 +105,7 @@ module Async
 			# @parameter id [String] the room ID, e.g. `!abc:localhost`.
 			# @returns [Room] the room.
 			def room(id)
-				Room.for(self, id)
+				api::Room.for(self, id)
 			end
 			
 			# Create a room.
@@ -93,7 +113,7 @@ module Async
 			# @parameter payload [Hash] the room creation options, e.g. `name:`, `topic:`, `preset:`.
 			# @returns [Room] the created room.
 			def create_room(**payload)
-				created = RoomReference.post(self.with(path: "#{V3}/createRoom"), payload)
+				created = api::RoomReference.post(self.with(path: "#{V3}/createRoom"), payload)
 				
 				return self.room(created.room_id)
 			end
@@ -105,7 +125,7 @@ module Async
 			def join(id_or_alias, **payload)
 				path = "#{V3}/join/#{::Protocol::URL::Encoding.escape(id_or_alias)}"
 				
-				joined = RoomReference.post(self.with(path: path), payload)
+				joined = api::RoomReference.post(self.with(path: path), payload)
 				
 				return self.room(joined.room_id)
 			end
@@ -116,7 +136,7 @@ module Async
 			# @parameter timeout [Integer] how long the server should wait, in milliseconds.
 			# @returns [Sync] the first batch.
 			def sync(since: nil, timeout: Sync::DEFAULT_TIMEOUT, **parameters)
-				Sync.start(self, since: since, timeout: timeout, **parameters)
+				api::Sync.start(self, since: since, timeout: timeout, **parameters)
 			end
 		end
 	end

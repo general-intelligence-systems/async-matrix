@@ -6,6 +6,8 @@
 require_relative "paths"
 require_relative "representation"
 require_relative "rooms"
+require_relative "versioned"
+require_relative "abstract/sync"
 
 module Async
 	module Matrix
@@ -15,6 +17,8 @@ module Async
 		# waiting for something to happen, so a sync loop is a sequence of requests, each one starting
 		# from the {#next_batch} token of the last.
 		class Sync < Representation
+			include Versioned
+			
 			# How long the server should hold a sync request open, in milliseconds.
 			DEFAULT_TIMEOUT = 30_000
 			

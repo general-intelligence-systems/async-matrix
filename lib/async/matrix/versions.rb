@@ -1,0 +1,175 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+require_relative "error"
+require_relative "versioned"
+
+module Async
+	module Matrix
+		# The specification versions this library knows about, oldest first.
+		#
+		# The order is significant: layers are applied in this order, so a later layer sits closer to
+		# the generated class than an earlier one, and therefore overrides it.
+		VERSIONS = %w[
+			v1.1 v1.2 v1.3 v1.4 v1.5 v1.6 v1.7 v1.8 v1.9 v1.10
+			v1.11 v1.12 v1.13 v1.14 v1.15 v1.16 v1.17 v1.18 v1.19
+		].freeze
+		
+		# The most recent version this library knows about.
+		LATEST = VERSIONS.last
+		
+		# Raised when asked for a version which is not one of {VERSIONS}.
+		class UnsupportedVersionError < Error
+			def initialize(version)
+				super("Unsupported version #{version.inspect}, expected one of #{VERSIONS.join(", ")}!")
+				
+				@version = version
+			end
+			
+			# @attribute [String] the version which was asked for.
+			attr :version
+		end
+		
+		# The version layers, which mirror the classes they are layered onto: the layers for
+		# {Async::Matrix::Room} live in `Async::Matrix::Abstract::Room`, in `abstract/rooms.rb`.
+		#
+		# A layer is a module named after the version which introduced the behaviour, so `v1.19`
+		# becomes `V1_19` - a constant cannot begin with a digit. A layer may also carry a nested
+		# `ClassMethods` module, which is extended onto the class rather than included into it.
+		module Abstract
+		end
+		
+		# Builds a set of classes for a given specification version, by layering the modules in
+		# {Abstract} onto the unversioned classes.
+		module Versions
+			class << self
+				# Normalize a version, which may be given with or without the `v` prefix.
+				#
+				# @parameter version [String | Symbol] e.g. `"v1.19"`, `"1.19"`.
+				# @returns [String] the canonical version, e.g. `"v1.19"`.
+				# @raises [UnsupportedVersionError] if the version is not supported.
+				def normalize(version)
+					version = version.to_s
+					version = "v#{version}" unless version.start_with?("v")
+					
+					raise UnsupportedVersionError, version unless VERSIONS.include?(version)
+					
+					return version
+				end
+				
+				# The name of the module which carries a version's implementation.
+				#
+				# @parameter version [String] a canonical version.
+				# @returns [Symbol] the layer name, e.g. `:V1_19`.
+				def layer_name(version)
+					:"V#{version.delete_prefix("v").tr(".", "_")}"
+				end
+				
+				# Every version up to and including the given one, oldest first.
+				#
+				# @parameter version [String] a canonical version.
+				# @returns [Array(String)] the applicable versions.
+				def up_to(version)
+					VERSIONS[0..VERSIONS.index(version)]
+				end
+				
+				# The layer names which apply to the given version, oldest first.
+				#
+				# @parameter version [String] a canonical version.
+				# @returns [Array(Symbol)] the layer names.
+				def layers_for(version)
+					self.up_to(version).map{|applicable| self.layer_name(applicable)}
+				end
+				
+				# The API built for a given specification version, which is cached: the classes for a
+				# version are built once, and are identical on every subsequent lookup.
+				#
+				# @parameter version [String | Symbol] e.g. `"v1.19"` or `"1.19"`.
+				# @returns [Module] a module containing one class per versioned class.
+				def [](version)
+					version = self.normalize(version)
+					
+					@apis ||= {}
+					@apis[version] ||= self.build(version)
+				end
+				
+				# @returns [Array(String)] the versions which have been built so far.
+				def built
+					(@apis ||= {}).keys
+				end
+				
+				# The classes which participate in versioning, which is to say those which include
+				# {Versioned}. There is no registry to keep in step: a class opts in by including it.
+				#
+				# @returns [Hash] the unversioned classes, keyed by constant name.
+				def classes
+					Matrix.constants(false).each_with_object({}) do |name, classes|
+						value = Matrix.const_get(name)
+						
+						if value.is_a?(Class) and value.include?(Versioned)
+							classes[name] = value
+						end
+					end
+				end
+				
+				private
+				
+				def build(version)
+					api = Module.new
+					api.const_set(:SPEC_VERSION, version)
+					
+					layers = self.layers_for(version)
+					
+					self.classes.each do |name, klass|
+						api.const_set(name, self.derive(klass, name, version, layers, api))
+					end
+					
+					# Anything which is not versioned - the wrapper, the errors, the paths - is shared, so
+					# that `api::Whatever` resolves uniformly whether or not it is versioned:
+					Matrix.constants(false).each do |name|
+						value = Matrix.const_get(name)
+						
+						if value.is_a?(Module) and !api.const_defined?(name, false)
+							api.const_set(name, value)
+						end
+					end
+					
+					return api
+				end
+				
+				# Derive a version of the given class, by including each applicable layer in order.
+				#
+				# `include` inserts each layer directly above the class, so the most recently included
+				# layer is found first: layering in ascending order means a later version overrides an
+				# earlier one, and `super` walks back down through the previous implementations and
+				# finally into the unversioned class itself.
+				def derive(klass, name, version, layers, api)
+					derived = Class.new(klass)
+					derived.const_set(:API, api)
+					
+					if Abstract.const_defined?(name, false)
+						abstract = Abstract.const_get(name, false)
+						
+						layers.each do |layer_name|
+							next unless abstract.const_defined?(layer_name, false)
+							
+							layer = abstract.const_get(layer_name, false)
+							
+							derived.include(layer)
+							derived.extend(layer::ClassMethods) if layer.const_defined?(:ClassMethods, false)
+						end
+					end
+					
+					# An anonymous class has no name, which makes failures hard to read:
+					label = "#{klass}[#{version.inspect}]"
+					derived.define_singleton_method(:to_s){label}
+					derived.define_singleton_method(:inspect){label}
+					
+					return derived
+				end
+			end
+		end
+	end
+end

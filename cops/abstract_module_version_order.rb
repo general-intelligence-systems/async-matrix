@@ -1,0 +1,153 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+require "rubocop"
+
+module RuboCop
+	module Cop
+		module AsyncMatrix
+			# Checks that every layer container in `lib/async/matrix/abstract/` declares a module for
+			# every supported specification version, and declares them from highest to lowest.
+			#
+			# A version layer is a module named after the version which introduced the behaviour, so
+			# `v1.19` becomes `V1_19`. Declaring every version, including the ones which changed
+			# nothing, means the set of layers can be read off the file rather than inferred from the
+			# gaps: a missing module is then unambiguously a mistake rather than a deliberate no-op.
+			#
+			# The declaration order is for readers only. {Async::Matrix::Versions} applies layers in
+			# ascending order regardless of where they appear in the file, because it looks them up by
+			# name. Highest first puts the current behaviour at the top, where it is read first.
+			#
+			# @example
+			#   # bad - V1_2 is missing, and the layers ascend
+			#   module Abstract
+			#     module Room
+			#       module V1_1
+			#       end
+			#
+			#       module V1_3
+			#       end
+			#     end
+			#   end
+			#
+			#   # good - every version is present, highest first
+			#   module Abstract
+			#     module Room
+			#       module V1_3
+			#       end
+			#
+			#       # No changes in v1.2.
+			#       module V1_2
+			#       end
+			#
+			#       module V1_1
+			#       end
+			#     end
+			#   end
+			class AbstractModuleVersionOrder < Base
+				MSG_MISSING = "Missing version %<layers>s. Declare every version, even as a no-op."
+				
+				MSG_UNKNOWN = "Unknown version %<layers>s, which is not one of the supported versions."
+				
+				MSG_ORDER = "Declare `%<layer>s` before `%<before>s`: order versions from highest (`%<highest>s`) to lowest (`%<lowest>s`)."
+				
+				# The versions which must be declared, highest first. Override with `Versions` in
+				# `.rubocop.yml` when {Async::Matrix::VERSIONS} gains a version.
+				DEFAULT_VERSIONS = (1..19).map{|minor| "v1.#{minor}"}.freeze
+				
+				# @returns [Array(Symbol)] the expected layer names, highest first.
+				def expected_layers
+					@expected_layers ||= begin
+						versions = cop_config.fetch("Versions", DEFAULT_VERSIONS)
+						
+						versions.map{|version| layer_name(version)}.reverse
+					end
+				end
+				
+				def on_module(node)
+					return unless self.abstract?(node)
+					
+					self.child_modules(node).each do |concept|
+						layers = self.child_modules(concept).filter_map do |child|
+							name = self.module_name(child)
+							
+							[name, child] if name.to_s.start_with?("V")
+						end
+						
+						self.check_completeness(concept, layers)
+						self.check_order(layers)
+					end
+				end
+				
+				private
+				
+				# `v1.19` -> `:V1_19`, mirroring `Async::Matrix::Versions.layer_name`.
+				def layer_name(version)
+					:"V#{version.to_s.delete_prefix("v").tr(".", "_")}"
+				end
+				
+				def abstract?(node)
+					self.module_name(node) == :Abstract
+				end
+				
+				def module_name(node)
+					node.identifier.short_name
+				end
+				
+				# The modules declared directly inside the given module.
+				def child_modules(node)
+					body = node.body
+					return [] unless body
+					
+					children = body.begin_type? ? body.children : [body]
+					
+					children.select{|child| child.is_a?(::RuboCop::AST::Node) && child.module_type?}
+				end
+				
+				def check_completeness(concept, layers)
+					declared = layers.map(&:first)
+					
+					missing = self.expected_layers - declared
+					unknown = declared - self.expected_layers
+					
+					if missing.any?
+						add_offense(concept.identifier, message: format(MSG_MISSING, layers: self.describe(missing)))
+					end
+					
+					unknown.each do |name|
+						node = layers.assoc(name).last
+						
+						add_offense(node.identifier, message: format(MSG_UNKNOWN, layers: self.describe([name])))
+					end
+				end
+				
+				# Flag each point where the declarations stop descending, rather than every module
+				# involved: a single swap is a single mistake.
+				def check_order(layers)
+					known = layers.select{|name, _| self.expected_layers.include?(name)}
+					
+					known.each_cons(2) do |(previous, _), (name, node)|
+						next if self.expected_layers.index(name) > self.expected_layers.index(previous)
+						
+						add_offense(node.identifier, message: format(MSG_ORDER,
+							layer: name,
+							before: previous,
+							highest: self.expected_layers.first,
+							lowest: self.expected_layers.last,
+						))
+					end
+				end
+				
+				def describe(names)
+					if names.size == 1
+						"layer `#{names.first}`"
+					else
+						"layers #{names.map{|name| "`#{name}`"}.join(", ")}"
+					end
+				end
+			end
+		end
+	end
+end

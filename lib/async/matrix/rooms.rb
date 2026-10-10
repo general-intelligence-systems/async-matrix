@@ -9,11 +9,15 @@ require "protocol/url/encoding"
 
 require_relative "paths"
 require_relative "representation"
+require_relative "versioned"
+require_relative "abstract/rooms"
 
 module Async
 	module Matrix
 		# The response to sending an event into a room.
 		class SentEvent < Representation
+			include Versioned
+			
 			# @returns [String] the ID of the event that was sent.
 			def event_id
 				self.value[:event_id]
@@ -22,6 +26,8 @@ module Async
 		
 		# The response to creating or joining a room.
 		class RoomReference < Representation
+			include Versioned
+			
 			# @returns [String] the ID of the room.
 			def room_id
 				self.value[:room_id]
@@ -30,6 +36,8 @@ module Async
 		
 		# The state events of a room.
 		class State < Representation
+			include Versioned
+			
 			include Enumerable
 			
 			# Enumerate over every state event.
@@ -69,6 +77,8 @@ module Async
 		# Matrix paginates the timeline with opaque tokens: `start` is the token for the page itself,
 		# and `finish` is the token to pass as `from` in order to fetch the following page.
 		class Messages < Representation
+			include Versioned
+			
 			include Enumerable
 			
 			# @returns [Array(Hash)] the events in this page, in the order the server returned them.
@@ -114,6 +124,8 @@ module Async
 		
 		# The members of a room, keyed by user ID.
 		class JoinedMembers < Representation
+			include Versioned
+			
 			# @returns [Hash] the joined members, keyed by user ID.
 			def members
 				self.value[:joined]
@@ -130,6 +142,8 @@ module Async
 		# therefore a navigator which carries its own identifier, because the identifier cannot be
 		# recovered from a derived resource.
 		class Room
+			include Versioned
+			
 			# The default number of events to fetch per page of timeline.
 			DEFAULT_LIMIT = 10
 			
@@ -177,12 +191,12 @@ module Async
 			
 			# @returns [State] the current state of the room.
 			def state
-				State.get(@resource.with(path: "state"))
+				api::State.get(@resource.with(path: "state"))
 			end
 			
 			# @returns [JoinedMembers] the members currently joined to the room.
 			def joined_members
-				JoinedMembers.get(@resource.with(path: "joined_members"))
+				api::JoinedMembers.get(@resource.with(path: "joined_members"))
 			end
 			
 			# A page of the room's timeline.
@@ -196,7 +210,7 @@ module Async
 				parameters[:limit] = limit
 				parameters[:from] = from if from
 				
-				Messages.get(@resource.with(path: "messages", parameters: parameters))
+				api::Messages.get(@resource.with(path: "messages", parameters: parameters))
 			end
 			
 			# Send an event into the room.
@@ -208,7 +222,7 @@ module Async
 			def send_event(type, content, transaction_id: self.class.transaction_id)
 				path = "send/#{::Protocol::URL::Encoding.escape(type)}/#{::Protocol::URL::Encoding.escape(transaction_id)}"
 				
-				SentEvent.put(@resource.with(path: path), content)
+				api::SentEvent.put(@resource.with(path: path), content)
 			end
 			
 			# Send a message into the room.
@@ -227,17 +241,17 @@ module Async
 			#
 			# @returns [RoomReference] the joined room.
 			def join(**payload)
-				RoomReference.post(@resource.with(path: "join"), payload)
+				api::RoomReference.post(@resource.with(path: "join"), payload)
 			end
 			
 			# Leave this room.
 			def leave(**payload)
-				Representation.post(@resource.with(path: "leave"), payload)
+				api::Representation.post(@resource.with(path: "leave"), payload)
 			end
 			
 			# Forget this room, which requires having left it first.
 			def forget(**payload)
-				Representation.post(@resource.with(path: "forget"), payload)
+				api::Representation.post(@resource.with(path: "forget"), payload)
 			end
 			
 			def close
@@ -247,6 +261,8 @@ module Async
 		
 		# The rooms the authenticated user has joined.
 		class JoinedRooms < Representation
+			include Versioned
+			
 			include Enumerable
 			
 			# @returns [Array(String)] the IDs of the joined rooms.
@@ -262,7 +278,7 @@ module Async
 				return to_enum unless block_given?
 				
 				self.ids.each do |id|
-					yield Room.for(@resource, id)
+					yield api::Room.for(@resource, id)
 				end
 			end
 			

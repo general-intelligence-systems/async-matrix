@@ -16,7 +16,7 @@ HOMESERVER = ENV.fetch("MATRIX_HOMESERVER", "http://localhost:8008")
 USER = ENV.fetch("MATRIX_USER", "echo")
 PASSWORD = ENV.fetch("MATRIX_PASSWORD", "password")
 
-Async::Matrix::Client.open(HOMESERVER) do |unauthenticated|
+Async::Matrix::Client[Async::Matrix::LATEST].open(HOMESERVER) do |unauthenticated|
 	client = unauthenticated.logged_in(USER, PASSWORD)
 	me = client.whoami.user_id
 	

@@ -1,0 +1,26 @@
+# The test rig: one Synapse, at whichever Matrix specification version is under test.
+#
+# The image is built and published by flake.nix in this directory, so the version is selected by
+# interpolation rather than by editing this file:
+#
+# 	MATRIX_VERSION=v1.11 docker compose up -d --wait synapse
+#
+# bin/test drives this across every version in turn.
+
+services:
+  synapse:
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-${MATRIX_VERSION:-v1.12}
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+      PYTHONPATH: /config/modules
+    ports:
+      - "${SYNAPSE_PORT:-8008}:8008"
+    volumes:
+      - ./homeserver.yaml:/config/homeserver.yaml:ro
+      - ./signing.key:/config/signing.key:ro
+      - ./modules:/config/modules:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30

@@ -1,0 +1,103 @@
+name: Synapse Images
+
+# Builds one Synapse image per Matrix specification version and pushes it to GHCR, so that
+# bin/test can run the suite for a version against a server which implements it.
+#
+# The images are defined by synapse/flake.nix, which is the single source of truth for which
+# Synapse each specification version maps onto. This workflow only runs it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: "Space separated versions to build, or 'all'."
+        required: false
+        default: "all"
+  push:
+    paths:
+      - synapse/flake.nix
+      - synapse/flake.lock
+      - .github/workflows/synapse-images.yaml
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: synapse-images-${{github.ref}}
+  cancel-in-progress: false
+
+jobs:
+  versions:
+    name: Resolve versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{steps.resolve.outputs.matrix}}
+    steps:
+    - uses: actions/checkout@v5
+    
+    - uses: DeterminateSystems/nix-installer-action@main
+    
+    # Ask the flake which versions it defines, rather than repeating them here:
+    - id: resolve
+      name: Resolve versions from the flake
+      working-directory: synapse
+      run: |
+        requested="${{github.event.inputs.versions}}"
+        
+        defined=$(nix flake show --json | jq -r '.packages["x86_64-linux"] | keys | .[]')
+        
+        if [ -z "$requested" ] || [ "$requested" = "all" ]; then
+          selected="$defined"
+        else
+          selected=""
+          for version in $requested; do
+            if echo "$defined" | grep -qx "$version"; then
+              selected="$selected$version"$'\n'
+            else
+              echo "::error::Unknown version $version. The flake defines:"; echo "$defined"
+              exit 1
+            fi
+          done
+        fi
+        
+        echo "matrix=$(echo "$selected" | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{matrix.version}}
+    needs: versions
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        version: ${{fromJSON(needs.versions.outputs.matrix)}}
+    
+    steps:
+    - uses: actions/checkout@v5
+    
+    - uses: DeterminateSystems/nix-installer-action@main
+    
+    - uses: docker/setup-buildx-action@v3
+    
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{github.actor}}
+        password: ${{secrets.GITHUB_TOKEN}}
+    
+    # The develop versions build Synapse from source, which compiles Rust - give them room:
+    - name: Build and push
+      timeout-minutes: 60
+      working-directory: synapse
+      env:
+        IMAGE_REPOSITORY: ghcr.io/${{github.repository_owner}}/synapse
+        PUSH: "1"
+      run: nix run ".#\"${{matrix.version}}\""
+    
+    - name: Report
+      run: |
+        echo "### ${{matrix.version}}" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo '`ghcr.io/${{github.repository_owner}}/synapse:spec-${{matrix.version}}`' >> "$GITHUB_STEP_SUMMARY"
