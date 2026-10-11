@@ -209,11 +209,19 @@ Local/CommentStructure:
 
   # Each check is scoped on its own. No `Include` means everywhere; an `Include` narrows it, and
   # `Exclude` then removes paths from what is left.
+  #
+  # A script in `bin` carries its documentation as a man page - the rendered output, as a comment -
+  # whose lines are wrapped and whose summaries are as long as the page needs by the formatter
+  # rather than by hand, so neither check applies there.
   Wrapping:
     Enabled: true
+    Exclude:
+      - "bin/*"
 
   Length:
     Enabled: true
+    Exclude:
+      - "bin/*"
 
   # Annotations document an interface, so they are asked for where there is one. A script in `bin`
   # and a case in `test` are called by nobody, and the generated layers under `abstract` carry the
