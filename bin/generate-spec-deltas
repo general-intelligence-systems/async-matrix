@@ -4,16 +4,62 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Compares the per-version manifests written by bin/update-spec and records what each specification version changed, as lib/async/matrix/abstract/<api>/schemas/<name>-<version>.deltas.yaml.
+# GENERATE-SPEC-DELTAS(1)            General Commands Manual          GENERATE-SPEC-DELTAS(1)
 #
-# @example
-#   bin/generate-spec-deltas                     # every manifest of every API
-#   bin/generate-spec-deltas client_server       # one API
-#   bin/generate-spec-deltas client_server/rooms # one manifest
+# NAME
+#      bin/generate-spec-deltas — record what each version changed in the operation
+#      manifests
 #
-# A deltas file holds every version in descending order, which is the order the layers appear in the Ruby beside it: open rooms.rb next to schemas/rooms-v1.12.deltas.yaml and `module V1_12` has the which says what it must implement, or an empty entry saying the specification changed nothing.
+# SYNOPSIS
+#      bin/generate-spec-deltas [api[/name]]
 #
-# Changes are reported as leaf paths - `parameters.query.from.required`, `responses.200.chunk[].type` - rather than as nested subtrees, because a subtree diff of something like /sync prints the entire response shape and tells you nothing about what moved.
+# DESCRIPTION
+#      Compares the per-version manifests written by bin/update-spec(1) and records what each
+#      specification version changed, as
+#      lib/async/matrix/abstract/api/<api>/schemas/<name>-<version>.deltas.yaml.  With no
+#      argument, every manifest of every API is compared.
+#
+#      A deltas file holds every version in descending order, which is the order the layers
+#      appear in the Ruby beside it: open rooms.rb next to schemas/rooms-v1.12.deltas.yaml
+#      and module V1_12 has the entry which says what it must implement, or an empty entry
+#      saying the specification changed nothing.
+#
+#      Changes are reported as leaf paths - parameters.query.from.required,
+#      responses.200.chunk[].type - rather than as nested subtrees, because a subtree diff of
+#      something like /sync prints the entire response shape and tells you nothing about what
+#      moved.
+#
+#      This reads the manifests rather than the specification, so it needs neither the
+#      submodules nor the network, and it can be re-run on its own whenever the manifests
+#      change.
+#
+# FILES
+#      lib/async/matrix/abstract/api/<api>/schemas/<name>-<version>.yaml
+#              The manifests which are compared.
+#
+#      lib/async/matrix/abstract/api/<api>/schemas/<name>-<version>.deltas.yaml
+#              What each version changed, which is what a version layer implements.
+#
+# EXIT STATUS
+#      The bin/generate-spec-deltas utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Compare every manifest:
+#
+#            bin/generate-spec-deltas
+#
+#      One API:
+#
+#            bin/generate-spec-deltas client_server
+#
+#      One manifest:
+#
+#            bin/generate-spec-deltas client_server/rooms
+#
+# SEE ALSO
+#      bin/update-spec(1), bin/generate-event-spec-deltas(1)
+#
+# async-matrix                          October 11, 2026              GENERATE-SPEC-DELTAS(1)
 
 require "yaml"
 

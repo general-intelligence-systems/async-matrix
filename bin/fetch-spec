@@ -1,15 +1,52 @@
 #!/usr/bin/env bash
 
-# Initializes the matrix-spec submodules: one per released specification version, each pinned to its
-# tag, in ./data.
+# FETCH-SPEC(1)                      General Commands Manual                    FETCH-SPEC(1)
 #
-#   bin/fetch-spec              # every version in MATRIX_API_VERSIONS.txt
-#   bin/fetch-spec v1.18 v1.19  # just these
+# NAME
+#      bin/fetch-spec — initialize the specification submodules
 #
-# A released specification version is a frozen tag, so a submodule per version is a fixed reference
-# rather than something which drifts. They are declared shallow, so each is one commit rather than
-# the whole history, and only the directories we read are checked out: the spec repository is mostly
-# a website, which is 122MB checked out in full against 58MB like this.
+# SYNOPSIS
+#      bin/fetch-spec [version ...]
+#
+# DESCRIPTION
+#      Initializes the matrix-spec submodules in data/, one per released specification
+#      version, each pinned to its tag. With no version, every version in
+#      MATRIX_API_VERSIONS.txt is fetched.
+#
+#      A released version is a frozen tag, so a submodule per version is a fixed reference
+#      rather than something which drifts.
+#
+#      They are declared shallow, so each is one commit rather than the whole history, and
+#      only the directories which are read are checked out: the specification repository is
+#      mostly a website, which is 122MB checked out in full against 58MB like this.
+#
+#      The directories kept are data/api, data/event-schemas and data/schemas.  The whole of
+#      data/api is needed rather than just client-server, because some client-server schemas
+#      reference the identity and application-service definitions.
+#
+# FILES
+#      MATRIX_API_VERSIONS.txt
+#              The versions to fetch, when none is named.
+#
+#      data/matrix-spec-<version>
+#              One submodule per version, which bin/update-spec(1) reads.
+#
+# EXIT STATUS
+#      The bin/fetch-spec utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Fetch every version:
+#
+#            bin/fetch-spec
+#
+#      Fetch two:
+#
+#            bin/fetch-spec v1.18 v1.19
+#
+# SEE ALSO
+#      bin/update-spec(1), bin/update-event-spec(1), git-submodule(1)
+#
+# async-matrix                          October 11, 2026                        FETCH-SPEC(1)
 
 set -o errexit
 set -o nounset

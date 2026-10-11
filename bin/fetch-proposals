@@ -1,18 +1,50 @@
 #!/usr/bin/env bash
 
-# Builds a table of every Matrix Spec Change proposal, one row per MSC, in data/matrix-spec-proposals.csv.
+# FETCH-PROPOSALS(1)                 General Commands Manual               FETCH-PROPOSALS(1)
 #
-#   bin/fetch-proposals                 # write data/matrix-spec-proposals.csv
-#   bin/fetch-proposals path/to/out.csv # write somewhere else
+# NAME
+#      bin/fetch-proposals — build a table of every Matrix Spec Change proposal
 #
-# There is no published index of MSCs: the proposal process lives in GitHub, where an MSC is a pull
-# request (or occasionally a bare issue) carrying the "proposal" label, its number is the pull
-# request number, and its state is a label rather than a field. This turns that into a table which
-# can be sorted and filtered, so that "what is unspecified, and in which API" is one query rather
-# than a day of reading.
+# SYNOPSIS
+#      bin/fetch-proposals [output]
 #
-# The proposal text itself is only in the repository for MSCs which merged; everything else lives on
-# a contributor's branch, which is why a row links to the proposal rather than carrying its prose.
+# DESCRIPTION
+#      Writes one row per MSC to data/matrix-spec-proposals.csv, or to output where one is
+#      given.
+#
+#      There is no published index of MSCs: the proposal process lives in GitHub, where an
+#      MSC is a pull request, or occasionally a bare issue, carrying the “proposal” label,
+#      its number is the pull request number, and its state is a label rather than a field.
+#      This turns that into a table which can be sorted and filtered, so that “what is
+#      unspecified, and in which API” is one query rather than a day of reading.
+#
+#      The proposal text itself is only in the repository for MSCs which merged; everything
+#      else lives on a contributor's branch, which is why a row links to the proposal rather
+#      than carrying its prose.
+#
+# REQUIREMENTS
+#      The GitHub CLI, gh(1), authenticated: the proposals are read through it.
+#
+# FILES
+#      data/matrix-spec-proposals.csv
+#              Where the table is written, when no output is named.
+#
+# EXIT STATUS
+#      The bin/fetch-proposals utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Write the table to its usual place:
+#
+#            bin/fetch-proposals
+#
+#      Write it somewhere else:
+#
+#            bin/fetch-proposals path/to/out.csv
+#
+# SEE ALSO
+#      bin/fetch-checklists(1), gh(1)
+#
+# async-matrix                          October 11, 2026                   FETCH-PROPOSALS(1)
 
 set -o errexit
 set -o nounset

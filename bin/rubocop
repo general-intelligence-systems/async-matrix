@@ -1,10 +1,49 @@
 #!/usr/bin/env bash
 
-# Lint the project, including the custom cops in cops/.
+# RUBOCOP(1)                         General Commands Manual                       RUBOCOP(1)
 #
-#   bin/rubocop                 # report
-#   bin/rubocop --autocorrect   # and correct what can be corrected
-#   bin/rubocop lib/async       # just these paths
+# NAME
+#      bin/rubocop — lint the project, including the cops it carries
+#
+# SYNOPSIS
+#      bin/rubocop [--autocorrect] [path ...]
+#
+# DESCRIPTION
+#      Runs RuboCop over the project with the custom cops in cops/ loaded, and with its cache
+#      turned off.
+#
+#      The cache is off because the cops read MATRIX_API_VERSIONS.txt, which is not part of
+#      RuboCop's cache key: a change to it would otherwise be masked by a cached result from
+#      before the change.
+#
+#      Arguments are passed to RuboCop, so anything it takes works here.
+#
+# FILES
+#      .rubocop.yml
+#              Which cops are enabled, and where each applies.
+#
+#      cops/   The cops this project carries, which the configuration loads by path.
+#
+# EXIT STATUS
+#      The bin/rubocop utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Report every offence:
+#
+#            bin/rubocop
+#
+#      Correct what can be corrected:
+#
+#            bin/rubocop --autocorrect
+#
+#      Lint one directory:
+#
+#            bin/rubocop lib/async
+#
+# SEE ALSO
+#      rubocop(1)
+#
+# async-matrix                          October 11, 2026                           RUBOCOP(1)
 
 set -o errexit
 set -o nounset

@@ -4,17 +4,54 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Generates the specification manifests in lib/async/matrix/abstract, one beside each Ruby file, so that the two can be read side by side: the manifest has the same shape as the code it describes.
+# UPDATE-SPEC(1)                     General Commands Manual                   UPDATE-SPEC(1)
 #
-# @example
-#   bin/update-spec              # every version in MATRIX_API_VERSIONS.txt
-#   bin/update-spec v1.18 v1.19  # only rebuild these versions' deltas
+# NAME
+#      bin/update-spec — generate the operation manifests from the specification
 #
-# A manifest holds the whole surface at the newest version, which is what the class body implements, followed by one entry per specification version holding only what that version changed, which is what the version layer implements. An empty entry means the specification changed nothing, so an empty layer beside it is correct.
+# SYNOPSIS
+#      bin/update-spec [version ...]
 #
-# Every operation in the client-server API appears in exactly one manifest. Those which no class implements yet get a manifest with no Ruby beside it, which is the map of what is left to build.
+# DESCRIPTION
+#      Generates the specification manifests in lib/async/matrix/abstract, one beside each
+#      Ruby file, so that the two can be read side by side: a manifest has the same shape as
+#      the code it describes. With no version, every version in MATRIX_API_VERSIONS.txt is
+#      rebuilt.
 #
-# The specifications come from the submodules in ./data, one per released version, so this needs no network. Run bin/fetch-spec first.
+#      A manifest holds the whole surface at the newest version, which is what the class body
+#      implements, followed by one entry per specification version holding only what that
+#      version changed, which is what the version layer implements. An empty entry means the
+#      specification changed nothing, so an empty layer beside it is correct.
+#
+#      Every operation in the client-server API appears in exactly one manifest. Those which
+#      no class implements yet get a manifest with no Ruby beside it, which is the map of
+#      what is left to build.
+#
+# FILES
+#      data/matrix-spec-<version>
+#              The specifications, as submodules, which this reads rather than the network.
+#              Run bin/fetch-spec(1) first.
+#
+#      lib/async/matrix/abstract/api/<api>/schemas/<name>-<version>.yaml
+#              One manifest per concept per version, which is what the tests measure the
+#              library against.
+#
+# EXIT STATUS
+#      The bin/update-spec utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Rebuild every version:
+#
+#            bin/update-spec
+#
+#      Rebuild two:
+#
+#            bin/update-spec v1.18 v1.19
+#
+# SEE ALSO
+#      bin/fetch-spec(1), bin/generate-spec-deltas(1), bin/update-event-spec(1)
+#
+# async-matrix                          October 11, 2026                       UPDATE-SPEC(1)
 
 require "yaml"
 require "uri"

@@ -4,17 +4,58 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Compares the per-version manifests written by bin/update-event-spec and records what each specification version changed, as lib/async/matrix/abstract/events/schemas/<name>-<version>.deltas.yaml.
+# GENERATE-EVENT-SPEC-DELTAS(1)      General Commands Manual    GENERATE-EVENT-SPEC-DELTAS(1)
 #
-# @example
-#   bin/generate-event-spec-deltas                  # every event type
-#   bin/generate-event-spec-deltas m.room.message   # one type
+# NAME
+#      bin/generate-event-spec-deltas — record what each version changed in the event
+#      manifests
 #
-# This reads the manifests rather than the specification, so it needs neither the submodules nor the network, and it can be re-run on its own whenever the manifests change.
+# SYNOPSIS
+#      bin/generate-event-spec-deltas [type]
 #
-# A deltas file holds every version a type exists at, in descending order, which is the order the layers appear in the Ruby beside it: open `module V1_10` and the v1.10 deltas say what it must implement, or say the specification changed nothing and the empty layer is correct.
+# DESCRIPTION
+#      Compares the per-version manifests written by bin/update-event-spec(1) and records
+#      what each specification version changed, as
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.deltas.yaml.  With no
+#      argument, every event type is compared.
 #
-# Changes are reported as leaf paths - `content.info.type`, `content.body.required` - rather than as nested subtrees, because a subtree diff of something like m.room.member prints the whole content shape and tells you nothing about what moved.
+#      This reads the manifests rather than the specification, so it needs neither the
+#      submodules nor the network, and it can be re-run on its own whenever the manifests
+#      change.
+#
+#      A deltas file holds every version a type exists at, in descending order, which is the
+#      order the layers appear in the Ruby beside it: open module V1_10 and the v1.10 deltas
+#      say what it must implement, or say the specification changed nothing and the empty
+#      layer is correct.
+#
+#      Changes are reported as leaf paths - content.info.type, content.body.required - rather
+#      than as nested subtrees, because a subtree diff of something like m.room.member prints
+#      the whole content shape and tells you nothing about what moved.
+#
+# FILES
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.yaml
+#              The manifests which are compared.
+#
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.deltas.yaml
+#              What each version changed.
+#
+# EXIT STATUS
+#      The bin/generate-event-spec-deltas utility exits 0 on success, and >0 if an error
+#      occurs.
+#
+# EXAMPLES
+#      Compare every type:
+#
+#            bin/generate-event-spec-deltas
+#
+#      One type:
+#
+#            bin/generate-event-spec-deltas m.room.message
+#
+# SEE ALSO
+#      bin/update-event-spec(1), bin/generate-spec-deltas(1)
+#
+# async-matrix                          October 11, 2026        GENERATE-EVENT-SPEC-DELTAS(1)
 
 require "yaml"
 

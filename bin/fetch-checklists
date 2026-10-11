@@ -1,21 +1,65 @@
 #!/usr/bin/env bash
 
-# Downloads the specification's release checklists into data/changelog-checklists, one file per
-# version, so that "what changed in v1.19, and have we implemented it" is a local file with boxes to
-# tick.
+# FETCH-CHECKLISTS(1)                General Commands Manual              FETCH-CHECKLISTS(1)
 #
-#   bin/fetch-checklists                 # every version in MATRIX_API_VERSIONS.txt, and unstable
-#   bin/fetch-checklists v1.18 unstable  # just these
-#   bin/fetch-checklists --dry-run       # print the issue it would raise rather than raising it
+# NAME
+#      bin/fetch-checklists — download the specification's release checklists
 #
-# A released version's checklist is frozen upstream and ticked off here, so it is downloaded once
-# and never written over; delete a file to fetch it again. Checklists begin at v1.12 - earlier
-# versions 404, which is reported rather than treated as a failure.
+# SYNOPSIS
+#      bin/fetch-checklists [--dry-run] [version ...]
 #
-# unstable moves with every merge into the specification, so it is the one which needs watching. It
-# is written only when there is nothing to lose: no file yet, or no box ticked yet. Once a box is
-# ticked the local file stands, and the upstream change is raised as an issue instead, because the
-# ticks are the record of what we have implemented and only a person can carry them across.
+# DESCRIPTION
+#      Downloads the release checklists into data/changelog-checklists, one file per version,
+#      so that “what changed in v1.19, and have we implemented it” is a local file with boxes
+#      to tick. With no version, every version in MATRIX_API_VERSIONS.txt is fetched, and
+#      unstable with them.
+#
+#      A released version's checklist is frozen upstream and ticked off here, so it is
+#      downloaded once and never written over; delete a file to fetch it again. Checklists
+#      begin at v1.12 - earlier versions 404, which is reported rather than treated as a
+#      failure.
+#
+#      unstable moves with every merge into the specification, so it is the one which needs
+#      watching. It is written only when there is nothing to lose: no file yet, or no box
+#      ticked yet. Once a box is ticked the local file stands, and the upstream change is
+#      raised as an issue instead, because the ticks are the record of what has been
+#      implemented and only a person can carry them across.
+#
+# OPTIONS
+#      --dry-run
+#              Print the issue which would be raised, rather than raising it.
+#
+# REQUIREMENTS
+#      The GitHub CLI, gh(1), authenticated: the checklists are read through it, and an issue
+#      is raised through it.
+#
+# FILES
+#      data/changelog-checklists/<version>.md
+#              One checklist per version, ticked off by hand as things are implemented.
+#
+#      MATRIX_API_VERSIONS.txt
+#              The versions to fetch, when none is named.
+#
+# EXIT STATUS
+#      The bin/fetch-checklists utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Fetch every version, and unstable:
+#
+#            bin/fetch-checklists
+#
+#      Fetch two:
+#
+#            bin/fetch-checklists v1.18 unstable
+#
+#      See what would be raised without raising it:
+#
+#            bin/fetch-checklists --dry-run
+#
+# SEE ALSO
+#      bin/fetch-proposals(1), gh(1)
+#
+# async-matrix                          October 11, 2026                  FETCH-CHECKLISTS(1)
 
 set -o errexit
 set -o nounset

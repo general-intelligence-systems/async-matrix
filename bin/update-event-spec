@@ -4,28 +4,58 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Generates the event manifests in lib/async/matrix/abstract/events, one per event type per version. What each version changed is written beside them by bin/generate-event-spec-deltas, which reads these files rather than the specification: extracting a surface and comparing two of them are separate jobs, and the comparison can then be re-run without reading the submodules.
+# UPDATE-EVENT-SPEC(1)               General Commands Manual             UPDATE-EVENT-SPEC(1)
 #
-# @example
-#   bin/update-event-spec              # every version in MATRIX_API_VERSIONS.txt
-#   bin/update-event-spec v1.18 v1.19  # only these versions
+# NAME
+#      bin/update-event-spec — generate the event manifests from the specification
 #
-# Events are generated separately from operations because they are a different kind of thing. An operation is a call: a method, a path, parameters, a response. An event is a value which travels through those calls, and the operation schemas cannot describe it - `sendMessage` takes the event type in its path, so its request body is opaque. These manifests are the other half: the operations say how to call, the events say what goes in and what comes back.
+# SYNOPSIS
+#      bin/update-event-spec [version ...]
 #
-# Two things about events shape the output:
+# DESCRIPTION
+#      Generates the event manifests in lib/async/matrix/abstract/events, one per event type
+#      per version. With no version, every version in MATRIX_API_VERSIONS.txt is rebuilt.
+#      What each version changed is written beside them by bin/generate-event-spec-deltas(1),
+#      which reads these files rather than the specification: extracting a surface and
+#      comparing two of them are separate jobs, and the comparison can then be re-run without
+#      reading the submodules.
 #
-# @example
-#   - The same type arrives in different framings. /sync omits the room ID, /messages carries it, a
-#     state event carries a state key, and an invite carries only a stripped subset. The framing is
-#     recorded per entry, because it decides which envelope fields exist.
+#      Events are generated separately from operations because they are a different kind of
+#      thing. An operation is a call: a method, a path, parameters, a response. An event is a
+#      value which travels through those calls, and the operation schemas cannot describe it
+#      - sendMessage takes the event type in its path, so its request body is opaque. These
+#      manifests are the other half: the operations say how to call, the events say what goes
+#      in and what comes back.
 #
-# @example
-#   - A type can have variants which are told apart by a field of the content rather than by the
-#     type: `m.room.message` has eleven, keyed by `msgtype`. The specification spells these
-#     `m.room.message$m.text.yaml`, and they are gathered into one manifest per type, so that
-#     everything which arrives as `m.room.message` is described in one file.
+#      Two things about events shape the output. The same type arrives in different framings:
+#      /sync omits the room ID, /messages carries it, a state event carries a state key, and
+#      an invite carries only a stripped subset, so the framing is recorded per entry,
+#      because it decides which envelope fields exist. And a type's content varies by a field
+#      within it, so those are recorded as variants.
 #
-# The specifications come from the submodules in ./data, one per released version, so this needs no network. Run bin/fetch-spec first.
+# FILES
+#      data/matrix-spec-<version>
+#              The specifications, as submodules. Run bin/fetch-spec(1) first.
+#
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.yaml
+#              One manifest per event type per version.
+#
+# EXIT STATUS
+#      The bin/update-event-spec utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Rebuild every version:
+#
+#            bin/update-event-spec
+#
+#      Rebuild two:
+#
+#            bin/update-event-spec v1.18 v1.19
+#
+# SEE ALSO
+#      bin/fetch-spec(1), bin/generate-event-spec-deltas(1), bin/update-spec(1)
+#
+# async-matrix                          October 11, 2026                 UPDATE-EVENT-SPEC(1)
 
 require "yaml"
 require "fileutils"
