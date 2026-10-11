@@ -13,6 +13,11 @@ require_relative "../../versioned"
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "session"
+require_relative "key_backup"
+require_relative "keys"
+require_relative "to_device"
+require_relative "cross_signing"
+require_relative "device_management"
 require_relative "rooms"
 require_relative "sync"
 
@@ -144,6 +149,31 @@ module Async
           joined = api::RoomReference.post(self.with(path: path), payload)
 
           self.room(joined.room_id)
+        end
+
+        # @returns [Keys] the end to end encryption keys.
+        def keys
+          api::Keys.for(self)
+        end
+
+        # @returns [KeyBackup] the versions of this user's key backup.
+        def key_backup
+          api::KeyBackup.for(self)
+        end
+
+        # @returns [ToDevice] the sender of device addressed events.
+        def to_device
+          api::ToDevice.for(self)
+        end
+
+        # @returns [CrossSigning] the cross signing keys.
+        def cross_signing
+          api::CrossSigning.for(self)
+        end
+
+        # @returns [DeviceManagement] the devices this user has logged in from.
+        def devices
+          api::DeviceManagement.for(self)
         end
 
         # Begin syncing.
