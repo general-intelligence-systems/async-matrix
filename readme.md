@@ -63,21 +63,48 @@ response is a *representation*.
 
 ## Testing
 
-The tests run against a real homeserver. The `examples/matrix` rig in the `async-rest` checkout
-alongside this one provides a throwaway Synapse, with every rate limiter disabled and a module which
-registers a user on first login, so the suite needs no setup and no fixtures of its own:
+The tests run against a real homeserver, and against more than one of them. There is a rig per
+backend, each a directory with a flake which publishes one image per Matrix specification version
+and a compose file with a service per version, so that a run is just the version wanted:
 
 ``` shell
-cd ../async-rest/examples/matrix && docker compose up -d --wait synapse
+bin/test                      # the latest version, on Synapse
+bin/test --all                # every version
+bin/test v1.11 v1.12          # just these
+bin/test --backend tuwunel    # on tuwunel instead
+bin/test --keep-alive         # and leave the homeserver running afterwards
 ```
 
-Then:
+`synapse/` is the first rig, and pins each specification version to the Synapse which first
+advertised it, which is the oldest server that version can be tested against. `tuwunel/` is the
+second, and pins every version to the same tuwunel release: one tuwunel build advertises the whole
+range, and its advertised list records the order it did the work in rather than when support
+arrived, so the first release to advertise v1.5 predates most of its development.
 
-``` shell
-nix develop --command bin/test
-```
+A second backend is the point rather than a bonus. A suite which only ever talks to Synapse tests
+what Synapse does, not what the specification says, so where a version passes on one server and
+fails on the other, either one of them is wrong or the specification is read two ways.
 
 Each test gets a fresh user and a fresh room, so tests cannot interfere with each other and the
-suite can be run repeatedly. Set `MATRIX_HOMESERVER` to test against a different server — but note
-that a homeserver with default rate limits will fail the suite, because Synapse allows a burst of 10
-room creations and then one per ~62 seconds, and a burst of 5 logins and then one per ~5 minutes.
+suite can be run repeatedly. The one thing the rigs cannot do alike is make that user: Synapse
+carries a module which registers it on first login, where tuwunel has no way to accept any
+password, so its rig opens registration and the suite registers the account before logging in.
+`bin/test` tells the suite which it is talking to.
+
+Set `MATRIX_HOMESERVER` to test against a server of your own — but note that one with default rate
+limits will fail the suite, because Synapse allows a burst of 10 room creations and then one per
+~62 seconds, and a burst of 5 logins and then one per ~5 minutes.
+
+The images come from the Build Test Images workflows, which is also what a new version needs run
+after it is added: a job pulls `ghcr.io/<owner>/<backend>:spec-<version>`, so without it there is
+nothing to start.
+
+### Linting
+
+``` shell
+bin/rubocop
+```
+
+The cops in `cops/` read files with Prism through `ast-crispr-ruby-prism`, which requires Ruby 4,
+so they are in a `lint` bundler group of their own. The suite itself runs on Ruby 3.3 and up, and
+the Test workflows install without that group.
