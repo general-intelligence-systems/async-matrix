@@ -197,6 +197,76 @@ module Async
           self.authenticated(login.access_token)
         end
 
+        # @returns [SSOLoginRedirect] where to send the user to sign in with a provider.
+        def sso_login_redirect
+          api::SSOLoginRedirect.for(self)
+        end
+
+        # Where to send the user's browser to sign in, with one provider or with any.
+        #
+        # @parameter redirect_url [String] where the homeserver returns the user afterwards.
+        # @parameter idp_id [String | nil] the provider the user chose, if they chose one.
+        # @returns [String] the URL to open.
+        def sso_login_url(redirect_url, idp_id: nil, **options)
+          redirect = self.sso_login_redirect
+
+          if idp_id
+            redirect.redirect_to_idp(idp_id, redirect_url, **options)
+          else
+            redirect.redirect_to_sso(redirect_url, **options)
+          end
+        end
+
+        # The token a single sign on redirect carried.
+        #
+        # @parameter redirect [String] the query string or URL the user was returned to.
+        # @returns [String] the login token.
+        # @raises [RequestError] if the redirect carried no token.
+        def self.login_token_from(redirect)
+          query = redirect.split("?", 2).last.to_s.split("#", 2).first.to_s
+          token = ::Protocol::URL::Encoding.decode(query)["loginToken"]
+
+          unless token
+            raise RequestError.new(0, "M_MISSING_PARAM", "The redirect carried no login token!")
+          end
+
+          token
+        end
+
+        # Log in with a single use token, which is how single sign on and `generate_login_token` end.
+        #
+        # @parameter token [String] the login token.
+        # @returns [Login] the login response, which carries the access token.
+        def login_with_token(token, **payload)
+          payload[:type] = "m.login.token"
+          payload[:token] = token
+
+          api::Login.post(self.with(path: "#{V3}/login"), payload)
+        end
+
+        # Log in with a single use token, and derive an authenticated client from the result.
+        #
+        # @parameter token [String] the login token.
+        # @returns [Client] an authenticated client.
+        def logged_in_with_token(token, **options)
+          login = self.login_with_token(token, **options)
+
+          self.authenticated(login.access_token)
+        end
+
+        # Finish a single sign on login, from the redirect the user came back with.
+        #
+        # @parameter redirect [String] the query string or URL the user was returned to.
+        # @returns [Client] an authenticated client.
+        def logged_in_with_sso(redirect, **options)
+          self.logged_in_with_token(self.class.login_token_from(redirect), **options)
+        end
+
+        # @returns [LoginToken] the issuer of a token which logs another client in.
+        def login_token
+          api::LoginToken.for(self)
+        end
+
         # The ways this homeserver will let a user log in. No authentication is required.
         #
         # @returns [LoginFlows] the supported login flows.
@@ -461,6 +531,66 @@ module Async
         # @returns [ThirdPartyLookup] the networks this homeserver bridges to.
         def third_party_lookup
           api::ThirdPartyLookup.for(self)
+        end
+
+        # @returns [Support] who to contact about this homeserver.
+        def support
+          api::Support.for(self)
+        end
+
+        # @returns [RoomSummary] what the homeserver says about a room without joining it.
+        def room_summary
+          api::RoomSummary.for(self)
+        end
+
+        # @returns [SpaceHierarchy] the rooms a space holds.
+        def space_hierarchy
+          api::SpaceHierarchy.for(self)
+        end
+
+        # @returns [ThreadsList] the threads of a room.
+        def threads_list
+          api::ThreadsList.for(self)
+        end
+
+        # @returns [Relations] the events which relate to an event.
+        def relations
+          api::Relations.for(self)
+        end
+
+        # @returns [RegistrationTokens] whether a registration token may still be used.
+        def registration_tokens
+          api::RegistrationTokens.for(self)
+        end
+
+        # @returns [LoginToken] a token which logs a user in once.
+        def login_token
+          api::LoginToken.for(self)
+        end
+
+        # @returns [ReportContent] reporting an event, a room or a user.
+        def report_content
+          api::ReportContent.for(self)
+        end
+
+        # @returns [AppservicePing] pinging an application service.
+        def appservice_ping
+          api::AppservicePing.for(self)
+        end
+
+        # @returns [PushRules] the rules which decide what raises a notification.
+        def pushrules
+          api::PushRules.for(self)
+        end
+
+        # @returns [ContentRepo] the files this homeserver holds.
+        def content_repo
+          api::ContentRepo.for(self)
+        end
+
+        # @returns [AuthedContentRepo] the files this homeserver holds, asked for with an access token.
+        def authed_content_repo
+          api::AuthedContentRepo.for(self)
         end
 
         # Begin syncing.

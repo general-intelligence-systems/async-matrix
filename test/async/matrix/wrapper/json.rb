@@ -92,4 +92,44 @@ describe Async::Matrix::Wrapper::JSON do
       expect(delegate.requests).to be == 1
     end
   end
+  with "a refusal which is a challenge" do
+    let(:delegate) do
+      RefusingDelegate.new(401, {"content-type" => "application/json"},
+        ["{\"session\":\"a-session\",\"flows\":[{\"stages\":[\"m.login.password\"]}],\"params\":{}}"])
+    end
+
+    # A body naming flows and a session is the homeserver asking, not refusing.
+    it "raises the challenge rather than a plain refusal" do
+      error = nil
+
+      begin
+        Async::Matrix::Representation.get(resource)
+      rescue Async::Matrix::InteractiveAuthenticationError => raised
+        error = raised
+      end
+
+      expect(error).not.to be_nil
+      expect(error.session).to be == "a-session"
+      expect(error).to be(:accepts?, "m.login.password")
+    end
+  end
+
+  with "a refusal whose body is not JSON" do
+    let(:delegate) {RefusingDelegate.new(502, {"content-type" => "text/html"}, ["<html>502</html>"])}
+
+    # The status is still meaningful, and the body is reported as it stands.
+    it "raises a plain refusal carrying the body" do
+      error = nil
+
+      begin
+        Async::Matrix::Representation.get(resource)
+      rescue Async::Matrix::RequestError => raised
+        error = raised
+      end
+
+      expect(error).to be_a(Async::Matrix::RequestError)
+      expect(error.status).to be == 502
+      expect(error.message).to be(:include?, "502")
+    end
+  end
 end

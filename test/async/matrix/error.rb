@@ -46,3 +46,48 @@ describe Async::Matrix::RequestError do
     expect(error).to be_a(StandardError)
   end
 end
+
+describe Async::Matrix::InteractiveAuthenticationError do
+  let(:challenge) do
+    subject.new(401, nil, nil,
+      session: "a-session",
+      flows: [{stages: ["m.login.password"]}, {stages: ["m.login.sso", "m.login.password"]}],
+      params: {"m.login.terms" => {policies: {}}},
+      completed: [],
+    )
+  end
+
+  it "is a request error, so a caller which handles one handles this" do
+    expect(challenge).to be_a(Async::Matrix::RequestError)
+  end
+
+  it "reports the session to carry through the stages" do
+    expect(challenge.session).to be == "a-session"
+  end
+
+  it "reports the stages of each flow" do
+    expect(challenge.stages).to be == [["m.login.password"], ["m.login.sso", "m.login.password"]]
+  end
+
+  it "accepts a single stage which completes a flow" do
+    expect(challenge).to be(:accepts?, "m.login.password")
+  end
+
+  it "does not accept a stage which leaves a flow unfinished" do
+    expect(challenge).not.to be(:accepts?, "m.login.sso")
+  end
+
+  it "accepts a stage once the others are completed" do
+    partial = subject.new(401, nil, nil, session: "a-session", flows: [{stages: ["m.login.sso", "m.login.password"]}], completed: ["m.login.sso"])
+
+    expect(partial).to be(:accepts?, "m.login.password")
+  end
+
+  it "reports the parameters a stage needs" do
+    expect(challenge.params).to be(:key?, "m.login.terms")
+  end
+
+  it "says what it wants when the homeserver did not" do
+    expect(challenge.message).to be(:include?, "requires authentication")
+  end
+end

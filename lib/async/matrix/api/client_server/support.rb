@@ -3,14 +3,21 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/support"
 
 module Async
   module Matrix
     module ClientServer
-      # Who to contact about this homeserver.
+      # The contacts a homeserver publishes.
       #
-      # The operations are not written yet: this is the class `support-v1.19.yaml` names.
+      # The endpoint arrived in v1.10, so the fields are read by that layer.
+      class SupportContacts < Representation
+        include Versioned
+      end
+
+      # Who to contact about a homeserver.
       class Support
         include Versioned
 

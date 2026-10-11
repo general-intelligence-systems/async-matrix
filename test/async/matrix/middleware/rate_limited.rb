@@ -146,6 +146,32 @@ describe Async::Matrix::Middleware::RateLimited do
     end
   end
 
+  with "#retry_after_duration" do
+    let(:durations) do
+      middleware.tap do |object|
+        object.singleton_class.send(:public, :retry_after_duration)
+      end
+    end
+
+    it "reads a number of seconds" do
+      expect(durations.retry_after_duration("123")).to be == 123
+    end
+
+    # A date which has passed asks for no wait at all, rather than a negative one.
+    it "reads a date which has passed as no wait" do
+      expect(durations.retry_after_duration(Time.now.httpdate)).to be == 0.0
+    end
+
+    it "reads a date in the future as the time until it" do
+      expect(durations.retry_after_duration((Time.now + 60).httpdate)).to be > 0.0
+    end
+
+    # Neither a date nor a number: `to_f` reads it as no wait, which is sent again at once.
+    it "reads something which is neither as no wait" do
+      expect(durations.retry_after_duration("soon")).to be == 0.0
+    end
+  end
+
   it "waits no longer than its maximum" do
     expect(subject::MAXIMUM_RETRY_DELAY).to be == 30.0
   end

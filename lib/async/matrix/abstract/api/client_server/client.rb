@@ -132,6 +132,22 @@ module Async
 
               self.authenticated(login.access_token, refresh_token: login.refresh_token, expires_in_ms: login.expires_in_ms)
             end
+
+            # Log in with a single use token, asking for a refresh token as well.
+            def login_with_token(token, refresh_token: false, **options)
+              if refresh_token
+                super(token, refresh_token: true, **options)
+              else
+                super(token, **options)
+              end
+            end
+
+            # Log in with a single use token, and derive a client which can renew its own access token.
+            def logged_in_with_token(token, refresh_token: true, **options)
+              login = self.login_with_token(token, refresh_token: refresh_token, **options)
+
+              self.authenticated(login.access_token, refresh_token: login.refresh_token, expires_in_ms: login.expires_in_ms)
+            end
           end
 
           # No changes in v1.2.

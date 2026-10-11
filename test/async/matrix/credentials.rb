@@ -61,6 +61,30 @@ describe Async::Matrix::Credentials do
     end
   end
 
+  with ".transient?" do
+    def refusal(status)
+      Async::Matrix::RequestError.new(status, "M_UNKNOWN")
+    end
+
+    # The homeserver having a bad moment leaves the session alone.
+    it "is transient for a server error" do
+      expect(subject).to be(:transient?, refusal(500))
+      expect(subject).to be(:transient?, refusal(503))
+    end
+
+    # Being asked to wait is not a verdict on the token.
+    it "is transient for a rate limit" do
+      expect(subject).to be(:transient?, refusal(429))
+    end
+
+    # Anything else is the homeserver judging the refresh token itself.
+    it "is not transient for a refusal" do
+      expect(subject).not.to be(:transient?, refusal(400))
+      expect(subject).not.to be(:transient?, refusal(401))
+      expect(subject).not.to be(:transient?, refusal(403))
+    end
+  end
+
   with "#renewable?" do
     it "is renewable with a refresh token" do
       expect(credentials).to be(:renewable?)

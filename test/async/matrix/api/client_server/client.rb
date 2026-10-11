@@ -33,6 +33,32 @@ describe Async::Matrix::ClientServer::Client do
   # The cases for the operations themselves, layered by the version which introduced each:
   include Async::Matrix::Testing::Abstract::ClientServer::Client::CASES
 
+  with "#with_credentials" do
+    let(:credentials) {Async::Matrix::Credentials.new(nil, access_token: "a-token")}
+
+    it "derives a client which authenticates with them" do
+      authenticated = unauthenticated.with_credentials(credentials)
+
+      expect(authenticated.delegate).to be_a(Async::Matrix::Middleware::Authenticated)
+      expect(authenticated.delegate.credentials).to be_equal(credentials)
+    end
+
+    # The token goes below the resource, so it is not copied into every resource derived from this one.
+    it "keeps the token out of the headers it derives" do
+      authenticated = unauthenticated.with_credentials(credentials)
+
+      expect(authenticated.headers["authorization"]).to be_nil
+      expect(authenticated.with(path: "/x").headers["authorization"]).to be_nil
+    end
+
+    # Every resource derived from it shares the one holder, so a renewal reaches all of them.
+    it "shares the credentials with every resource derived from it" do
+      authenticated = unauthenticated.with_credentials(credentials)
+
+      expect(authenticated.with(path: "/x").delegate.credentials).to be_equal(credentials)
+    end
+  end
+
   with ".login_token_from" do
     it "takes the token out of a redirect URL" do
       expect(subject.login_token_from("http://127.0.0.1:9999/cb?loginToken=abc123")).to be == "abc123"

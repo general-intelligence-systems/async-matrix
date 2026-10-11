@@ -3,14 +3,18 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../content"
+require_relative "../../paths"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/authed_content_repo"
+require_relative "content_repo"
 
 module Async
   module Matrix
     module ClientServer
-      # The authenticated media repository, which replaced the open one.
-      #
-      # The operations are not written yet: this is the class `authed_content_repo-v1.19.yaml` names.
+      # The files a homeserver holds, asked for with an access token.
       class AuthedContentRepo
         include Versioned
 

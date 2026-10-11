@@ -3,14 +3,22 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/login_token"
 
 module Async
   module Matrix
     module ClientServer
-      # Issues a single use token for logging in elsewhere.
+      # The single use token a homeserver generated.
       #
-      # The operations are not written yet: this is the class `login_token-v1.19.yaml` names.
+      # The endpoint arrived in v1.7, so the fields are read by that layer.
+      class GeneratedLoginToken < Representation
+        include Versioned
+      end
+
+      # Issues a single use token for logging in elsewhere.
       class LoginToken
         include Versioned
 

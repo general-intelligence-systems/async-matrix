@@ -3,14 +3,22 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/registration_tokens"
+require_relative "../../paths"
 
 module Async
   module Matrix
     module ClientServer
-      # Whether a registration token is still good.
+      # Whether a token is still good.
       #
-      # The operations are not written yet: this is the class `registration_tokens-v1.19.yaml` names.
+      # The endpoint arrived in v1.2, so the fields are read by that layer.
+      class TokenValidity < Representation
+        include Versioned
+      end
+
+      # Whether a registration token may still be used.
       class RegistrationTokens
         include Versioned
 

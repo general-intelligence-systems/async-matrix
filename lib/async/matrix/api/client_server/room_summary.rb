@@ -3,14 +3,24 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/room_summary"
 
 module Async
   module Matrix
     module ClientServer
-      # A summary of a room, without joining it.
+      # A room as a homeserver summarises it.
       #
-      # The operations are not written yet: this is the class `room_summary-v1.19.yaml` names.
+      # The endpoint arrived in v1.15, so the fields are read by that layer.
+      class SummarisedRoom < Representation
+        include Versioned
+      end
+
+      # What a homeserver will say about a room without joining it.
       class RoomSummary
         include Versioned
 

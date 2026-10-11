@@ -34,29 +34,38 @@ module Async
           super
 
           unless response.success?
-            errcode, message = self.error_for(response)
-
-            raise RequestError.new(response.status, errcode, message)
+            raise self.error_for(response)
           end
 
           response
         end
 
-        # The Matrix error code and message from an unsuccessful response.
+        # The error an unsuccessful response reports.
+        #
+        # A body naming flows and a session is a challenge rather than a refusal.
         #
         # @parameter response [Protocol::HTTP::Response] the unsuccessful response.
-        # @returns [Tuple(String | nil, String | nil)] the error code and message.
+        # @returns [RequestError] the error to raise.
         private def error_for(response)
           payload = response.read
 
           if payload.is_a?(Hash)
-            [payload[:errcode], payload[:error]]
+            if payload[:flows] and payload[:session]
+              InteractiveAuthenticationError.new(response.status, payload[:errcode], payload[:error],
+                session: payload[:session],
+                flows: payload[:flows],
+                params: payload[:params],
+                completed: payload[:completed],
+              )
+            else
+              RequestError.new(response.status, payload[:errcode], payload[:error])
+            end
           else
-            [nil, payload&.to_s]
+            RequestError.new(response.status, nil, payload&.to_s)
           end
         rescue => error
           # The body was not readable or was not valid JSON - the status is still meaningful:
-          [nil, error.message]
+          RequestError.new(response.status, nil, error.message)
         end
       end
     end

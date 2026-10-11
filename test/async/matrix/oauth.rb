@@ -228,6 +228,20 @@ describe Async::Matrix::OAuth do
     it "is a request error" do
       expect{server.refresh("a-spent-token", client_id: "a-client")}.to raise_exception(Async::Matrix::RequestError)
     end
+
+    # Registration is the one request sent as JSON rather than a form, so it has a wrapper of its own to report a refusal.
+    it "reports a refused registration" do
+      error = nil
+
+      begin
+        server.register(client_name: "async-matrix")
+      rescue Async::Matrix::OAuth::Error => error
+      end
+
+      expect(error).to be_a(Async::Matrix::OAuth::Error)
+      expect(error.errcode).to be == "invalid_grant"
+      expect(error.status).to be == 400
+    end
   end
 
   with "an endpoint on another host" do
@@ -396,6 +410,22 @@ describe Async::Matrix::OAuth do
     it "prints neither the state nor the verifier" do
       expect(authorization.inspect).not.to be(:include?, "a-known-state")
       expect(authorization.inspect).not.to be(:include?, "a-known-verifier")
+    end
+  end
+  with Async::Matrix::OAuth::Wrapper do
+    let(:wrapper) {Async::Matrix::OAuth::Wrapper.new}
+
+    # The authorization server need not say what an empty body is, and a response with no content type is left alone rather than raising.
+    it "leaves a response with no content type alone" do
+      response = ::Protocol::HTTP::Response[200, {}, []]
+
+      expect(wrapper.parser_for(response)).to be_nil
+    end
+
+    it "parses a response which says it is JSON" do
+      response = ::Protocol::HTTP::Response[200, {"content-type" => "application/json"}, ["{}"]]
+
+      expect(wrapper.parser_for(response)).to be == Async::REST::Wrapper::JSON::Parser
     end
   end
 end

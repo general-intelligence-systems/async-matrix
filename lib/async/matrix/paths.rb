@@ -11,5 +11,6 @@ module Async
     V1 = "/_matrix/client/v1"
     V3 = "/_matrix/client/v3"
     MEDIA_V3 = "/_matrix/media/v3"
+    MEDIA_V1 = "/_matrix/media/v1"
   end
 end

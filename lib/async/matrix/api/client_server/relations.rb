@@ -3,14 +3,24 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/relations"
 
 module Async
   module Matrix
     module ClientServer
-      # The events which relate to a given event.
+      # A page of the events which relate to an event.
       #
-      # The operations are not written yet: this is the class `relations-v1.19.yaml` names.
+      # The endpoint arrived in v1.3, so the fields are read by that layer.
+      class RelatedEvents < Representation
+        include Versioned
+      end
+
+      # The events which relate to an event.
       class Relations
         include Versioned
 

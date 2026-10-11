@@ -3,14 +3,24 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/threads_list"
 
 module Async
   module Matrix
     module ClientServer
-      # The threads in a room.
+      # A page of the events which start threads.
       #
-      # The operations are not written yet: this is the class `threads_list-v1.19.yaml` names.
+      # The endpoint arrived in v1.4, so the fields are read by that layer.
+      class ThreadRoots < Representation
+        include Versioned
+      end
+
+      # The threads of a room.
       class ThreadsList
         include Versioned
 

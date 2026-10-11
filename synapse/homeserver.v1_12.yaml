@@ -138,3 +138,8 @@ rc_user_directory:              # default: 0.016/s, burst 200
 rc_profile:                     # default: 1/s, burst 500
   per_second: 1000
   burst_count: 1000
+
+# The rig exists to be tested against, and `m.get_login_token` is disabled by default, which leaves
+# the token login flow unreachable.
+login_via_existing_session:
+  enabled: true

@@ -3,14 +3,24 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/appservice_ping"
 
 module Async
   module Matrix
     module ClientServer
-      # Checks that the homeserver can reach an application service.
+      # How long a ping took.
       #
-      # The operations are not written yet: this is the class `appservice_ping-v1.19.yaml` names.
+      # The endpoint arrived in v1.7, so the fields are read by that layer.
+      class Ping < Representation
+        include Versioned
+      end
+
+      # Pinging an application service.
       class AppservicePing
         include Versioned
 

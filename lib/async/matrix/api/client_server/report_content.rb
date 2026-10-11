@@ -3,14 +3,17 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/report_content"
 
 module Async
   module Matrix
     module ClientServer
-      # Reports an event, a room or a user.
-      #
-      # The operations are not written yet: this is the class `report_content-v1.19.yaml` names.
+      # Reporting an event, a room or a user to the homeserver's administrators.
       class ReportContent
         include Versioned
 

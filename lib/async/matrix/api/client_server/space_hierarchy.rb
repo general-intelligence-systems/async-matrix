@@ -3,14 +3,24 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/space_hierarchy"
 
 module Async
   module Matrix
     module ClientServer
-      # The rooms a space contains, and their spaces.
+      # A page of the rooms a space holds.
       #
-      # The operations are not written yet: this is the class `space_hierarchy-v1.19.yaml` names.
+      # The endpoint arrived in v1.2, so the fields are read by that layer.
+      class Hierarchy < Representation
+        include Versioned
+      end
+
+      # The rooms a space holds.
       class SpaceHierarchy
         include Versioned
 

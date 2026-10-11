@@ -42,6 +42,52 @@ module Async
       end
     end
 
+    # Raised when the homeserver wants the user to authenticate again before it will act.
+    #
+    # The challenge names the flows it accepts and the session to carry through them.
+    class InteractiveAuthenticationError < RequestError
+      # @parameter status [Integer] the HTTP status code of the response.
+      # @parameter errcode [String | nil] the Matrix error code, if the stage failed.
+      # @parameter message [String | nil] the human readable error message.
+      # @parameter session [String | nil] the session to send with each stage.
+      # @parameter flows [Array(Hash) | nil] the flows the homeserver accepts.
+      # @parameter params [Hash | nil] the parameters a stage needs, by stage type.
+      # @parameter completed [Array(String) | nil] the stages already completed.
+      def initialize(status, errcode, message = nil, session: nil, flows: nil, params: nil, completed: nil)
+        super(status, errcode, message || "The homeserver requires authentication.")
+
+        @session = session
+        @flows = flows || []
+        @params = params || {}
+        @completed = completed || []
+      end
+
+      # @attribute [String | nil] the session to send with each stage.
+      attr :session
+
+      # @attribute [Array(Hash)] the flows the homeserver accepts.
+      attr :flows
+
+      # @attribute [Hash] the parameters a stage needs, by stage type.
+      attr :params
+
+      # @attribute [Array(String)] the stages already completed.
+      attr :completed
+
+      # @returns [Array(Array(String))] the stages of each flow it accepts.
+      def stages
+        @flows.map{|flow| Array(flow[:stages])}
+      end
+
+      # Whether a flow exists whose remaining stages are only of the given type.
+      #
+      # @parameter type [String] the stage type, e.g. `m.login.password`.
+      # @returns [Boolean] whether that single stage would complete a flow.
+      def accepts?(type)
+        self.stages.any?{|stages| stages - @completed == [type]}
+      end
+    end
+
     # Raised when a rejected access token could not be replaced, so the caller must log in again.
     #
     # It is a {RequestError}: the refusal is the `cause`.
