@@ -15,7 +15,7 @@ module Async
     E2EEContext = Sus::Shared("an encrypting client") do
       include Async::Matrix::ClientContext
 
-      let(:crypto) {Async::Matrix::E2EE::Plaintext.new}
+      let(:crypto) {Async::Matrix::E2EE::Plaintext.new(one_time_key_target: 2)}
 
       let(:store) {Async::Matrix::E2EE::Store.new}
 
@@ -29,7 +29,7 @@ module Async
 
       let(:other_device_id) {other.whoami.device_id}
 
-      let(:other_crypto) {Async::Matrix::E2EE::Plaintext.new}
+      let(:other_crypto) {Async::Matrix::E2EE::Plaintext.new(one_time_key_target: 2)}
 
       let(:other_store) {Async::Matrix::E2EE::Store.new}
 
@@ -52,9 +52,9 @@ module Async
         batches.lazy.take(attempts).find(&block)
       end
 
-      # Sync onwards from a batch which was already read, rather than from nothing.
+      # Sync onwards from a batch already read, rather than from nothing.
       #
-      # A device list change is only reported against a cursor which predates it, because an initial sync has nothing to report a change against.
+      # A device list change is only reported against a cursor which predates it.
       #
       # @parameter since [Async::Matrix::ClientServer::Sync] the batch to continue from.
       # @parameter attempts [Integer] how many batches to read.
@@ -77,6 +77,14 @@ module Async
         sync_until(from){|sync| !sync.to_device.empty?}&.tap do |sync|
           to.receive(sync)
         end
+      end
+
+      # The other user's view of a room, so that they send as themselves rather than as us.
+      #
+      # @parameter room [Async::Matrix::ClientServer::Room] the room, as we see it.
+      # @returns [Async::Matrix::ClientServer::Room] the room, as they see it.
+      def other_room(room)
+        other.room(room.id)
       end
 
       # Both users' keys published, which is what sending either of them a session needs.

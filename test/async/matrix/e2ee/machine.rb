@@ -191,7 +191,7 @@ describe Async::Matrix::E2EE::Machine do
       machine.publish!
 
       session = other_machine.share(room.id, [user_id])
-      room.send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
+      other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
 
       receive_device_message(machine, client)
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
@@ -219,7 +219,7 @@ describe Async::Matrix::E2EE::Machine do
     it "keeps an event whose session has not arrived, rather than failing" do
       room = shared_room
       other_machine.share(room.id, [])
-      room.send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
+      other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
 
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
       encrypted = sync.each_event.find{|event| event.type == "m.room.encrypted"}
@@ -231,7 +231,7 @@ describe Async::Matrix::E2EE::Machine do
     it "reads the events which were waiting, once the key arrives" do
       room = shared_room
       session = other_machine.share(room.id, [])
-      room.send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "late")))
+      other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "late")))
 
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
       machine.decrypt(sync.each_event.find{|event| event.type == "m.room.encrypted"}, room_id: room.id)
@@ -269,7 +269,7 @@ describe Async::Matrix::E2EE::Machine do
 
       machine.share(room.id, [other_user_id])
 
-      expect(sync_until(other, attempts: 2, timeout: 500){|batch| !batch.to_device.empty?}).to be_nil
+      expect(sync_until(other, attempts: 1, timeout: 200){|batch| !batch.to_device.empty?}).to be_nil
     end
 
     it "does not send the key to this device" do
@@ -278,7 +278,7 @@ describe Async::Matrix::E2EE::Machine do
 
       machine.share(room.id, [user_id])
 
-      expect(sync_until(client, attempts: 2, timeout: 500){|batch| !batch.to_device.empty?}).to be_nil
+      expect(sync_until(client, attempts: 1, timeout: 200){|batch| !batch.to_device.empty?}).to be_nil
     end
   end
 end

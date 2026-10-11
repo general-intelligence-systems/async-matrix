@@ -10,16 +10,16 @@ require "async/matrix/e2ee_context"
 describe Async::Matrix::E2EE::Store do
   include Async::Matrix::E2EEContext
 
-  # A room both users are in, and the other user's keys published, which is what sharing a session needs.
+  # A room both users are in, with both their keys published, which is what sharing a session needs.
   def prepared
     shared_room.tap do
-      other_machine.publish!
+      published
     end
   end
 
   # The encrypted event the other user sent into the room, as it came back from sync.
   def encrypted_in(room)
-    room.send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
+    other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
 
     sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
 
