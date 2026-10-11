@@ -11,7 +11,8 @@ name: Test (Tuwunel)
 #
 # Only one Ruby, where Test runs three. The Ruby dimension is about the gem rather than about the
 # homeserver, and Test already covers it across every version; repeating it here would double the
-# jobs to say nothing new.
+# jobs to say nothing new. It is the newest of the three, because that is the one the lock file
+# resolves for: a gem in it wants Ruby 4, so an older Ruby does not reach the homeserver at all.
 
 on:
   push:
@@ -68,7 +69,7 @@ jobs:
 
     - uses: ruby/setup-ruby@v1
       with:
-        ruby-version: "3.4"
+        ruby-version: "4.0"
         bundler-cache: true
 
     - uses: docker/login-action@v3
