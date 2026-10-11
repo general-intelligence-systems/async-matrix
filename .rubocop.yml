@@ -161,7 +161,7 @@ AsyncMatrix/EachFileHasMatchingTest:
   Exclude:
     # Describe the shape of the project - which classes exist, and which test files are guarded -
     # rather than a file in lib, so they have no counterpart there.
-    - "test/operations.rb"
+    - "test/operations/*.rb"
     - "test/events.rb"
 
 # House style, shared with ratalada.

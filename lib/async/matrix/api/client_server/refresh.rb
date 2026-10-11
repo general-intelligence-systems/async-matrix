@@ -38,6 +38,14 @@ module Async
         # @attribute [Async::REST::Resource] the resource requests are made against.
         attr :resource
 
+        # Nothing to revoke: a session the homeserver issued is ended by logging out.
+        #
+        # @parameter token [String] the token which would be withdrawn.
+        # @parameter token_type_hint [String | nil] what kind of token it is.
+        # @returns [Nil] nothing.
+        def revoke(token, token_type_hint: nil)
+        end
+
         # Nothing to close: this shares the client's delegate, which the client still needs.
         #
         # @returns [Nil] nothing.

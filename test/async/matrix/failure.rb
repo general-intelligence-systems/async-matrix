@@ -3,6 +3,9 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/http/body/buffered"
+require "protocol/http/response"
+
 require "async/matrix/failure"
 
 describe Async::Matrix::Failure do

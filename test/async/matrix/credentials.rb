@@ -20,14 +20,24 @@ class Issuer
   def initialize(expires_in_ms: 300_000)
     @expires_in_ms = expires_in_ms
     @attempts = 0
+    @revocations = []
   end
 
   attr :attempts
+
+  # @attribute [Array(Hash)] what each withdrawal carried.
+  attr :revocations
 
   def refresh(refresh_token)
     @attempts += 1
 
     Issued.new(@attempts, @expires_in_ms)
+  end
+
+  def revoke(token, token_type_hint: nil)
+    @revocations << {token: token, token_type_hint: token_type_hint}
+
+    nil
   end
 end
 
@@ -108,6 +118,40 @@ describe Async::Matrix::Credentials do
       lifetime = ((subject::MARGIN + 60) * 1000).to_i
 
       expect(subject.new(issuer, access_token: "first", expires_in_ms: lifetime)).not.to be(:expiring?)
+    end
+  end
+
+  with "#revoke!" do
+    # Where the homeserver does not hold the session, withdrawing the tokens is what ends it.
+    it "withdraws both tokens" do
+      credentials.revoke!
+
+      expect(issuer.revocations).to be == [
+        {token: "refresh-0", token_type_hint: "refresh_token"},
+        {token: "first", token_type_hint: "access_token"},
+      ]
+    end
+
+    it "leaves nothing to renew with" do
+      credentials.revoke!
+
+      expect(credentials).not.to be(:renewable?)
+    end
+
+    it "counts as a replacement, so a request in flight knows its token is stale" do
+      credentials.revoke!
+
+      expect(credentials.generation).to be == 1
+    end
+
+    with "nothing to renew with" do
+      let(:credentials) {subject.new(issuer, access_token: "first")}
+
+      it "withdraws the access token alone" do
+        credentials.revoke!
+
+        expect(issuer.revocations).to be == [{token: "first", token_type_hint: "access_token"}]
+      end
     end
   end
 

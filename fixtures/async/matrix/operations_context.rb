@@ -13,24 +13,70 @@ module Async
   module Matrix
     # Which operations a test owes, and which cases it has.
     module Operations
-      SCHEMAS = File.expand_path("../../../lib/async/matrix/abstract/api/client_server/schemas", __dir__)
+      # Where the schemas of every API are, one directory per API.
+      SCHEMAS_ROOT = File.expand_path("../../../lib/async/matrix/abstract/api", __dir__)
+
+      # The specification has five APIs, and a test is for whichever one its path names.
+      APIS = Dir.children(SCHEMAS_ROOT).select{|name| File.directory?(File.join(SCHEMAS_ROOT, name, "schemas"))}.sort.freeze
 
       # A case is named exactly `can <operation>`, so that ordinary English - `can page backwards through the timeline` - is not mistaken for naming an operation called `page`.
       PATTERN = /\Acan\s+(?<operation>\S+)\z/
 
       class << self
+        # The API a path belongs to, which is the directory beneath `api`.
+        #
+        # @parameter path [String] a path under `lib` or `test`.
+        # @returns [String | nil] the API, e.g. `client_server`.
+        def api_for(path)
+          segments = path.to_s.split(File::SEPARATOR)
+          index = segments.rindex("api")
+
+          if index
+            segments[index + 1]
+          end
+        end
+
+        # Where one API's schemas are.
+        #
+        # @parameter api [String] the API, e.g. `client_server`.
+        # @returns [String] the directory.
+        def schemas_for(api)
+          File.join(SCHEMAS_ROOT, api.to_s, "schemas")
+        end
+
+        # The concepts one API names, which is one schema manifest each.
+        #
+        # @parameter api [String] the API, e.g. `client_server`.
+        # @returns [Array(String)] the concepts, named as a Ruby file would be.
+        def concepts_for(api)
+          Dir.glob(File.join(self.schemas_for(api), "*-#{Async::Matrix::TEST_VERSION}.yaml")).filter_map do |path|
+            if path.end_with?(".deltas.yaml")
+              next
+            end
+
+            File.basename(path).delete_suffix("-#{Async::Matrix::TEST_VERSION}.yaml").tr("-", "_")
+          end.sort
+        end
+
         # The operations the schema lists for the concept a test describes, taken from its path, since a test mirrors the class it describes.
         #
         # @returns [Hash] the operations, by ID.
         def for(path)
           concept = File.basename(path, ".rb")
+          api = self.api_for(path)
 
-          # The schema keeps the specification's own name, which may be hyphenated where a Ruby file cannot be: `authed-content-repo.yaml` could not be required as `authed-content-repo.rb`.
-          schema = [concept, concept.tr("_", "-")].uniq.lazy.map do |name|
-            File.join(SCHEMAS, "#{name}-#{Async::Matrix::TEST_VERSION}.yaml")
-          end.find{|candidate| File.exist?(candidate)}
+          if api
+            # The schema keeps the specification's own name, which may be hyphenated where a Ruby file cannot be: `authed-content-repo.yaml` could not be required as `authed-content-repo.rb`.
+            schema = [concept, concept.tr("_", "-")].uniq.lazy.map do |name|
+              File.join(self.schemas_for(api), "#{name}-#{Async::Matrix::TEST_VERSION}.yaml")
+            end.find{|candidate| File.exist?(candidate)}
+          end
 
-          schema ? (YAML.safe_load_file(schema)["operations"] || {}) : {}
+          if schema
+            YAML.safe_load_file(schema)["operations"] || {}
+          else
+            {}
+          end
         end
 
         # Every operation ID the version under test defines.
@@ -39,7 +85,7 @@ module Async
         #
         # @returns [Array(String)] every operation ID.
         def defined
-          @defined ||= Dir.glob(File.join(SCHEMAS, "*-#{Async::Matrix::TEST_VERSION}.yaml")).each_with_object([]) do |path, found|
+          @defined ||= Dir.glob(File.join(SCHEMAS_ROOT, "*", "schemas", "*-#{Async::Matrix::TEST_VERSION}.yaml")).each_with_object([]) do |path, found|
             if path.end_with?(".deltas.yaml")
               next
             end

@@ -578,6 +578,21 @@ module Async
           api::AppservicePing.for(self)
         end
 
+        # @returns [AppserviceRoomDirectory] whether a bridged room is published.
+        def appservice_room_directory
+          api::AppserviceRoomDirectory.for(self)
+        end
+
+        # @returns [PolicyServer] the policy server a room may check events with.
+        def policy_server
+          api::PolicyServer.for(self)
+        end
+
+        # @returns [MutualRooms] the rooms this user shares with another.
+        def mutual_rooms
+          api::MutualRooms.for(self)
+        end
+
         # @returns [PushRules] the rules which decide what raises a notification.
         def pushrules
           api::PushRules.for(self)

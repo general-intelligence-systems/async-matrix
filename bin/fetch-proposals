@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+
+# Builds a table of every Matrix Spec Change proposal, one row per MSC, in data/matrix-spec-proposals.csv.
+#
+#   bin/fetch-proposals                 # write data/matrix-spec-proposals.csv
+#   bin/fetch-proposals path/to/out.csv # write somewhere else
+#
+# There is no published index of MSCs: the proposal process lives in GitHub, where an MSC is a pull
+# request (or occasionally a bare issue) carrying the "proposal" label, its number is the pull
+# request number, and its state is a label rather than a field. This turns that into a table which
+# can be sorted and filtered, so that "what is unspecified, and in which API" is one query rather
+# than a day of reading.
+#
+# The proposal text itself is only in the repository for MSCs which merged; everything else lives on
+# a contributor's branch, which is why a row links to the proposal rather than carrying its prose.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+repository="matrix-org/matrix-spec-proposals"
+output="${1:-data/matrix-spec-proposals.csv}"
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+# The whole proposal set, open and closed: ~1200 rows over ~12 requests. This needs gh to be
+# authenticated, since unauthenticated GitHub allows 60 requests an hour.
+echo "Fetching proposals from $repository..." >&2
+gh api --paginate "repos/$repository/issues?labels=proposal&state=all&per_page=100" > "$work/proposals.json"
+
+# The merged proposals' own markdown, so that a row can link to the text and not just the discussion.
+gh api "repos/$repository/contents/proposals?ref=main" > "$work/documents.json"
+
+# One program, two outputs, so that the summary counts the same statuses the table records.
+cat > "$work/program.jq" <<'PROGRAM'
+# The proposal markdown is named "<number>-<slug>.md", zero padded, so the number is the join key.
+def documents:
+	[$documents[0][]
+		| select(.name | test("^[0-9]+-.*\\.md$"))
+		| {key: (.name | split("-")[0] | tonumber | tostring), value: .html_url}]
+	| from_entries;
+
+def names: [.labels[].name];
+
+# An MSC carries several process labels at once ("accepted, but the spec PR is missing, and
+# blocked"), so its status is the furthest it has got rather than the set. Most settled first.
+def status:
+	names as $labels |
+	def tagged($label): $labels | index($label);
+
+	if tagged("merged") or (.pull_request.merged_at != null) then "merged"
+	elif tagged("rejected") then "rejected"
+	elif tagged("obsolete") then "obsolete"
+	elif tagged("abandoned") then "abandoned"
+	elif tagged("proposal-postponed") or tagged("disposition-postpone") then "postponed"
+	elif tagged("spec-pr-in-review") then "spec-pr-in-review"
+	elif tagged("spec-pr-missing") then "accepted-spec-pr-missing"
+	elif tagged("finished-final-comment-period") then "fcp-finished"
+	elif tagged("final-comment-period") then "fcp"
+	elif tagged("proposed-final-comment-period") then "fcp-proposed"
+	elif tagged("proposal-placeholder") then "placeholder"
+	elif .state == "open" then "in-review"
+	else "closed"
+	end;
+
+# The labels divide into prefixed facets, which are the filters worth having as columns, and process
+# states, which status already summarises. A facet is semicolon separated so that a spreadsheet or a
+# grep can match one value inside it.
+def facet($prefix): [names[] | select(startswith($prefix)) | ltrimstr($prefix)] | sort | join(";");
+
+# What an MSC is waiting on, which is the part of the process labels status throws away: a merged
+# proposal whose spec text is still unwritten is flagged spec-pr-missing.
+def flags:
+	["needs-implementation", "implementation-needs-checking", "unresolved-concerns", "blocked",
+		"requires-room-version", "unassigned-room-version", "matrix-2.0", "release-blocker",
+		"spec-pr-in-review", "spec-pr-missing"] as $interesting
+	| [names[] | select(. as $label | $interesting | index($label))] | sort | join(";");
+
+# A tag is one topic, and a proposal carries every tag which applies: a room's auth rules are
+# "auth;events", end-to-end encryption is "crypto;e2e". Nothing here is a compound of two ideas,
+# because a compound cannot be filtered on either of its halves.
+#
+# The labels already name the area (client-server, federation, push, VoIP, widgets), so a tag earns
+# its place only where it cuts across them. Each matches against the title and the labels together,
+# so an A-Encryption label counts as evidence even when the title is silent. ids are the proposals
+# no keyword reaches without dragging in false positives with them.
+def taxonomy: [
+	{
+		# Authentication and authorisation of every kind: a person logging in, a client holding a
+		# token, and a room deciding whether an event is allowed.
+		tag: "auth",
+		ids: [4128, 3796, 2078, 2949, 3910, 3805, 4257],
+		include: "\\blog(in|ins|ged|ging)\\b|\\blog[ -]?out\\b|sign[ -]?in\\b|\\bsignin\\b|\\bsso\\b|oauth|\\boidc\\b|openid|\\bm\\.login|user-interactive auth|\\buia\\b|two-factor|\\b2fa\\b|\\btotp\\b|captcha|password|access token|refresh token|token revocation|\\bjwt\\b|authenticat|authoriz(ation|ed) (server|code|request|grant|endpoint|header)|authoriz(ation|ing) rule|inviting with authorization|dynamic client registration|\\bregistrations?\\b|\\bregister\\b|client_secret|\\bpake\\b|speke|credential|\\bguests?\\b|device authorization grant|pushed authorization request|rendezvous|identity provider|\\bidp\\b|whoami|api scopes|oauth scope|step up authentication|query string auth|x-matrix|requesttoken|submittoken|auth rules?|auth_events|event auth|event_auth|query_auth|auth chain|auth lock|power[- ]levels?|power_levels?|permission level|access control|role[- ]based|attribute-based|join rule|\\bacls?\\b|aclin|server_acl|redaction rules|restricting who|restricting room membership|participation based authorization|simple server authorization",
+		exclude: "password manager|\\biana\\b|appservice registration|authentication strings?"
+	},
+	{
+		# Anything cryptographic: encryption, signatures, key management, transport security.
+		# Hashing used only to make an identifier is not here.
+		tag: "crypto",
+		ids: [3122, 1183, 4430, 4243, 3839, 4050, 2787, 4014],
+		include: "encrypt|decrypt|\\be2ee?\\b|end[- ]to[- ]end|megolm|\\bolm\\b|\\bmls\\b|rfc ?9420|key backup|one-time key|one time key|\\botk\\b|fallback key|cross[- ]sign|device keys|room key|room_key|key[- ]shar|key quer(y|ies)|/keys/|withheld|sender key|ssss|secret storage|secret sharing|\\bsecrets\\b|recovery key|dehydrat|\\bsas\\b|short authentication string|x25519|diffie-hellman|elliptic|curve25519|\\btls\\b|signature|\\bsigned\\b|signing key|server key|sign events|key validity|keyid|crypto|pepper|\\btofu\\b|key pinning|emoji verification|key verification|verifying with qr|verifiable|certificate|public key|unwedging|a-encryption|a-cross signing",
+		exclude: "blurhash"
+	},
+	{
+		# End to end, as opposed to a server holding the keys. Always cryptographic in Matrix, so it
+		# is read with crypto rather than instead of it.
+		tag: "e2e",
+		ids: [3122],
+		include: "encrypt|decrypt|\\be2ee?\\b|end[- ]to[- ]end|megolm|\\bolm\\b|\\bmls\\b|rfc ?9420|key backup|one-time key|one time key|\\botk\\b|fallback key|cross[- ]sign|device keys|room key|room_key|key[- ]shar|key quer(y|ies)|/keys/|withheld|sender key|ssss|secret storage|secret sharing|\\bsecrets\\b|recovery key|dehydrat|\\bsas\\b|short authentication string|emoji verification|key verification|verifying with qr|unwedging|key pinning|\\btofu\\b|a-encryption|a-cross signing",
+		exclude: "blurhash|unencrypted"
+	},
+	{
+		# Events: their format, their types, their graph, and the rules over them.
+		tag: "events",
+		ids: [],
+		include: "\\bevents?\\b|\\bpdus?\\b|\\bedus?\\b|\\bm\\.room\\.|event_id|event ids?|event types?|state event|state res|prev_content|\\bredact|relations?\\b|rel_type|aggregat|msgtype|auth_events|auth rules?|power[- ]levels?|power_levels?|\\bdag\\b|to[- ]device|\\bunsigned\\b|annotation|\\btimeline\\b",
+		exclude: ""
+	}
+];
+
+def tags:
+	((.title + " " + (names | join(" "))) | ascii_downcase) as $text
+	| .number as $id
+	| [taxonomy[] as $rule
+		| select(($rule.ids | index($id))
+			or (($text | test($rule.include))
+				and ($rule.exclude == "" or (($text | test($rule.exclude)) | not))))
+		| $rule.tag]
+	| sort | join(";");
+
+def table:
+	documents as $documents
+	| ["id", "name", "status", "tags", "kind", "areas", "types", "flags", "author", "created",
+		"updated", "closed", "discussion", "document", "labels"],
+	(sort_by(-.number)[]
+		| [
+			.number,
+			(.title | sub("^\\s*\\[?MSC\\s*[0-9]+\\]?\\s*[-:.]*\\s*"; ""; "i")),
+			status,
+			tags,
+			facet("kind:"),
+			facet("A-"),
+			facet("T-"),
+			flags,
+			.user.login,
+			(.created_at | split("T")[0]),
+			(.updated_at | split("T")[0]),
+			(.closed_at // "" | split("T")[0]),
+			.html_url,
+			($documents[.number | tostring] // ""),
+			(names | sort | join(";"))
+		])
+	| @csv;
+
+def summary:
+	(length | tostring) + " proposals",
+	(group_by(status) | sort_by(-length)[] | "  " + (.[0] | status) + " " + (length | tostring)),
+	"tags",
+	([.[] | tags | split(";")[]] | group_by(.) | sort_by(-length)[]
+		| "  " + .[0] + " " + (length | tostring));
+
+if $mode == "summary" then summary else table end
+PROGRAM
+
+run() {
+	jq --raw-output --arg mode "$1" --slurpfile documents "$work/documents.json" \
+		--from-file "$work/program.jq" "$work/proposals.json"
+}
+
+mkdir -p "$(dirname "$output")"
+run table > "$output"
+
+echo "$output: $(run summary)" >&2

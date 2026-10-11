@@ -223,6 +223,57 @@ module Async
                   authorized&.close
                 end
 
+                base.it "names where a token is withdrawn" do
+                  expect(metadata.revocation_endpoint).to be(:start_with?, "http")
+                end
+
+                # Logging out of the homeserver does not end a session the authorization server issued: withdrawing the token is what does.
+                base.it "withdraws the tokens of a session it issued" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  client_id = register_client(server).client_id
+                  authorization = server.authorize(client_id: client_id, redirect_uri: REDIRECT_URI)
+
+                  redirected = consent_to(authorization)
+                  tokens = authorization.exchange(redirected["code"], state: redirected["state"])
+
+                  authorized = unauthenticated.authorized(tokens, server: server, client_id: client_id)
+
+                  expect(authorized.get_token_owner.user_id).to be == "@#{Async::Matrix::OAUTH_USERNAME}:localhost"
+
+                  # Both tokens are withdrawn, and the session is left with nothing to renew with:
+                  authorized.delegate.credentials.revoke!
+
+                  expect(authorized.delegate.credentials).not.to be(:renewable?)
+                ensure
+                  authorized&.close
+                end
+
+                # The authorization server is the authority for a refresh token, so this holds whatever the homeserver has cached.
+                base.it "withdraws a refresh token, which can then buy nothing" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  client_id = register_client(server).client_id
+                  authorization = server.authorize(client_id: client_id, redirect_uri: REDIRECT_URI)
+
+                  redirected = consent_to(authorization)
+                  tokens = authorization.exchange(redirected["code"], state: redirected["state"])
+
+                  # Withdrawn before it is spent, because a renewal rotates it:
+                  server.revoke(tokens.refresh_token, client_id: client_id, token_type_hint: "refresh_token")
+
+                  error = nil
+
+                  begin
+                    server.refresh(tokens.refresh_token, client_id: client_id)
+                  rescue Async::Matrix::OAuth::Error => raised
+                    error = raised
+                  end
+
+                  expect(error).not.to be_nil
+                  expect(error).to be(:invalid_grant?)
+                ensure
+                  server&.close
+                end
+
                 # A redirect which came back with the wrong state is never redeemed, so the server is never asked.
                 base.it "refuses a redirect whose state does not match" do
                   server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)

@@ -136,6 +136,24 @@ module Async
         end
       end
 
+      # Withdraw both tokens, which is how a session ends where the homeserver does not hold it.
+      #
+      # The access token is withdrawn last, so that a failure leaves nothing usable behind.
+      #
+      # @returns [Integer] the generation the session ended on.
+      def revoke!
+        @semaphore.acquire do
+          if @refresh_token
+            @refresh.revoke(@refresh_token, token_type_hint: "refresh_token")
+          end
+
+          @refresh.revoke(@access_token, token_type_hint: "access_token")
+
+          @refresh_token = nil
+          @generation += 1
+        end
+      end
+
       # Close whatever issues the tokens, which may hold a connection of its own.
       #
       # @returns [Nil] nothing.

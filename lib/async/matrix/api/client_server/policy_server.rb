@@ -3,14 +3,21 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/policy_server"
 
 module Async
   module Matrix
     module ClientServer
-      # Where the homeserver publishes its policy.
+      # The keys a policy server signs with.
       #
-      # The operations are not written yet: this is the class `policy_server-v1.19.yaml` names.
+      # The endpoint arrived in v1.18, so the fields are read by that layer.
+      class PolicyKeys < Representation
+        include Versioned
+      end
+
+      # The policy server a room may be asked to check events with.
       class PolicyServer
         include Versioned
 

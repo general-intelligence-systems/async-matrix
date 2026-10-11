@@ -11,7 +11,7 @@ module Async
   module Matrix
     # The bytes of a file, rather than a document describing one.
     #
-    # The headers carry what the bytes are, which is as much of the answer as the body.
+    # Building this reads the bytes, so a large file is asked for with a block instead.
     class Content < Async::REST::Representation[Wrapper::Content]
       # @returns [String] the bytes themselves.
       def bytes

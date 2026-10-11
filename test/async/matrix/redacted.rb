@@ -3,6 +3,8 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "async/rest/resource"
+
 require "async/matrix/redacted"
 require "async/matrix/representation"
 

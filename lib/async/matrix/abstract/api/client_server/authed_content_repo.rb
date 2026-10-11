@@ -49,10 +49,10 @@ module Async
             # @parameter media_id [String] the file itself.
             # @parameter timeout_ms [Integer | nil] how long to wait for another homeserver to answer.
             # @returns [Content] the bytes.
-            def get_content_authed(server_name, media_id, timeout_ms: nil)
+            def get_content_authed(server_name, media_id, timeout_ms: nil, &block)
               parameters = {timeout_ms: timeout_ms}.compact
 
-              api::Content.get(@resource.with(path: self.path_for("download", server_name, media_id), parameters: parameters))
+              api::Content.get(@resource.with(path: self.path_for("download", server_name, media_id), parameters: parameters), &block)
             end
 
             # A file, under a name of the caller's choosing.
@@ -62,11 +62,11 @@ module Async
             # @parameter file_name [String] the name to ask for it under.
             # @parameter timeout_ms [Integer | nil] how long to wait for another homeserver to answer.
             # @returns [Content] the bytes.
-            def get_content_override_name_authed(server_name, media_id, file_name, timeout_ms: nil)
+            def get_content_override_name_authed(server_name, media_id, file_name, timeout_ms: nil, &block)
               parameters = {timeout_ms: timeout_ms}.compact
               path = "#{self.path_for("download", server_name, media_id)}/#{::Protocol::URL::Encoding.escape(file_name)}"
 
-              api::Content.get(@resource.with(path: path, parameters: parameters))
+              api::Content.get(@resource.with(path: path, parameters: parameters), &block)
             end
 
             # A thumbnail of a file.
@@ -79,10 +79,10 @@ module Async
             # @parameter animated [Boolean | nil] whether an animated file may answer with an animation.
             # @parameter timeout_ms [Integer | nil] how long to wait for another homeserver to answer.
             # @returns [Content] the bytes of the thumbnail.
-            def get_content_thumbnail_authed(server_name, media_id, width, height, method: nil, animated: nil, timeout_ms: nil)
+            def get_content_thumbnail_authed(server_name, media_id, width, height, method: nil, animated: nil, timeout_ms: nil, &block)
               parameters = {width: width, height: height, method: method, animated: animated, timeout_ms: timeout_ms}.compact
 
-              api::Content.get(@resource.with(path: self.path_for("thumbnail", server_name, media_id), parameters: parameters))
+              api::Content.get(@resource.with(path: self.path_for("thumbnail", server_name, media_id), parameters: parameters), &block)
             end
 
             # What this homeserver will accept.

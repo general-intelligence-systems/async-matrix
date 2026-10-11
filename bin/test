@@ -1,23 +1,108 @@
 #!/usr/bin/env bash
 
-# Run the test suite against a Matrix specification version, on a homeserver which implements it.
-# Each backend has a directory with a compose file which has a service per version, carrying its
-# own image and configuration.
+# TEST(1)                            General Commands Manual                          TEST(1)
 #
-#   bin/test                      # the latest version, on Synapse
-#   bin/test --all                # every version
-#   bin/test v1.11 v1.12          # just these
-#   bin/test --backend tuwunel    # on tuwunel instead
-#   bin/test --keep-alive         # and leave the homeserver running afterwards
+# NAME
+#      bin/test — run the suite against a Matrix specification version
 #
-# Only one homeserver runs at a time - they all bind the same port - so each version is brought up
-# in turn and taken down at the end. `--keep-alive` leaves it running, and reuses it when it is
-# already the version wanted, which is what you want while iterating: the suite then costs seconds
-# rather than a container start, and a run of `sus` by hand afterwards has something to talk to.
+# SYNOPSIS
+#      bin/test [--all] [--api name] [--backend name] [--core] [--keep-alive] [version ...]
 #
-# The backends are different servers, not different versions of one, so a run says which it was:
-# the point of having more than one is that the suite is testing the specification rather than
-# whatever Synapse happens to do.
+# DESCRIPTION
+#      bin/test brings up a homeserver which implements the given specification version and
+#      runs the suite against it. Each backend has a directory holding a compose file with a
+#      service per version, carrying its own image and configuration, so testing a version is
+#      naming it.
+#
+#      Only one homeserver runs at a time, since they all bind the same port: each version is
+#      brought up in turn and taken down on the way out.
+#
+#      With no version, the latest one is tested. With no --api and no --core, the whole
+#      suite is run.
+#
+#      The backends are different servers rather than different versions of one, so a run
+#      says which it was: the point of having more than one is that the suite tests the
+#      specification rather than whatever Synapse happens to do.
+#
+# OPTIONS
+#      --all   Test every version in MATRIX_API_VERSIONS.txt, in order.
+#
+#      --api name
+#              Run only that API's tests: its structural test, the tests of its classes, and
+#              the version layers those are built from. The specification has five APIs and
+#              this takes the specification's own name for them, so client-server rather than
+#              client_server, which is how the workflows are named too. May be given more
+#              than once.
+#
+#      --backend name
+#              The homeserver to test against, which is a directory holding a compose file.
+#              Defaults to synapse.
+#
+#      --core  Run only the tests which belong to no API: the wrappers, the versioning, the
+#              events, the credentials, and everything else the APIs are built from.
+#
+#      --keep-alive
+#              Leave the homeserver running afterwards, and reuse it when it is already the
+#              version wanted. This is what you want while iterating: the suite then costs
+#              seconds rather than a container start, and a run of sus(1) by hand afterwards
+#              has something to talk to.
+#
+# ENVIRONMENT
+#      MATRIX_VERSION
+#              Set for the suite, to the version under test. The fixtures read it to build
+#              the classes for that version.
+#
+#      MATRIX_BACKEND
+#              Set for the suite, to the backend being tested.
+#
+#      MATRIX_ACCOUNTS
+#              Set for the suite, to how it is to get an account: login where the backend
+#              registers a user on first login, or register where the suite must register one
+#              first. The backend decides this, not the suite.
+#
+#      IMAGE_OWNER
+#              Read by the compose file, to name the registry the images come from.
+#
+#      SYNAPSE_PORT
+#              Read by the compose file, to move the homeserver off port 8008. A second
+#              version can be brought up alongside the first with it.
+#
+# FILES
+#      MATRIX_API_VERSIONS.txt
+#              The versions which can be tested, generated from the Synapse compose file by
+#              the Update Matrix Versions List workflow. Adding a service to each backend is
+#              all that is needed to add a version.
+#
+#      <backend>/docker-compose.yml
+#              The homeservers of one backend, one service per version.
+#
+#      test/operations/<api>.rb
+#              What one API owes against its own schemas, which is what --api runs first.
+#
+# EXIT STATUS
+#      The bin/test utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Test the latest version on Synapse:
+#
+#            bin/test
+#
+#      Test two versions:
+#
+#            bin/test v1.11 v1.12
+#
+#      Test one API, which is what CI does per workflow:
+#
+#            bin/test --api client-server
+#
+#      Iterate against a homeserver which stays up between runs:
+#
+#            bin/test --keep-alive --core
+#
+# SEE ALSO
+#      sus(1), .github/workflows/test.yaml, .github/workflows/test-client-server.yaml
+#
+# async-matrix                          October 11, 2026                              TEST(1)
 
 set -o errexit
 set -o nounset
@@ -31,6 +116,18 @@ mapfile -t versions < "$root/MATRIX_API_VERSIONS.txt"
 
 all="no"
 keep_alive="no"
+
+# Which APIs to test, or none for the whole suite. The specification has five, each with its own
+# schemas, classes and tests, and CI runs a workflow per API: see .github/workflows/test-<api>.yaml.
+#
+# Named as the specification names them - client-server, push-gateway - which is how the workflows
+# are named too. Ruby spells the same names with underscores, since that is what a file is called,
+# so the name is translated where it is used as a path.
+apis=()
+
+# Whether to run the tests which belong to no API: the wrappers, the versioning, the events, and
+# everything else the APIs are built from.
+core="no"
 backend="${MATRIX_BACKEND:-synapse}"
 chosen=()
 
@@ -41,6 +138,22 @@ while [ "$#" -gt 0 ]; do
       ;;
     --keep-alive)
       keep_alive="yes"
+      ;;
+    --api)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--api needs a name." >&2
+        exit 1
+      fi
+
+      apis+=("$1")
+      ;;
+    --api=*)
+      apis+=("${1#--api=}")
+      ;;
+    --core)
+      core="yes"
       ;;
     --backend)
       shift
@@ -113,6 +226,44 @@ start() {
   fi
 }
 
+# The paths the chosen APIs' tests live at, which is empty when none was chosen.
+#
+# An API has a structural test, a test per class, and the version layers those tests are built from.
+# A path which does not exist yet is left out, so an API whose tests are not written is just its
+# structural test.
+paths=()
+selection=()
+
+if [ "$core" = "yes" ]; then
+  selection+=("the core")
+
+  # Everything which is not an API: what is left once the APIs' own paths are taken out.
+  while IFS= read -r candidate; do
+    paths+=("$candidate")
+  done < <(cd "$root" && find test -name "*.rb" \
+    -not -path "test/operations/*" \
+    -not -path "test/async/matrix/api/*" \
+    -not -path "test/async/matrix/abstract/api/*" | sort)
+fi
+
+for api in ${apis[@]+"${apis[@]}"}; do
+  selection+=("$api")
+
+  # The specification's name as Ruby spells it: `client-server` is `client_server` on disk.
+  directory="${api//-/_}"
+
+  if [ ! -d "$root/lib/async/matrix/abstract/api/$directory/schemas" ]; then
+    echo "Unknown api $api: lib/async/matrix/abstract/api/$directory/schemas does not exist." >&2
+    exit 1
+  fi
+
+  for candidate in "test/operations/$directory.rb" "test/async/matrix/api/$directory" "test/async/matrix/abstract/api/$directory"; do
+    if [ -e "$root/$candidate" ]; then
+      paths+=("$candidate")
+    fi
+  done
+done
+
 run_tests() {
   local version="$1"
 
@@ -123,9 +274,13 @@ run_tests() {
 
   start "$version"
 
-  echo "Testing Matrix $version on $backend." >&2
+  if [ "${#selection[@]}" -gt 0 ]; then
+    echo "Testing Matrix $version on $backend, for ${selection[*]}." >&2
+  else
+    echo "Testing Matrix $version on $backend." >&2
+  fi
 
-  MATRIX_VERSION="$version" MATRIX_BACKEND="$backend" MATRIX_ACCOUNTS="$accounts" bundle exec sus
+  MATRIX_VERSION="$version" MATRIX_BACKEND="$backend" MATRIX_ACCOUNTS="$accounts" bundle exec sus ${paths[@]+"${paths[@]}"}
 }
 
 if [ "$all" = "yes" ]; then

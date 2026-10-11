@@ -78,21 +78,6 @@ module Async
 
                   expect(client.content_repo.upload_content_to_mxc(server_name, media_id, "the reserved bytes", "text/plain").value).to be == {}
                 end
-
-                # The bytes of a URI which was reserved and never filled in are not there yet, which the homeserver says rather than denying the URI.
-                base.it "holds the URI until the bytes arrive" do
-                  created = client.content_repo.create_content
-                  server_name, media_id = created.content_uri.delete_prefix("mxc://").split("/")
-
-                  error = nil
-
-                  begin
-                    client.authed_content_repo.get_content_authed(server_name, media_id)
-                  rescue Async::Matrix::RequestError => error
-                  end
-
-                  expect(error.errcode).to be == "M_NOT_YET_UPLOADED"
-                end
               end
             end
 

@@ -42,9 +42,9 @@ module Async
             # Derive a client which authenticates with tokens the authorization server issued.
             #
             # The tokens are renewed at the authorization server rather than the homeserver.
-            def authorized(tokens, server:, client_id:)
+            def authorized(tokens, server:, client_id:, client_secret: nil)
               self.with_credentials(
-                Credentials.new(OAuth::Issuer.new(server, client_id),
+                Credentials.new(OAuth::Issuer.new(server, client_id, client_secret),
                   access_token: tokens.access_token,
                   refresh_token: tokens.refresh_token,
                   expires_in_ms: tokens.expires_in_ms,

@@ -54,11 +54,11 @@ module Async
               PNG = Base64.decode64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQAY3Y2wAAAAAElFTkSuQmCC")
 
               def self.included(base)
-                base.let(:uploaded) {client.content_repo.upload_content("the bytes of a file", "text/plain", filename: "a.txt")}
+                base.let(:uploaded){client.content_repo.upload_content("the bytes of a file", "text/plain", filename: "a.txt")}
 
-                base.let(:located) {uploaded.content_uri.delete_prefix("mxc://").split("/")}
+                base.let(:located){uploaded.content_uri.delete_prefix("mxc://").split("/")}
 
-                base.let(:image) {client.content_repo.upload_content(PNG, "image/png", filename: "dot.png").content_uri.delete_prefix("mxc://").split("/")}
+                base.let(:image){client.content_repo.upload_content(PNG, "image/png", filename: "dot.png").content_uri.delete_prefix("mxc://").split("/")}
 
                 base.it "can getContentAuthed" do
                   server_name, media_id = located
@@ -74,6 +74,21 @@ module Async
                   server_name, media_id = image
 
                   expect(client.authed_content_repo.get_content_authed(server_name, media_id).bytes).to be == PNG
+                end
+
+                # A file is as large as it is: given a block, the bytes arrive a chunk at a time, so nothing holds the whole of it.
+                base.it "streams the bytes where it is given a block" do
+                  large = client.content_repo.upload_content("x" * 200_000, "application/octet-stream", filename: "big.bin")
+                  server_name, media_id = large.content_uri.delete_prefix("mxc://").split("/")
+
+                  chunks = []
+
+                  client.authed_content_repo.get_content_authed(server_name, media_id) do |_resource, response, _klass|
+                    response.body.each{|chunk| chunks << chunk.bytesize}
+                  end
+
+                  expect(chunks.size).to be > 1
+                  expect(chunks.sum).to be == 200_000
                 end
 
                 base.it "can getContentOverrideNameAuthed" do
@@ -92,6 +107,21 @@ module Async
 
                   expect(thumbnail.content_type).to be == "image/png"
                   expect(thumbnail.size).to be > 0
+                end
+
+                # A URI reserved by v1.7 and never filled in is held rather than denied, and this is the first version which can read it back.
+                base.it "says the bytes of a reserved URI have not arrived" do
+                  created = client.content_repo.create_content
+                  server_name, media_id = created.content_uri.delete_prefix("mxc://").split("/")
+
+                  error = nil
+
+                  begin
+                    client.authed_content_repo.get_content_authed(server_name, media_id)
+                  rescue Async::Matrix::RequestError => error
+                  end
+
+                  expect(error.errcode).to be == "M_NOT_YET_UPLOADED"
                 end
 
                 base.it "can getConfigAuthed" do

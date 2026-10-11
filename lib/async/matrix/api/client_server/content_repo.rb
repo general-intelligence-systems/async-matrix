@@ -109,11 +109,12 @@ module Async
         # @parameter server_name [String] the homeserver which holds the file.
         # @parameter media_id [String] the file itself.
         # @parameter allow_remote [Boolean | nil] whether the homeserver may fetch it from another.
-        # @returns [Content] the bytes.
-        def get_content(server_name, media_id, allow_remote: nil)
+        # @yields {|resource, response, klass| ...} the response, where a block is given, while the body is still arriving.
+        # @returns [Content] the bytes, where no block is given.
+        def get_content(server_name, media_id, allow_remote: nil, &block)
           parameters = {allow_remote: allow_remote}.compact
 
-          api::Content.get(@resource.with(path: self.class.path_for("download", server_name, media_id), parameters: parameters))
+          api::Content.get(@resource.with(path: self.class.path_for("download", server_name, media_id), parameters: parameters), &block)
         end
 
         # A file, under a name of the caller's choosing.
@@ -122,12 +123,13 @@ module Async
         # @parameter media_id [String] the file itself.
         # @parameter file_name [String] the name to ask for it under.
         # @parameter allow_remote [Boolean | nil] whether the homeserver may fetch it from another.
-        # @returns [Content] the bytes.
-        def get_content_override_name(server_name, media_id, file_name, allow_remote: nil)
+        # @yields {|resource, response, klass| ...} the response, where a block is given, while the body is still arriving.
+        # @returns [Content] the bytes, where no block is given.
+        def get_content_override_name(server_name, media_id, file_name, allow_remote: nil, &block)
           parameters = {allow_remote: allow_remote}.compact
           path = "#{self.class.path_for("download", server_name, media_id)}/#{::Protocol::URL::Encoding.escape(file_name)}"
 
-          api::Content.get(@resource.with(path: path, parameters: parameters))
+          api::Content.get(@resource.with(path: path, parameters: parameters), &block)
         end
 
         # A thumbnail of a file.
@@ -138,11 +140,12 @@ module Async
         # @parameter height [Integer] the height wanted, in pixels.
         # @parameter method [String | nil] `crop` or `scale`.
         # @parameter allow_remote [Boolean | nil] whether the homeserver may fetch it from another.
-        # @returns [Content] the bytes of the thumbnail.
-        def get_content_thumbnail(server_name, media_id, width, height, method: nil, allow_remote: nil)
+        # @yields {|resource, response, klass| ...} the response, where a block is given, while the body is still arriving.
+        # @returns [Content] the bytes of the thumbnail, where no block is given.
+        def get_content_thumbnail(server_name, media_id, width, height, method: nil, allow_remote: nil, &block)
           parameters = {width: width, height: height, method: method, allow_remote: allow_remote}.compact
 
-          api::Content.get(@resource.with(path: self.class.path_for("thumbnail", server_name, media_id), parameters: parameters))
+          api::Content.get(@resource.with(path: self.class.path_for("thumbnail", server_name, media_id), parameters: parameters), &block)
         end
 
         # What this homeserver will accept.

@@ -3,6 +3,10 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/http/body/buffered"
+require "protocol/http/request"
+require "protocol/http/response"
+
 require "sus/fixtures/async/reactor_context"
 
 require "async/matrix/middleware/rate_limited"

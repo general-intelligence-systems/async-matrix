@@ -16,13 +16,9 @@ end
 
 # Separate from :test, because the cops cannot be installed everywhere the suite can run.
 #
-# The gemspec asks for Ruby 3.3, and the suite does run there. ast-crispr-ruby-prism does not: it
-# has only ever been released at 7.1.x, and that line - along with ast-crispr, ast-merge,
-# prism-merge and tree_haver 7 beneath it - requires Ruby 4, so there is no older version to hold
-# back to. Keeping it in :test made `bundle install` fail on Ruby 3.3 before a test could run.
+# The gemspec asks for Ruby 3.3, and the suite does run there. ast-crispr-ruby-prism does not: it has only ever been released at 7.1.x, and that line - along with ast-crispr, ast-merge, prism-merge and tree_haver 7 beneath it - requires Ruby 4, so there is no older version to hold back to. Keeping it in :test made `bundle install` fail on Ruby 3.3 before a test could run.
 #
-# So linting is a group of its own, which a job that only wants to run the suite leaves out with
-# BUNDLE_WITHOUT. `bin/rubocop` needs Ruby 4, which is the Ruby it is run on.
+# So linting is a group of its own, which a job that only wants to run the suite leaves out with BUNDLE_WITHOUT. `bin/rubocop` needs Ruby 4, which is the Ruby it is run on.
 group :lint do
   gem "rubocop"
   gem "rubocop-socketry"

@@ -10,96 +10,19 @@ require "securerandom"
 
 require "async/rest/resource"
 require "async/rest/representation"
-require "async/rest/wrapper/form"
-require "async/rest/wrapper/json"
 
 require "protocol/url/encoding"
 
 require_relative "error"
 require_relative "redacted"
+require_relative "oauth/error"
+require_relative "wrapper/client_registration"
+require_relative "wrapper/token"
 
 module Async
   module Matrix
     # The OAuth 2.0 API a homeserver delegates to.
     module OAuth
-      # The error the authorization server reported.
-      #
-      # @parameter response [Protocol::HTTP::Response] the refusal.
-      # @returns [Tuple(String, String | nil)] the error code and its description.
-      def self.error_for(response)
-        payload = response.read
-
-        if payload.is_a?(Hash)
-          [payload[:error] || "invalid_request", payload[:error_description]]
-        else
-          ["invalid_request", payload&.to_s]
-        end
-      rescue => error
-        ["invalid_request", error.message]
-      end
-
-      # Raised when the authorization server refuses a request.
-      #
-      # A {RequestError}, so a caller which handles one refusal handles both.
-      class Error < Matrix::RequestError
-        # @returns [Boolean] whether the grant was rejected, so the caller must authorize again.
-        def invalid_grant?
-          self.errcode == "invalid_grant"
-        end
-      end
-
-      # The form wrapper, corrected for the authorization server's error shape.
-      #
-      # A token request is form encoded and answered with JSON, which is what the token endpoint asks for.
-      class Wrapper < Async::REST::Wrapper::Form
-        # @parameter request [Protocol::HTTP::Request] the request that was made.
-        # @parameter response [Protocol::HTTP::Response] the response that was received.
-        # @returns [Protocol::HTTP::Response] the response.
-        # @raises [Error] if the authorization server refused.
-        def process_response(request, response)
-          super
-
-          unless response.success?
-            error, description = OAuth.error_for(response)
-
-            raise Error.new(response.status, error, description)
-          end
-
-          response
-        end
-
-        # Which parser to use, if the response says what it is.
-        #
-        # A response with no content type is left alone rather than raising.
-        #
-        # @parameter response [Protocol::HTTP::Response] the response to parse.
-        # @returns [Class | nil] the parser.
-        def parser_for(response)
-          if response.headers["content-type"]
-            super
-          end
-        end
-      end
-
-      # The JSON wrapper, for the registration endpoint, which takes JSON rather than a form.
-      class JSONWrapper < Async::REST::Wrapper::JSON
-        # @parameter request [Protocol::HTTP::Request] the request that was made.
-        # @parameter response [Protocol::HTTP::Response] the response that was received.
-        # @returns [Protocol::HTTP::Response] the response.
-        # @raises [Error] if the authorization server refused.
-        def process_response(request, response)
-          super
-
-          unless response.success?
-            error, description = OAuth.error_for(response)
-
-            raise Error.new(response.status, error, description)
-          end
-
-          response
-        end
-      end
-
       # A proof key, which ties an authorization code to the client that asked for it.
       #
       # A public client has no secret, so this is what guards the code.
@@ -141,7 +64,7 @@ module Async
       end
 
       # The tokens the authorization server issued.
-      class Tokens < Async::REST::Representation[Wrapper]
+      class Tokens < Async::REST::Representation[Wrapper::Token]
         include Redacted
 
         # @returns [String] the access token to authenticate with.
@@ -174,8 +97,12 @@ module Async
         end
       end
 
+      # The empty answer a revocation gives.
+      class Revoked < Async::REST::Representation[Wrapper::Token]
+      end
+
       # The client this application registered as.
-      class Registration < Async::REST::Representation[JSONWrapper]
+      class Registration < Async::REST::Representation[Wrapper::ClientRegistration]
         include Redacted
 
         # @returns [String] the identifier the authorization server assigned.
@@ -272,9 +199,10 @@ module Async
         # @parameter redirect_uri [String] where the code is returned to.
         # @parameter scope [String] what is being asked for.
         # @returns [Authorization] the authorization in progress.
-        def authorize(client_id:, redirect_uri:, scope: self.class.scope(self.class.device_id))
+        def authorize(client_id:, redirect_uri:, device_id: self.class.device_id, scope: nil, client_secret: nil)
           verifier = Verifier.generate
           state = self.class.state
+          scope = scope || self.class.scope(device_id)
 
           url = self.authorization_url(
             client_id: client_id,
@@ -287,10 +215,33 @@ module Async
           Authorization.new(self.endpoint(@metadata.token_endpoint),
             url: url,
             client_id: client_id,
+            client_secret: client_secret,
             redirect_uri: redirect_uri,
             state: state,
             verifier: verifier,
+            device_id: device_id,
+            issuer: @metadata.issuer,
           )
+        end
+
+        # Withdraw a token, which is how an OAuth session is ended.
+        #
+        # @parameter token [String] the access or refresh token to withdraw.
+        # @parameter client_id [String] the registered client.
+        # @parameter token_type_hint [String | nil] `access_token` or `refresh_token`, if known.
+        # @parameter client_secret [String | nil] the secret, for a client which was issued one.
+        # @returns [Revoked] the empty answer.
+        # @raises [Error] if the server has no revocation endpoint.
+        def revoke(token, client_id:, token_type_hint: nil, client_secret: nil)
+          endpoint = @metadata.revocation_endpoint
+
+          unless endpoint
+            raise Error.new(0, "invalid_request", "The authorization server published no revocation endpoint!")
+          end
+
+          payload = {token: token, client_id: client_id, token_type_hint: token_type_hint, client_secret: client_secret}
+
+          Revoked.post(self.endpoint(endpoint), payload.compact)
         end
 
         # Redeem an authorization code for tokens.
@@ -300,14 +251,17 @@ module Async
         # @parameter redirect_uri [String] the same URI the code was asked for with.
         # @parameter verifier [Verifier] the proof key the challenge was derived from.
         # @returns [Tokens] the tokens issued.
-        def exchange(code, client_id:, redirect_uri:, verifier:)
-          Tokens.post(self.endpoint(@metadata.token_endpoint), {
+        def exchange(code, client_id:, redirect_uri:, verifier:, client_secret: nil)
+          payload = {
             grant_type: "authorization_code",
             code: code,
             redirect_uri: redirect_uri,
             client_id: client_id,
             code_verifier: verifier.verifier,
-          })
+            client_secret: client_secret,
+          }
+
+          Tokens.post(self.endpoint(@metadata.token_endpoint), payload.compact)
         end
 
         # Exchange a refresh token for a new access token.
@@ -315,12 +269,15 @@ module Async
         # @parameter refresh_token [String] the refresh token to exchange.
         # @parameter client_id [String] the registered client.
         # @returns [Tokens] the tokens issued.
-        def refresh(refresh_token, client_id:)
-          Tokens.post(self.endpoint(@metadata.token_endpoint), {
+        def refresh(refresh_token, client_id:, client_secret: nil)
+          payload = {
             grant_type: "refresh_token",
             refresh_token: refresh_token,
             client_id: client_id,
-          })
+            client_secret: client_secret,
+          }
+
+          Tokens.post(self.endpoint(@metadata.token_endpoint), payload.compact)
         end
 
         def close
@@ -358,13 +315,19 @@ module Async
         # @parameter redirect_uri [String] where the code is returned to.
         # @parameter state [String] the opaque value the redirect must carry back.
         # @parameter verifier [Verifier] the proof key the challenge was derived from.
-        def initialize(resource, url:, client_id:, redirect_uri:, state:, verifier:)
+        # @parameter device_id [String | nil] the device the scope asked the server to create.
+        # @parameter issuer [String | nil] the authorization server, which the redirect may name back.
+        # @parameter client_secret [String | nil] the secret, for a client which was issued one.
+        def initialize(resource, url:, client_id:, redirect_uri:, state:, verifier:, device_id: nil, issuer: nil, client_secret: nil)
           @resource = resource
           @url = url
           @client_id = client_id
+          @client_secret = client_secret
           @redirect_uri = redirect_uri
           @state = state
           @verifier = verifier
+          @device_id = device_id
+          @issuer = issuer
         end
 
         # @attribute [String] where to send the user to authorize.
@@ -373,24 +336,50 @@ module Async
         # @attribute [String] the opaque value the redirect must carry back.
         attr :state
 
+        # @attribute [String | nil] the device the scope asked the server to create.
+        attr :device_id
+
+        # @attribute [String | nil] the authorization server the code must have come from.
+        attr :issuer
+
         # Redeem the code the redirect carried.
         #
         # @parameter code [String] the authorization code.
         # @parameter state [String] the state the redirect carried.
+        # @parameter iss [String | nil] the issuer the redirect named, which RFC 9207 asks us to check.
         # @returns [Tokens] the tokens issued.
-        # @raises [Error] if the state does not match the authorization request.
-        def exchange(code, state:)
+        # @raises [Error] if the state or the issuer does not match the authorization request.
+        def exchange(code, state:, iss: nil)
           unless ::OpenSSL.secure_compare(state, @state)
             raise Error.new(0, "invalid_grant", "The redirect state does not match the authorization request!")
           end
 
-          Tokens.post(@resource, {
+          # A redirect which names a different authorization server is one answering for somebody else:
+          if iss and @issuer and !::OpenSSL.secure_compare(iss, @issuer)
+            raise Error.new(0, "invalid_grant", "The redirect names #{iss} rather than #{@issuer}!")
+          end
+
+          payload = {
             grant_type: "authorization_code",
             code: code,
             redirect_uri: @redirect_uri,
             client_id: @client_id,
             code_verifier: @verifier.verifier,
-          })
+            client_secret: @client_secret,
+          }
+
+          Tokens.post(@resource, payload.compact)
+        end
+
+        # Withdraw a token this authorization issued.
+        #
+        # @parameter token [String] the access or refresh token to withdraw.
+        # @parameter token_type_hint [String | nil] `access_token` or `refresh_token`, if known.
+        # @returns [Revoked] the empty answer.
+        def revoke(token, token_type_hint: nil)
+          payload = {token: token, client_id: @client_id, token_type_hint: token_type_hint, client_secret: @client_secret}
+
+          Revoked.post(@resource, payload.compact)
         end
 
         def inspect
@@ -404,15 +393,26 @@ module Async
       class Issuer
         # @parameter server [AuthorizationServer] the server which issues the tokens.
         # @parameter client_id [String] the registered client.
-        def initialize(server, client_id)
+        # @parameter client_secret [String | nil] the secret, for a client which was issued one.
+        def initialize(server, client_id, client_secret = nil)
           @server = server
           @client_id = client_id
+          @client_secret = client_secret
         end
 
         # @parameter refresh_token [String] the refresh token to exchange.
         # @returns [Tokens] the tokens issued.
         def refresh(refresh_token)
-          @server.refresh(refresh_token, client_id: @client_id)
+          @server.refresh(refresh_token, client_id: @client_id, client_secret: @client_secret)
+        end
+
+        # Withdraw a token, which is how an OAuth session is ended.
+        #
+        # @parameter token [String] the token to withdraw.
+        # @parameter token_type_hint [String | nil] `access_token` or `refresh_token`, if known.
+        # @returns [Revoked] the empty answer.
+        def revoke(token, token_type_hint: nil)
+          @server.revoke(token, client_id: @client_id, token_type_hint: token_type_hint, client_secret: @client_secret)
         end
 
         # Close the authorization server, which is a connection to another host.
