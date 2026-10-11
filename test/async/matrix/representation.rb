@@ -7,6 +7,6 @@ require "async/matrix"
 
 describe Async::Matrix::Representation do
   it "wraps responses with the Matrix wrapper" do
-    expect(subject::WRAPPER).to be_a(Async::Matrix::Wrapper)
+    expect(subject::WRAPPER).to be_a(Async::Matrix::Wrapper::JSON)
   end
 end

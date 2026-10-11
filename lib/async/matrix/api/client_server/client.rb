@@ -13,7 +13,8 @@ require_relative "../../versioned"
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "../../credentials"
-require_relative "../../authenticated"
+require_relative "../../middleware/authenticated"
+require_relative "../../middleware/rate_limited"
 require_relative "../../oauth"
 require_relative "../../abstract/api/client_server/client"
 require_relative "session"
@@ -109,6 +110,18 @@ module Async
         # The user agent supplied with every request.
         USER_AGENT = "async-matrix/#{VERSION}"
 
+        # Connect to the homeserver, waiting out a rate limit on every request.
+        #
+        # An unauthenticated client is rate limited too, `/login` especially.
+        #
+        # @parameter endpoint [Async::HTTP::Endpoint] the homeserver to connect to.
+        # @returns [Tuple(Protocol::HTTP::Middleware, Protocol::URL::Reference)] the delegate and the reference.
+        def self.connect(endpoint)
+          delegate, reference = super
+
+          [Middleware::RateLimited.new(delegate), reference]
+        end
+
         # Every client carries the user agent, authenticated or not.
         #
         # `Resource.open` cannot supply it, because it forwards `headers:` into a positional parameter. Both `open` and `with` build through here.
@@ -131,9 +144,13 @@ module Async
           api::Capabilities.get(self.with(path: "#{V3}/capabilities"))
         end
 
-        # @returns [Representation] the specification versions supported by the homeserver.
+        # The specification versions the homeserver implements.
+        #
+        # The short way to ask {SupportedVersions#get_versions}.
+        #
+        # @returns [ServerVersions] what it implements.
         def versions
-          api::Representation.get(self.with(path: "/_matrix/client/versions"))
+          self.supported_versions.get_versions
         end
 
         # Derive a client which authenticates using the given access token.
@@ -152,7 +169,7 @@ module Async
         # @parameter credentials [Credentials] the access token, and whatever may replace it.
         # @returns [Client] an authenticated client.
         def with_credentials(credentials)
-          self.class.new(Authenticated.new(self.delegate, credentials), self.reference, self.headers)
+          self.class.new(Middleware::Authenticated.new(self.delegate, credentials), self.reference, self.headers)
         end
 
         # Log in using a password.
@@ -279,6 +296,171 @@ module Async
         # @returns [Profile] the display names, avatars and other profile fields.
         def profile
           api::Profile.for(self)
+        end
+
+        # @returns [Registration] registering an account.
+        def registration
+          api::Registration.for(self)
+        end
+
+        # @returns [PasswordManagement] changing this user's password.
+        def password_management
+          api::PasswordManagement.for(self)
+        end
+
+        # @returns [AccountDeactivation] deactivating this user's account.
+        def account_deactivation
+          api::AccountDeactivation.for(self)
+        end
+
+        # @returns [AdministrativeContact] the email addresses and phone numbers on this account.
+        def administrative_contact
+          api::AdministrativeContact.for(self)
+        end
+
+        # @returns [Admin] what the homeserver will tell an administrator.
+        def admin
+          api::Admin.for(self)
+        end
+
+        # @returns [Users] the user directory.
+        def users
+          api::Users.for(self)
+        end
+
+        # @returns [Banning] banning a user from a room, and lifting it.
+        def banning
+          api::Banning.for(self)
+        end
+
+        # @returns [Kicking] removing a user from a room.
+        def kicking
+          api::Kicking.for(self)
+        end
+
+        # @returns [Inviting] inviting a user to a room.
+        def inviting
+          api::Inviting.for(self)
+        end
+
+        # @returns [ThirdPartyMembership] inviting someone by an address.
+        def third_party_membership
+          api::ThirdPartyMembership.for(self)
+        end
+
+        # @returns [Knocking] knocking on a room.
+        def knocking
+          api::Knocking.for(self)
+        end
+
+        # @returns [Redaction] redacting an event.
+        def redaction
+          api::Redaction.for(self)
+        end
+
+        # @returns [RoomUpgrades] upgrading a room.
+        def room_upgrades
+          api::RoomUpgrades.for(self)
+        end
+
+        # @returns [EventContext] the events around an event.
+        def event_context
+          api::EventContext.for(self)
+        end
+
+        # @returns [RoomInitialSync] a room's state and recent events together.
+        def room_initial_sync
+          api::RoomInitialSync.for(self)
+        end
+
+        # @returns [PeekingEvents] reading a room without joining it.
+        def peeking_events
+          api::PeekingEvents.for(self)
+        end
+
+        # @returns [AccountData] this user's own data, which the homeserver keeps but does not read.
+        def account_data
+          api::AccountData.for(self)
+        end
+
+        # @returns [Tags] the tags this user has put on their rooms.
+        def tags
+          api::Tags.for(self)
+        end
+
+        # @returns [Filter] the filters which narrow what a sync returns.
+        def filter
+          api::Filter.for(self)
+        end
+
+        # @returns [Presence] whether a user is around.
+        def presence
+          api::Presence.for(self)
+        end
+
+        # @returns [Receipts] saying how far this user has read.
+        def receipts
+          api::Receipts.for(self)
+        end
+
+        # @returns [ReadMarkers] where this user has read up to.
+        def read_markers
+          api::ReadMarkers.for(self)
+        end
+
+        # @returns [Directory] the aliases which name a room readably.
+        def directory
+          api::Directory.for(self)
+        end
+
+        # @returns [ListPublicRooms] the rooms a homeserver publishes.
+        def list_public_rooms
+          api::ListPublicRooms.for(self)
+        end
+
+        # @returns [Notifications] the notifications waiting for this user.
+        def notifications
+          api::Notifications.for(self)
+        end
+
+        # @returns [OpenID] a token which proves to another service who this user is.
+        def openid
+          api::OpenID.for(self)
+        end
+
+        # @returns [VOIP] the TURN server a call should go through.
+        def voip
+          api::VOIP.for(self)
+        end
+
+        # @returns [SupportedVersions] the specification versions this homeserver implements.
+        def supported_versions
+          api::SupportedVersions.for(self)
+        end
+
+        # @returns [Wellknown] where a client should look for the homeserver.
+        def wellknown
+          api::Wellknown.for(self)
+        end
+
+        # @returns [Search] searching the events of this user's rooms.
+        def search
+          api::Search.for(self)
+        end
+
+        # @returns [Pusher] the pushers which tell this user's devices about events.
+        def pusher
+          api::Pusher.for(self)
+        end
+
+        # @returns [OldSync] the synchronisation the specification deprecated.
+        def old_sync
+          api::OldSync.for(self)
+        end
+
+        # @returns [ThirdPartyLookup] the networks this homeserver bridges to.
+        def third_party_lookup
+          api::ThirdPartyLookup.for(self)
         end
 
         # Begin syncing.

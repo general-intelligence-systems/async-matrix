@@ -3,14 +3,16 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
 require_relative "../../versioned"
+require_relative "rooms"
 
 module Async
   module Matrix
     module ClientServer
-      # Asks to be let into a room.
-      #
-      # The operations are not written yet: this is the class `knocking-v1.19.yaml` names.
+      # Knocking on a room, which asks to be let in.
       class Knocking
         include Versioned
 
@@ -27,6 +29,19 @@ module Async
 
         # @attribute [Async::REST::Resource] the resource requests are made against.
         attr :resource
+
+        # Knock on a room, which asks its members to invite you.
+        #
+        # @parameter room_id_or_alias [String] the room to knock on, by ID or by alias.
+        # @parameter via [Array(String) | nil] the servers to knock through.
+        # @parameter reason [String | nil] what to record as the reason.
+        # @returns [RoomReference] the room knocked on.
+        def knock_room(room_id_or_alias, via: nil, reason: nil)
+          payload = {reason: reason}.compact
+          parameters = {via: via}.compact
+
+          api::RoomReference.post(@resource.with(path: "#{V3}/knock/#{::Protocol::URL::Encoding.escape(room_id_or_alias)}", parameters: parameters), payload)
+        end
 
         def inspect
           "\#<#{self.class}>"

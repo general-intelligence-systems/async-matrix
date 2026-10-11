@@ -9,4 +9,22 @@ require "async/matrix/operations_context"
 describe Async::Matrix::ClientServer::Filter do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
+
+  # The operations are in every version, so the methods are on the class rather than in a layer.
+  it "can defineFilter" do
+    expect(client.filter.define_filter(self.user_id, {room: {timeline: {limit: 1}}}).filter_id).to be_a(String)
+  end
+
+  it "can getFilter" do
+    defined = client.filter.define_filter(self.user_id, {room: {timeline: {limit: 3}}})
+
+    expect(client.filter.get_filter(self.user_id, defined.filter_id).room).to be == {timeline: {limit: 3}}
+  end
+
+  # A filter the homeserver never stored is not a filter it will answer for.
+  it "fails for a filter which was never defined" do
+    expect do
+      client.filter.get_filter(self.user_id, "not-a-filter")
+    end.to raise_exception(Async::Matrix::RequestError)
+  end
 end

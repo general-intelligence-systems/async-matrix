@@ -268,4 +268,134 @@ describe Async::Matrix::OAuth do
       expect(credentials.generation).to be == 1
     end
   end
+  with "#authorize" do
+    let(:authorization) do
+      server.authorize(client_id: "a-client", redirect_uri: "http://127.0.0.1:1234/")
+    end
+
+    it "reports an authorization in progress" do
+      expect(authorization).to be_a(Async::Matrix::OAuth::Authorization)
+    end
+
+    it "builds the URL on the endpoint the metadata named" do
+      expect(authorization.url).to be(:start_with?, "http://localhost:8091/authorize?")
+    end
+
+    it "carries the state it reports in the URL" do
+      expect(authorization.url).to be(:include?, "state=#{authorization.state}")
+    end
+
+    # Without this the caller cannot tell the redirect apart from one it did not ask for.
+    it "reports the state it asked for" do
+      expect(authorization.state).not.to be_nil
+    end
+
+    it "asks for a different state each time" do
+      states = 4.times.map{server.authorize(client_id: "a-client", redirect_uri: "http://127.0.0.1:1234/").state}
+
+      expect(states.uniq.size).to be == 4
+    end
+
+    it "asks for the API and a device by default" do
+      expect(authorization.url).to be(:include?, ::Protocol::URL::Encoding.escape(Async::Matrix::OAuth::AuthorizationServer::API_SCOPE))
+      expect(authorization.url).to be(:include?, ::Protocol::URL::Encoding.escape(Async::Matrix::OAuth::AuthorizationServer::DEVICE_SCOPE))
+    end
+
+    it "carries a challenge rather than a verifier" do
+      expect(authorization.url).to be(:include?, "code_challenge_method=S256")
+      expect(authorization.url).not.to be(:include?, "code_verifier")
+    end
+
+    it "makes no request to build it" do
+      authorization
+
+      expect(delegate.requests).to be(:empty?)
+    end
+  end
+
+  with Async::Matrix::OAuth::Authorization do
+    let(:delegate) do
+      FakeAuthorizationServer.new(body: "{\"access_token\":\"an-access-token\",\"refresh_token\":\"a-refresh-token\",\"expires_in\":300}")
+    end
+
+    let(:authorization) do
+      Async::Matrix::OAuth::Authorization.new(resource,
+        url: "http://localhost:8091/authorize?state=a-known-state",
+        client_id: "a-client",
+        redirect_uri: "http://127.0.0.1:1234/",
+        state: "a-known-state",
+        verifier: verifier,
+      )
+    end
+
+    with "#exchange" do
+      it "reports the tokens it was issued" do
+        tokens = authorization.exchange("a-code", state: "a-known-state")
+
+        expect(tokens.access_token).to be == "an-access-token"
+        expect(tokens.refresh_token).to be == "a-refresh-token"
+        expect(tokens.expires_in_ms).to be == 300_000
+      end
+
+      it "redeems the code with the verifier" do
+        authorization.exchange("a-code", state: "a-known-state")
+
+        form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+        expect(form["grant_type"]).to be == "authorization_code"
+        expect(form["code"]).to be == "a-code"
+        expect(form["code_verifier"]).to be == "a-known-verifier"
+        expect(form["client_id"]).to be == "a-client"
+      end
+
+      # The caller does not supply it again, so it cannot disagree with the one the code was asked for.
+      it "redeems the code with the redirect it was asked for" do
+        authorization.exchange("a-code", state: "a-known-state")
+
+        form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+        expect(form["redirect_uri"]).to be == "http://127.0.0.1:1234/"
+      end
+
+      it "refuses a state which does not match" do
+        expect do
+          authorization.exchange("a-code", state: "another-state")
+        end.to raise_exception(Async::Matrix::OAuth::Error)
+      end
+
+      it "reports a state which does not match as a rejected grant" do
+        error = nil
+
+        begin
+          authorization.exchange("a-code", state: "another-state")
+        rescue Async::Matrix::OAuth::Error => raised
+          error = raised
+        end
+
+        expect(error).to be(:invalid_grant?)
+      end
+
+      # A code redeemed for the wrong flow is the attack the state guards against, so nothing is sent.
+      it "sends nothing when the state does not match" do
+        begin
+          authorization.exchange("a-code", state: "another-state")
+        rescue Async::Matrix::OAuth::Error
+          # Expected.
+        end
+
+        expect(delegate.requests).to be(:empty?)
+      end
+
+      it "refuses a state of a different length without comparing it loosely" do
+        expect do
+          authorization.exchange("a-code", state: "a")
+        end.to raise_exception(Async::Matrix::OAuth::Error)
+      end
+    end
+
+    it "prints neither the state nor the verifier" do
+      expect(authorization.inspect).not.to be(:include?, "a-known-state")
+      expect(authorization.inspect).not.to be(:include?, "a-known-verifier")
+    end
+  end
 end

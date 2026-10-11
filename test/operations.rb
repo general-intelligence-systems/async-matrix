@@ -63,18 +63,33 @@ describe Async::Matrix do
 
   # Every operation the layers applied at this version withdrew.
   #
-  # A withdrawal keeps the method and says what became of it, so the surface is allowed to carry one.
-  #
   # @parameter api [Module] the API to search.
   # @returns [Array(Symbol)] every withdrawn method name.
   def self.removals_of(api)
+    self.withdrawals_of(api, :removals)
+  end
+
+  # Every operation the layers applied at this version handed to another class.
+  #
+  # @parameter api [Module] the API to search.
+  # @returns [Array(Symbol)] every moved method name.
+  def self.moves_of(api)
+    self.withdrawals_of(api, :moves)
+  end
+
+  # The names a layer declared, by whichever of its registers is asked for.
+  #
+  # @parameter api [Module] the API to search.
+  # @parameter register [Symbol] `:removals` or `:moves`.
+  # @returns [Array(Symbol)] the method names.
+  def self.withdrawals_of(api, register)
     api.constants.each_with_object([]) do |name, found|
       value = api.const_get(name)
 
       if value.is_a?(Class)
         value.ancestors.each do |ancestor|
           if ancestor.is_a?(Async::Matrix::Removals)
-            found.concat(ancestor.removals.keys)
+            found.concat(ancestor.public_send(register).keys)
           end
         end
       end
@@ -86,6 +101,8 @@ describe Async::Matrix do
   METHODS = self.methods_of(API).freeze
 
   REMOVED = self.removals_of(API).freeze
+
+  MOVED = self.moves_of(API).freeze
 
   # The specification names every operation, and the library owes each one a method of that name.
   #
@@ -119,7 +136,7 @@ describe Async::Matrix do
   # The check above is one-directional, and so is the context which demands a case per operation: both read the version under test, so a method it has no operation for is invisible to them. A method written into the class rather than into a layer is exactly that - present whatever the version, against a homeserver which does not implement it - and this is where it shows up. The class holds what every version has, everything else belongs to the layer for the version which introduced it, and a layer which takes one back declares it {ruby removed} rather than leaving it to be inherited forward.
   (ELSEWHERE.keys - OWED).each do |name|
     it "has no method named #{name}, which #{Async::Matrix::TEST_VERSION} has no operation for" do
-      expect(METHODS - REMOVED).not.to be(:include?, name)
+      expect(METHODS - REMOVED - MOVED).not.to be(:include?, name)
     end
   end
 
@@ -127,6 +144,13 @@ describe Async::Matrix do
   REMOVED.each do |name|
     it "withdraws #{name}, which #{Async::Matrix::TEST_VERSION} has no operation for" do
       expect(OWED).not.to be(:include?, name)
+    end
+  end
+
+  # A move says the operation went to another class, which is the opposite claim: the version still has it, and something else must answer for it. A move where the specification dropped the operation is a removal written as a move.
+  MOVED.each do |name|
+    it "moves #{name}, which #{Async::Matrix::TEST_VERSION} still has an operation for" do
+      expect(OWED).to be(:include?, name)
     end
   end
 

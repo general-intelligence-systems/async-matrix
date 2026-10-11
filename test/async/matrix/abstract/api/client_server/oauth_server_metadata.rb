@@ -3,6 +3,8 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "async/http/internet"
+
 require "async/matrix/operations_context"
 
 # Cases for the OAuth server metadata operations, layered by version.
@@ -31,6 +33,25 @@ module Async
 
             # v1.15 added the auth metadata endpoint.
             module V1_15
+              # Where the rig sends an authorization code back to.
+              REDIRECT_URI = Async::Matrix::OAUTH_REDIRECT_URI
+
+              # Register this application, which a public client must do before it can authorize.
+              #
+              # @parameter server [Async::Matrix::OAuth::AuthorizationServer] the server to register with.
+              # @returns [Async::Matrix::OAuth::Registration] the client this application is now known as.
+              def register_client(server)
+                server.register(
+                  client_name: "async-matrix",
+                  application_type: "native",
+                  client_uri: "https://github.com/socketry/async-matrix",
+                  grant_types: ["authorization_code", "refresh_token"],
+                  response_types: ["code"],
+                  redirect_uris: [REDIRECT_URI],
+                  token_endpoint_auth_method: "none",
+                )
+              end
+
               def self.included(base)
                 base.it "can getAuthMetadata" do
                   expect(metadata.issuer).to be_a(String)
@@ -86,6 +107,132 @@ module Async
 
                   expect(url).to be(:start_with?, metadata.authorization_endpoint)
                   expect(url).to be(:include?, "code_challenge_method=S256")
+                end
+
+                # Everything the client controls is correct, so the server answers with its own login page rather than refusing the request.
+                base.it "sends the user to a request the server accepts" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  authorization = server.authorize(client_id: register_client(server).client_id, redirect_uri: REDIRECT_URI)
+
+                  internet = Async::HTTP::Internet.new
+                  response = internet.get(authorization.url)
+
+                  expect(response.status).to be < 400
+                ensure
+                  response&.close
+                  internet&.close
+                  server&.close
+                end
+
+                # The code is the one thing the client cannot fabricate, so this is as far as a test without a user can go: the request is well formed enough for the server to judge the grant itself.
+                base.it "redeems a code at the server, which refuses one it never issued" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  authorization = server.authorize(client_id: register_client(server).client_id, redirect_uri: REDIRECT_URI)
+
+                  error = nil
+
+                  begin
+                    authorization.exchange("not-a-code-this-server-issued", state: authorization.state)
+                  rescue Async::Matrix::OAuth::Error => raised
+                    error = raised
+                  end
+
+                  expect(error).not.to be_nil
+                  expect(error).to be(:invalid_grant?)
+                ensure
+                  server&.close
+                end
+
+                # The whole flow, with the user's consent performed by the fixture as a browser would.
+                base.it "is issued tokens once the user consents" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  authorization = server.authorize(client_id: register_client(server).client_id, redirect_uri: REDIRECT_URI)
+
+                  redirected = consent_to(authorization)
+                  tokens = authorization.exchange(redirected["code"], state: redirected["state"])
+
+                  expect(tokens.access_token).to be_a(String)
+                  expect(tokens.refresh_token).to be_a(String)
+                  expect(tokens.token_type).to be == "Bearer"
+                  expect(tokens.expires_in_ms).to be > 0
+                ensure
+                  server&.close
+                end
+
+                # The code is bound to the challenge, so it is useless to anyone who did not generate the verifier. Were the challenge or its method sent wrongly, the server would accept this.
+                base.it "binds the code to the challenge, so another verifier cannot redeem it" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  client_id = register_client(server).client_id
+                  authorization = server.authorize(client_id: client_id, redirect_uri: REDIRECT_URI)
+
+                  redirected = consent_to(authorization)
+
+                  error = nil
+
+                  begin
+                    server.exchange(redirected["code"],
+                      client_id: client_id,
+                      redirect_uri: REDIRECT_URI,
+                      verifier: Async::Matrix::OAuth::Verifier.generate,
+                    )
+                  rescue Async::Matrix::OAuth::Error => raised
+                    error = raised
+                  end
+
+                  expect(error).not.to be_nil
+                  expect(error).to be(:invalid_grant?)
+                ensure
+                  server&.close
+                end
+
+                base.it "authenticates as the user who consented" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  client_id = register_client(server).client_id
+                  authorization = server.authorize(client_id: client_id, redirect_uri: REDIRECT_URI)
+
+                  redirected = consent_to(authorization)
+                  tokens = authorization.exchange(redirected["code"], state: redirected["state"])
+
+                  authorized = unauthenticated.authorized(tokens, server: server, client_id: client_id)
+                  whoami = authorized.get_token_owner
+
+                  expect(whoami.user_id).to be == "@#{Async::Matrix::OAUTH_USERNAME}:localhost"
+                  expect(whoami.device_id).to be_a(String)
+                ensure
+                  authorized&.close
+                end
+
+                # The refresh token the flow issued buys a new access token, which is what keeps a long lived client working.
+                base.it "renews the access token at the authorization server" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  client_id = register_client(server).client_id
+                  authorization = server.authorize(client_id: client_id, redirect_uri: REDIRECT_URI)
+
+                  redirected = consent_to(authorization)
+                  tokens = authorization.exchange(redirected["code"], state: redirected["state"])
+
+                  authorized = unauthenticated.authorized(tokens, server: server, client_id: client_id)
+                  credentials = authorized.delegate.credentials
+
+                  credentials.renew!
+
+                  expect(credentials.access_token).not.to be == tokens.access_token
+                  expect(credentials.generation).to be == 1
+                  expect(authorized.get_token_owner.user_id).to be == "@#{Async::Matrix::OAUTH_USERNAME}:localhost"
+                ensure
+                  authorized&.close
+                end
+
+                # A redirect which came back with the wrong state is never redeemed, so the server is never asked.
+                base.it "refuses a redirect whose state does not match" do
+                  server = Async::Matrix::OAuth::AuthorizationServer.for(metadata)
+                  authorization = server.authorize(client_id: register_client(server).client_id, redirect_uri: REDIRECT_URI)
+
+                  expect do
+                    authorization.exchange("not-a-code-this-server-issued", state: "a-state-it-did-not-ask-for")
+                  end.to raise_exception(Async::Matrix::OAuth::Error)
+                ensure
+                  server&.close
                 end
               end
             end

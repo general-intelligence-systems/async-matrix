@@ -68,9 +68,11 @@ module Async
         error.status >= 500 or error.status == 429
       end
 
+      # Whether there is both a refresh token and somewhere to spend it.
+      #
       # @returns [Boolean] whether there is anything to replace the access token with.
       def renewable?
-        !@refresh_token.nil?
+        !@refresh.nil? and !@refresh_token.nil?
       end
 
       # Whether the access token has expired, or is close enough that it should be replaced now.
@@ -111,6 +113,34 @@ module Async
             self.replace!
           end
         end
+      end
+
+      # Adopt tokens obtained some other way.
+      #
+      # Every resource derived from the client shares these credentials, so the resource graph does not have to be rebuilt after logging in again.
+      #
+      # @parameter access_token [String] the token to authenticate with from now on.
+      # @parameter refresh_token [String | nil] the token which buys the next access token.
+      # @parameter expires_in_ms [Integer | nil] how long the access token lasts.
+      # @returns [Integer] the new generation.
+      def replace(access_token:, refresh_token: nil, expires_in_ms: nil)
+        @semaphore.acquire do
+          @access_token = access_token
+          @refresh_token = refresh_token || @refresh_token
+          @expires_at = self.class.expires_at(expires_in_ms)
+
+          # The session is no longer known to be dead:
+          @rejection = nil
+
+          @generation += 1
+        end
+      end
+
+      # Close whatever issues the tokens, which may hold a connection of its own.
+      #
+      # @returns [Nil] nothing.
+      def close
+        @refresh&.close
       end
 
       def inspect

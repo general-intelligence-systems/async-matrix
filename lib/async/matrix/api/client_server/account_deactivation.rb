@@ -3,14 +3,18 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/account_deactivation"
+require_relative "administrative_contact"
 
 module Async
   module Matrix
     module ClientServer
-      # Deactivates an account, which cannot be undone.
+      # Deactivating an account.
       #
-      # The operations are not written yet: this is the class `account_deactivation-v1.19.yaml` names.
+      # v1.15 took this from the registration, so it is reached by that layer.
       class AccountDeactivation
         include Versioned
 

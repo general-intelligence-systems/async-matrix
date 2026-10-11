@@ -9,4 +9,28 @@ require "async/matrix/operations_context"
 describe Async::Matrix::ClientServer::Kicking do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
+
+  # A second user, since these operations are about somebody else.
+  let(:other_username) {"other-#{SecureRandom.hex(6)}"}
+
+  let(:other_id) {"@#{self.other_username}:localhost"}
+
+  let(:other) {unauthenticated.logged_in(self.other_username, Async::Matrix::TEST_PASSWORD)}
+
+  # The operation is in every version, so the method is on the class rather than in a layer.
+  it "can kick" do
+    client.inviting.invite_user(room.id, other_id)
+    other.room(room.id).join_room_by_id
+
+    expect(client.kicking.kick(room.id, other_id, reason: "that is enough").value).to be == {}
+  end
+
+  # A kick is not a ban, so the user may come back.
+  it "lets a kicked user join again" do
+    client.inviting.invite_user(room.id, other_id)
+    other.room(room.id).join_room_by_id
+    client.kicking.kick(room.id, other_id)
+
+    expect(client.inviting.invite_user(room.id, other_id).value).to be == {}
+  end
 end

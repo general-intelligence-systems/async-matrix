@@ -123,7 +123,7 @@ module Async
         # @parameter one_time_keys [Hash | nil] the one time keys, by algorithm and ID.
         # @returns [UploadedKeys] how many one time keys the server now holds.
         def upload_keys(**options)
-          self.upload_payload(self.upload_fields(**options))
+          api::UploadedKeys.post(@resource.with(path: "#{V3}/keys/upload"), self.upload_fields(**options))
         end
 
         # Ask for the keys of the given devices.
@@ -182,14 +182,6 @@ module Async
         # @returns [Hash] the fields.
         def upload_fields(device_keys: nil, one_time_keys: nil)
           {device_keys: device_keys, one_time_keys: one_time_keys}.compact
-        end
-
-        # Make the upload request.
-        #
-        # @parameter payload [Hash] the fields to send.
-        # @returns [UploadedKeys] how many one time keys the server now holds.
-        def upload_payload(payload)
-          api::UploadedKeys.post(@resource.with(path: "#{V3}/keys/upload"), payload)
         end
       end
     end

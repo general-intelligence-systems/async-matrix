@@ -9,4 +9,14 @@ require "async/matrix/operations_context"
 describe Async::Matrix::ClientServer::VOIP do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
+
+  # The operation is in every version, so the method is on the class rather than in a layer.
+  #
+  # The rig has no TURN server, so the homeserver answers with no URIs rather than refusing.
+  it "can getTurnServer" do
+    turn = client.voip.get_turn_server
+
+    expect(turn.uris).to be_a(Array)
+    expect(turn.uris).to be(:empty?)
+  end
 end

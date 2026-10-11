@@ -68,11 +68,14 @@ module Async
 
             # v1.6 added the timestamp lookup.
             module V1_6
+              # A moment after the message the cases send, since the search finds the event nearest the moment it is given and `Time.now` floors to the second it is already in.
+              AFTER_THE_MESSAGE = ->{(Time.now.to_f * 1000).to_i + 1000}
+
               def self.included(base)
                 base.it "can getEventByTimestamp" do
                   sent = room.send_message("m.room.message", {msgtype: "m.text", body: "at a time"})
 
-                  found = client.room_event_by_timestamp.get_event_by_timestamp(room.id, Time.now.to_i * 1000, dir: "b")
+                  found = client.room_event_by_timestamp.get_event_by_timestamp(room.id, AFTER_THE_MESSAGE.call, dir: "b")
 
                   expect(found.event_id).to be == sent.event_id
                 end
@@ -80,7 +83,7 @@ module Async
                 base.it "reports when the event it found was sent" do
                   room.send_message("m.room.message", {msgtype: "m.text", body: "at a time"})
 
-                  found = client.room_event_by_timestamp.get_event_by_timestamp(room.id, Time.now.to_i * 1000, dir: "b")
+                  found = client.room_event_by_timestamp.get_event_by_timestamp(room.id, AFTER_THE_MESSAGE.call, dir: "b")
 
                   expect(found.origin_server_ts).to be > 0
                 end

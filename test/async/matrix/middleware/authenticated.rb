@@ -5,7 +5,7 @@
 
 require "sus/fixtures/async/reactor_context"
 
-require "async/matrix/authenticated"
+require "async/matrix/middleware/authenticated"
 require "async/matrix/credentials"
 
 require "protocol/http/middleware"
@@ -61,7 +61,7 @@ class RejectingDelegate < ::Protocol::HTTP::Middleware
   end
 end
 
-describe Async::Matrix::Authenticated do
+describe Async::Matrix::Middleware::Authenticated do
   include Sus::Fixtures::Async::ReactorContext
 
   let(:issuer) {TokenIssuer.new}

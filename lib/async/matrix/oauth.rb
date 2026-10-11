@@ -5,6 +5,7 @@
 
 require "base64"
 require "digest"
+require "openssl"
 require "securerandom"
 
 require "async/rest/resource"
@@ -15,6 +16,7 @@ require "async/rest/wrapper/json"
 require "protocol/url/encoding"
 
 require_relative "error"
+require_relative "redacted"
 
 module Async
   module Matrix
@@ -140,6 +142,8 @@ module Async
 
       # The tokens the authorization server issued.
       class Tokens < Async::REST::Representation[Wrapper]
+        include Redacted
+
         # @returns [String] the access token to authenticate with.
         def access_token
           self.value[:access_token]
@@ -172,6 +176,8 @@ module Async
 
       # The client this application registered as.
       class Registration < Async::REST::Representation[JSONWrapper]
+        include Redacted
+
         # @returns [String] the identifier the authorization server assigned.
         def client_id
           self.value[:client_id]
@@ -260,6 +266,33 @@ module Async
           "#{@metadata.authorization_endpoint}?#{::Protocol::URL::Encoding.encode(parameters)}"
         end
 
+        # Begin an authorization, which the caller completes when the redirect returns.
+        #
+        # @parameter client_id [String] the registered client.
+        # @parameter redirect_uri [String] where the code is returned to.
+        # @parameter scope [String] what is being asked for.
+        # @returns [Authorization] the authorization in progress.
+        def authorize(client_id:, redirect_uri:, scope: self.class.scope(self.class.device_id))
+          verifier = Verifier.generate
+          state = self.class.state
+
+          url = self.authorization_url(
+            client_id: client_id,
+            redirect_uri: redirect_uri,
+            verifier: verifier,
+            scope: scope,
+            state: state,
+          )
+
+          Authorization.new(self.endpoint(@metadata.token_endpoint),
+            url: url,
+            client_id: client_id,
+            redirect_uri: redirect_uri,
+            state: state,
+            verifier: verifier,
+          )
+        end
+
         # Redeem an authorization code for tokens.
         #
         # @parameter code [String] the code the redirect carried.
@@ -315,6 +348,56 @@ module Async
         end
       end
 
+      # An authorization in progress, which the caller holds until the redirect returns.
+      #
+      # The authorization endpoint is not a resource this library requests: its URL goes to the user's browser.
+      class Authorization
+        # @parameter resource [Async::REST::Resource] the token endpoint the code is redeemed at.
+        # @parameter url [String] where to send the user to authorize.
+        # @parameter client_id [String] the registered client.
+        # @parameter redirect_uri [String] where the code is returned to.
+        # @parameter state [String] the opaque value the redirect must carry back.
+        # @parameter verifier [Verifier] the proof key the challenge was derived from.
+        def initialize(resource, url:, client_id:, redirect_uri:, state:, verifier:)
+          @resource = resource
+          @url = url
+          @client_id = client_id
+          @redirect_uri = redirect_uri
+          @state = state
+          @verifier = verifier
+        end
+
+        # @attribute [String] where to send the user to authorize.
+        attr :url
+
+        # @attribute [String] the opaque value the redirect must carry back.
+        attr :state
+
+        # Redeem the code the redirect carried.
+        #
+        # @parameter code [String] the authorization code.
+        # @parameter state [String] the state the redirect carried.
+        # @returns [Tokens] the tokens issued.
+        # @raises [Error] if the state does not match the authorization request.
+        def exchange(code, state:)
+          unless ::OpenSSL.secure_compare(state, @state)
+            raise Error.new(0, "invalid_grant", "The redirect state does not match the authorization request!")
+          end
+
+          Tokens.post(@resource, {
+            grant_type: "authorization_code",
+            code: code,
+            redirect_uri: @redirect_uri,
+            client_id: @client_id,
+            code_verifier: @verifier.verifier,
+          })
+        end
+
+        def inspect
+          "\#<#{self.class} #{@client_id}>"
+        end
+      end
+
       # Renews an access token at the authorization server.
       #
       # {Credentials} asks with the refresh token alone, where the authorization server also wants to know which client is asking.
@@ -330,6 +413,13 @@ module Async
         # @returns [Tokens] the tokens issued.
         def refresh(refresh_token)
           @server.refresh(refresh_token, client_id: @client_id)
+        end
+
+        # Close the authorization server, which is a connection to another host.
+        #
+        # @returns [Nil] nothing.
+        def close
+          @server.close
         end
 
         def inspect

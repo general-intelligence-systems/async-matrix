@@ -3,14 +3,18 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/password_management"
+require_relative "administrative_contact"
 
 module Async
   module Matrix
     module ClientServer
-      # Changes a password, and recovers a forgotten one.
+      # Changing a password, and asking for the tokens a reset needs.
       #
-      # The operations are not written yet: this is the class `password_management-v1.19.yaml` names.
+      # v1.15 took these from the registration, so they are reached by that layer.
       class PasswordManagement
         include Versioned
 

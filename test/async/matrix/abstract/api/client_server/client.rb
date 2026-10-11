@@ -29,8 +29,92 @@ module Async
             module V1_16
             end
 
-            # No changes in v1.15.
+            # v1.15 added the OAuth 2.0 API.
             module V1_15
+              # Stands in for the authorization server, recording what a renewal carried.
+              class FakeAuthorizationServer
+                def initialize
+                  @renewals = []
+                  @closed = false
+                end
+
+                # @attribute [Array(Hash)] what each renewal carried.
+                attr :renewals
+
+                # @attribute [Boolean] whether it was closed.
+                attr :closed
+
+                def refresh(refresh_token, client_id:)
+                  @renewals << {refresh_token: refresh_token, client_id: client_id}
+
+                  FakeTokens.new("a-renewed-token", "a-new-refresh-token", 300_000)
+                end
+
+                def close
+                  @closed = true
+                end
+              end
+
+              # The tokens the authorization server issued.
+              FakeTokens = Struct.new(:access_token, :refresh_token, :expires_in_ms)
+
+              # The tokens a successful authorization would have produced.
+              def oauth_tokens
+                FakeTokens.new("an-access-token", "a-refresh-token", 300_000)
+              end
+
+              def self.included(base)
+                base.it "authenticates with the token the authorization server issued" do
+                  authorized = unauthenticated.authorized(oauth_tokens, server: FakeAuthorizationServer.new, client_id: "a-client")
+
+                  expect(authorized.delegate.credentials.access_token).to be == "an-access-token"
+                end
+
+                base.it "can renew, because the authorization server issues the tokens" do
+                  authorized = unauthenticated.authorized(oauth_tokens, server: FakeAuthorizationServer.new, client_id: "a-client")
+
+                  expect(authorized.delegate.credentials).to be(:renewable?)
+                  expect(authorized.delegate.credentials.expires_at).to be_a(Time)
+                end
+
+                # The token goes below the resource, so it is not copied into every resource derived from this one.
+                base.it "does not carry the token in its headers" do
+                  authorized = unauthenticated.authorized(oauth_tokens, server: FakeAuthorizationServer.new, client_id: "a-client")
+
+                  expect(authorized.headers["authorization"]).to be_nil
+                  expect(authorized.inspect).not.to be(:include?, "an-access-token")
+                end
+
+                base.it "renews at the authorization server rather than the homeserver" do
+                  server = FakeAuthorizationServer.new
+                  authorized = unauthenticated.authorized(oauth_tokens, server: server, client_id: "a-client")
+
+                  authorized.delegate.credentials.renew!
+
+                  expect(server.renewals).to be == [{refresh_token: "a-refresh-token", client_id: "a-client"}]
+                end
+
+                base.it "adopts the tokens a renewal issued" do
+                  authorized = unauthenticated.authorized(oauth_tokens, server: FakeAuthorizationServer.new, client_id: "a-client")
+                  credentials = authorized.delegate.credentials
+
+                  credentials.renew!
+
+                  expect(credentials.access_token).to be == "a-renewed-token"
+                  expect(credentials.refresh_token).to be == "a-new-refresh-token"
+                  expect(credentials.generation).to be == 1
+                end
+
+                # The authorization server is a connection to another host, which nothing else will close.
+                base.it "closes the authorization server with the client" do
+                  server = FakeAuthorizationServer.new
+                  authorized = unauthenticated.authorized(oauth_tokens, server: server, client_id: "a-client")
+
+                  authorized.close
+
+                  expect(server.closed).to be == true
+                end
+              end
             end
 
             # No changes in v1.14.

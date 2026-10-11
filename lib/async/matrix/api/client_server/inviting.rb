@@ -3,14 +3,14 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "rooms"
 
 module Async
   module Matrix
     module ClientServer
-      # Invites a user to a room.
-      #
-      # The operations are not written yet: this is the class `inviting-v1.19.yaml` names.
+      # Inviting a user to a room.
       class Inviting
         include Versioned
 
@@ -27,6 +27,18 @@ module Async
 
         # @attribute [Async::REST::Resource] the resource requests are made against.
         attr :resource
+
+        # Invite a user to a room.
+        #
+        # @parameter room_id [String] the room to invite them to.
+        # @parameter user_id [String] the user to invite.
+        # @parameter reason [String | nil] what to record as the reason.
+        # @returns [Representation] the empty response.
+        def invite_user(room_id, user_id, reason: nil)
+          payload = {user_id: user_id, reason: reason}.compact
+
+          api::Representation.post(@resource.with(path: "#{api::Room.path_for(room_id)}/invite"), payload)
+        end
 
         def inspect
           "\#<#{self.class}>"

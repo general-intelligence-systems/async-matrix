@@ -9,4 +9,22 @@ require "async/matrix/operations_context"
 describe Async::Matrix::ClientServer::Inviting do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
+
+  # A second user, since these operations are about somebody else.
+  let(:other_username) {"other-#{SecureRandom.hex(6)}"}
+
+  let(:other_id) {"@#{self.other_username}:localhost"}
+
+  let(:other) {unauthenticated.logged_in(self.other_username, Async::Matrix::TEST_PASSWORD)}
+
+  # The operation is in every version, so the method is on the class rather than in a layer.
+  it "can inviteUser" do
+    expect(client.inviting.invite_user(room.id, other_id, reason: "come in").value).to be == {}
+  end
+
+  it "lets the invited user join" do
+    client.inviting.invite_user(room.id, other_id)
+
+    expect(other.room(room.id).join_room_by_id.room_id).to be == room.id
+  end
 end

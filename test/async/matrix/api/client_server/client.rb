@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/client"
+
 # Records what each request carried, and sends it to the homeserver all the same.
 class RecordingDelegate < Protocol::HTTP::Middleware
   def initialize(delegate)
@@ -27,6 +29,9 @@ end
 describe Async::Matrix::ClientServer::Client do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Client::CASES
 
   with "#versions" do
     it "can be read without authentication" do

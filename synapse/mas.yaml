@@ -97,6 +97,20 @@ secrets:
       oUQDQgAEKIB+tTwxKKAkOR3nW/BUu20Efd2mFxceYo/kxCIbEp9mnksEVe3qgnIA
       QKwA7VyBSXRfUrTpPwZpw6eB3ysykw==
       -----END EC PRIVATE KEY-----
+# This is a throwaway local rig with nothing in it worth protecting, and MAS limits logins to a
+# small burst per IP by default, which a suite that logs in for each case exhausts part way through.
+rate_limiting:
+  login:
+    per_ip:
+      burst: 1000
+      per_second: 1000.0
+    per_account:
+      burst: 1000
+      per_second: 1000.0
+  registration:
+    burst: 1000
+    per_second: 1000.0
+
 passwords:
   enabled: true
   schemes:

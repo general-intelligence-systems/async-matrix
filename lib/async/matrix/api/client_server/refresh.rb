@@ -38,6 +38,12 @@ module Async
         # @attribute [Async::REST::Resource] the resource requests are made against.
         attr :resource
 
+        # Nothing to close: this shares the client's delegate, which the client still needs.
+        #
+        # @returns [Nil] nothing.
+        def close
+        end
+
         def inspect
           "\#<#{self.class}>"
         end
