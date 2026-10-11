@@ -1,0 +1,231 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+# GENERATE-SPEC-DELTAS(1)            General Commands Manual          GENERATE-SPEC-DELTAS(1)
+#
+# NAME
+#      bin/generate-spec-deltas — record what each version changed in the operation
+#      manifests
+#
+# SYNOPSIS
+#      bin/generate-spec-deltas [api[/name]]
+#
+# DESCRIPTION
+#      Compares the per-version manifests written by bin/update-spec(1) and records what each
+#      specification version changed, as
+#      lib/async/matrix/abstract/api/<api>/schemas/<name>-<version>.deltas.yaml.  With no
+#      argument, every manifest of every API is compared.
+#
+#      A deltas file holds every version in descending order, which is the order the layers
+#      appear in the Ruby beside it: open rooms.rb next to schemas/rooms-v1.12.deltas.yaml
+#      and module V1_12 has the entry which says what it must implement, or an empty entry
+#      saying the specification changed nothing.
+#
+#      Changes are reported as leaf paths - parameters.query.from.required,
+#      responses.200.chunk[].type - rather than as nested subtrees, because a subtree diff of
+#      something like /sync prints the entire response shape and tells you nothing about what
+#      moved.
+#
+#      This reads the manifests rather than the specification, so it needs neither the
+#      submodules nor the network, and it can be re-run on its own whenever the manifests
+#      change.
+#
+# FILES
+#      lib/async/matrix/abstract/api/<api>/schemas/<name>-<version>.yaml
+#              The manifests which are compared.
+#
+#      lib/async/matrix/abstract/api/<api>/schemas/<name>-<version>.deltas.yaml
+#              What each version changed, which is what a version layer implements.
+#
+# EXIT STATUS
+#      The bin/generate-spec-deltas utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Compare every manifest:
+#
+#            bin/generate-spec-deltas
+#
+#      One API:
+#
+#            bin/generate-spec-deltas client_server
+#
+#      One manifest:
+#
+#            bin/generate-spec-deltas client_server/rooms
+#
+# SEE ALSO
+#      bin/update-spec(1), bin/generate-event-spec-deltas(1)
+#
+# async-matrix                          October 11, 2026              GENERATE-SPEC-DELTAS(1)
+
+require "yaml"
+
+ROOT = File.expand_path("..", __dir__)
+ABSTRACT = File.join(ROOT, "lib", "async", "matrix", "abstract", "api")
+
+# Keys which describe rather than define, so a reworded sentence is not a change.
+IGNORED = %w[description summary source keyed_by].freeze
+
+def versions
+  File.readlines(File.join(ROOT, "MATRIX_API_VERSIONS.txt"), chomp: true).reject(&:empty?)
+end
+
+# An operation as a flat map of leaf path to value.
+#
+# The `fields` key is a container rather than a step, so it is skipped.
+def leaves(node, trail = [], out = {})
+  case node
+  when Hash
+    node.each do |key, value|
+      if IGNORED.include?(key)
+        next
+      end
+
+      leaves(value, key == "fields" ? trail : trail + [key.to_s], out)
+    end
+  when Array
+    # A schema array carries one descriptor for its members; anything else is a value in itself.
+    if node.size == 1 && node.first.is_a?(Hash)
+      leaves(node.first, trail[0..-2].to_a + ["#{trail.last}[]"], out)
+    else
+      out[trail.join(".")] = node
+    end
+  else
+    out[trail.join(".")] = node
+  end
+
+  out
+end
+
+def delta(before, after)
+  if before.nil?
+    {"introduced" => true}
+  else
+    if after.nil?
+      {"removed" => true}
+    else
+      previous = leaves(before)
+      current = leaves(after)
+      added = (current.keys - previous.keys).sort
+      removed = (previous.keys - current.keys).sort
+      changed = (current.keys & previous.keys).reject{|path| previous[path] == current[path]}.sort
+      out = {}
+      unless added.empty?
+        out["added"] = added.to_h{|path| [path, current[path]]}
+      end
+      unless removed.empty?
+        out["removed"] = removed.to_h{|path| [path, previous[path]]}
+      end
+      unless changed.empty?
+        out["changed"] = changed.to_h{|path| [path, {"from" => previous[path], "to" => current[path]}]}
+      end
+      out
+    end
+  end
+end
+
+all = versions
+
+# Every schema, as "<api>/<name>", discovered from the files bin/update-spec wrote.
+manifests = Dir.children(ABSTRACT).select do |api|
+  File.directory?(File.join(ABSTRACT, api, "schemas"))
+end.flat_map do |api|
+  Dir.children(File.join(ABSTRACT, api, "schemas")).filter_map do |file|
+    match = /\A(?<name>.+)-(?<version>v\d+\.\d+)\.yaml\z/.match(file)
+
+    if match
+      "#{api}/#{match[:name]}"
+    end
+  end.uniq
+end.sort
+
+unless ARGV.empty?
+  manifests = manifests.select do |manifest|
+    ARGV.any?{|argument| manifest == argument || manifest.start_with?("#{argument}/")}
+  end
+end
+
+if manifests.empty?
+  abort "No manifests found in #{ABSTRACT}. Run bin/update-spec first."
+end
+
+changed_total = 0
+
+manifests.each do |manifest|
+  api = File.dirname(manifest)
+  name = File.basename(manifest)
+  directory = File.join(ABSTRACT, api, "schemas")
+
+  # What the manifest looked like at each version, if it existed there at all.
+  catalogue = all.to_h do |version|
+    path = File.join(directory, "#{name}-#{version}.yaml")
+
+    [version, File.exist?(path) ? (YAML.safe_load_file(path)["operations"] || {}) : nil]
+  end
+
+  deltas = {}
+
+  all.reverse_each do |version|
+    index = all.index(version)
+    if index.zero?
+      before = nil
+    else
+      before = catalogue[all[index - 1]]
+    end
+    after = catalogue[version]
+
+    # A version with no manifest at all - the endpoints did not exist yet:
+    if after.nil?
+      deltas[version] = {}
+      next
+    end
+
+    changes = {}
+
+    (Array(before&.keys) | after.keys).sort.each do |identifier|
+      difference = delta(before && before[identifier], after[identifier])
+
+      unless difference.empty?
+        changes[identifier] = difference
+      end
+    end
+
+    deltas[version] = changes
+  end
+
+  # The first version is where everything starts, which is not a change anyone needs to read:
+  introduced = deltas[all.first].count{|_, change| change["introduced"]}
+
+  interesting = deltas.reject{|version, _| version == all.first}.reject{|_, changes| changes.empty?}
+  changed_total += interesting.size
+
+  # One file per version, beside the schema for that version: open `module V1_12` in the Ruby and `<name>-v1.12.deltas.yaml` says what it has to implement, or says the specification changed nothing and the empty layer is correct.
+  all.each do |version|
+    if catalogue[version].nil?
+      next
+    end
+
+    out = {
+      "api" => api,
+      "name" => name,
+      "version" => version,
+      "previous" => (index = all.index(version)).zero? ? nil : all[index - 1],
+      "changed" => !deltas[version].empty?,
+      "deltas" => deltas[version],
+    }
+
+    File.write(
+      File.join(directory, "#{name}-#{version}.deltas.yaml"),
+      "# Generated by bin/generate-spec-deltas. Do not edit.\n" + YAML.dump(out)
+    )
+  end
+
+  warn format("  %-44s %2d operations at %s, changed in: %s",
+    manifest, after_count = catalogue[all.last]&.size || 0, all.last,
+    interesting.keys.empty? ? "nothing" : interesting.keys.join(" "))
+end
+
+warn "\n#{manifests.size} manifests, #{changed_total} versions with changes."

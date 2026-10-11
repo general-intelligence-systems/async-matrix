@@ -1,0 +1,432 @@
+#!/usr/bin/env bash
+
+# TEST(1)                            General Commands Manual                          TEST(1)
+#
+# NAME
+#      bin/test — run the suite against a Matrix specification version
+#
+# SYNOPSIS
+#      bin/test [--all] [--api name] [--backend name] [--core] [--keep-alive] [version ...]
+#
+# DESCRIPTION
+#      bin/test brings up a homeserver which implements the given specification version and
+#      runs the suite against it. Each backend has a directory holding a compose file with a
+#      service per version, carrying its own image and configuration, so testing a version is
+#      naming it.
+#
+#      Only one homeserver runs at a time, since they all bind the same port: each version is
+#      brought up in turn and taken down on the way out.
+#
+#      With no version, the latest one is tested. With no --api and no --core, the whole
+#      suite is run: the core, and every API the backend serves.
+#
+#      The backends are different servers rather than different versions of one, so a run
+#      says which it was: the point of having more than one is that the suite tests the
+#      specification rather than whatever Synapse happens to do.
+#
+#      A backend declares what its rig is, and this script knows nothing else about it. Which
+#      APIs it can serve is MATRIX_APIS in <backend>/test.env; the servers an API needs
+#      besides the homeserver are the services its compose file gives a profile named for
+#      that API. So an API served by the homeserver alone needs no profile, and an API the rig
+#      has no server for is left out of both files: asking for it is then a run of nothing,
+#      which is said rather than failed.
+#
+# OPTIONS
+#      --all   Test every version in MATRIX_API_VERSIONS.txt, in order.
+#
+#      --api name
+#              Run only that API's tests: its structural test, the tests of its classes, and
+#              the version layers those are built from. The specification has five APIs and
+#              this takes the specification's own name for them, so client-server rather than
+#              client_server, which is how the workflows are named too. May be given more
+#              than once. An API the backend does not serve is reported and skipped.
+#
+#      --backend name
+#              The homeserver to test against, which is a directory holding a compose file
+#              and a test.env. Defaults to synapse.
+#
+#      --core  Run only the tests which belong to no API: the wrappers, the versioning, the
+#              events, the credentials, and everything else the APIs are built from.
+#
+#      --keep-alive
+#              Leave the homeserver running afterwards, and reuse it when it is already the
+#              version wanted. This is what you want while iterating: the suite then costs
+#              seconds rather than a container start, and a run of sus(1) by hand afterwards
+#              has something to talk to.
+#
+# ENVIRONMENT
+#      MATRIX_VERSION
+#              Set for the suite, to the version under test. The fixtures read it to build
+#              the classes for that version.
+#
+#      MATRIX_BACKEND
+#              Set for the suite, to the backend being tested. Read as the default for
+#              --backend.
+#
+#      MATRIX_APIS
+#              Read from <backend>/test.env, as the APIs that backend's rig can serve. Set it
+#              to narrow a run further, or to insist on an API the rig does not claim.
+#
+#      MATRIX_ACCOUNTS
+#              Read from <backend>/test.env and set for the suite, as how it is to get an
+#              account: login where the rig registers a user on first login, or register
+#              where the suite must register one first.
+#
+#      MATRIX_SERVICE
+#              Set for the compose file, to the version whose homeserver is up, so that a
+#              server which joins the homeserver's network namespace can name the service it
+#              is joining.
+#
+#      IMAGE_OWNER
+#              Read by the compose file, to name the registry the images come from.
+#
+#      HOMESERVER_PORT
+#              Read by every backend's compose file, to move the homeserver off port 7300. A
+#              second version can be brought up alongside the first with it. The other
+#              servers a rig runs have a variable each, named in its compose file, and the
+#              fixtures are told about them by MATRIX_HOMESERVER, MATRIX_IDENTITY_SERVER,
+#              MATRIX_PUSH_GATEWAY, MATRIX_APPLICATION_SERVICE and MATRIX_OAUTH_HOMESERVER.
+#
+#              Anything else <backend>/test.env assigns is exported for the suite too, which
+#              is how a rig says what it has: the tuwunel rig runs no authorization server,
+#              so it sets MATRIX_OAUTH_HOMESERVER empty and the OAuth flow is left out.
+#
+# FILES
+#      MATRIX_API_VERSIONS.txt
+#              The versions which can be tested, generated from the Synapse compose file by
+#              the Update Matrix Versions List workflow. Adding a service to each backend is
+#              all that is needed to add a version.
+#
+#      <backend>/docker-compose.yml
+#              The homeservers of one backend, one service per version, and the servers its
+#              other APIs are tested against, each under a profile named for its API.
+#
+#      <backend>/test.env
+#              What that backend's rig is: the APIs it serves, how the suite gets an account,
+#              and whatever else differs between one rig and another.
+#
+#      test/operations/<api>.rb
+#              What one API owes against its own schemas, which is what --api runs first.
+#
+# EXIT STATUS
+#      The bin/test utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Test the latest version on Synapse:
+#
+#            bin/test
+#
+#      Test two versions:
+#
+#            bin/test v1.11 v1.12
+#
+#      Test one API, which is what CI does per workflow:
+#
+#            bin/test --api client-server
+#
+#      Test another backend, which serves what its rig has:
+#
+#            bin/test --backend tuwunel v1.1
+#
+#      Iterate against a homeserver which stays up between runs:
+#
+#            bin/test --keep-alive --core
+#
+# SEE ALSO
+#      sus(1), .github/workflows/test.yaml, .github/workflows/test-client-server.yaml
+#
+# async-matrix                          October 11, 2026                              TEST(1)
+
+set -o errexit
+set -o nounset
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+
+# The versions which can be tested, generated from the Synapse compose file by the Update Matrix
+# Versions List workflow, which also checks that every backend offers the same ones. Adding a
+# service to each backend is all that is needed to add a version.
+mapfile -t versions < "$root/MATRIX_API_VERSIONS.txt"
+
+all="no"
+keep_alive="no"
+
+# Which APIs to test, or none for the core and every API the backend serves. The specification has
+# five, each with its own schemas, classes and tests, and CI runs a workflow per API: see
+# .github/workflows/test-<api>.yaml.
+#
+# Named as the specification names them - client-server, push-gateway - which is how the workflows
+# are named too. Ruby spells the same names with underscores, since that is what a file is called,
+# so the name is translated where it is used as a path.
+apis=()
+
+# Whether to run the tests which belong to no API: the wrappers, the versioning, the events, and
+# everything else the APIs are built from.
+core="no"
+backend="${MATRIX_BACKEND:-synapse}"
+chosen=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --all)
+      all="yes"
+      ;;
+    --keep-alive)
+      keep_alive="yes"
+      ;;
+    --api)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--api needs a name." >&2
+        exit 1
+      fi
+
+      apis+=("$1")
+      ;;
+    --api=*)
+      apis+=("${1#--api=}")
+      ;;
+    --core)
+      core="yes"
+      ;;
+    --backend)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--backend needs a name." >&2
+        exit 1
+      fi
+
+      backend="$1"
+      ;;
+    --backend=*)
+      backend="${1#--backend=}"
+      ;;
+    -*)
+      echo "Unknown option $1." >&2
+      exit 1
+      ;;
+    *)
+      chosen+=("$1")
+      ;;
+  esac
+
+  shift
+done
+
+compose="$root/$backend/docker-compose.yml"
+environment="$root/$backend/test.env"
+
+if [ ! -f "$compose" ]; then
+  echo "Unknown backend $backend: $compose does not exist." >&2
+  exit 1
+fi
+
+if [ ! -f "$environment" ]; then
+  echo "Backend $backend has no test.env, which is where a backend says what its rig serves." >&2
+  exit 1
+fi
+
+# What the backend's rig is, which the backend declares rather than this script knowing: the APIs it
+# can serve, how the suite gets an account, and wherever its servers answer. Everything assigned
+# there is exported for the suite, and each entry keeps a value which is already set, so one given
+# on the command line wins.
+set -o allexport
+# shellcheck source=/dev/null
+. "$environment"
+set +o allexport
+
+# The APIs the library has, which are the directories its schemas live in. The specification spells
+# them with hyphens where a directory has underscores.
+apis_available=()
+
+while IFS= read -r directory; do
+  apis_available+=("${directory//_/-}")
+done < <(cd "$root/lib/async/matrix/abstract/api" && find . -mindepth 2 -maxdepth 2 -type d -name schemas -printf "%h\n" | sed "s|^\./||" | sort)
+
+# The APIs this backend's rig serves, which is the one thing it has to say about itself.
+apis_served=()
+read -r -a apis_served <<< "${MATRIX_APIS:-}"
+
+serves() {
+  [[ " ${apis_served[*]} " == *" $1 "* ]]
+}
+
+# The profiles the backend's compose file declares, which is how it says which servers an API needs
+# besides the homeserver. An API the homeserver answers by itself has no profile, and one whose
+# servers run once and exit has an `<api>-seed` profile beside the API's own.
+mapfile -t profiles_declared < <(docker compose --file "$compose" config --profiles)
+
+declares() {
+  [[ " ${profiles_declared[*]} " == *" $1 "* ]]
+}
+
+# The lines which are none of the given names, or all of them when none was given.
+excluding() {
+  if [ "$#" -eq 0 ]; then
+    cat
+  else
+    grep --invert-match --line-regexp --fixed-strings --file <(printf "%s\n" "$@") || true
+  fi
+}
+
+# The version whose homeserver is running, if one is. The servers beside it are running under their
+# own names, so the answer is the one running service which names a version.
+running() {
+  docker compose --file "$compose" ps --services --filter status=running 2>/dev/null \
+    | grep --line-regexp --fixed-strings --file <(printf "%s\n" "${versions[@]}") \
+    | head -1 || true
+}
+
+# The servers one API needs besides the homeserver, which are the services carrying the profile the
+# backend declares for that API. This is as far as the script goes towards knowing them: it enables
+# the profile and brings up what the profile turns out to hold.
+start_servers() {
+  local api="$1"
+  local version="$2"
+
+  if declares "$api"; then
+    local serving=()
+    local seeding=()
+
+    mapfile -t serving < <(docker compose --file "$compose" --profile "$api" config --services | excluding "${versions[@]}")
+
+    # The ones which run once and exit rather than serving, which are whatever the API's seed
+    # profile adds to the API's own. They are run below instead of being waited on, since `docker
+    # compose up --wait` counts a container which has exited as a failure, however it exited.
+    if declares "$api-seed"; then
+      mapfile -t seeding < <(docker compose --file "$compose" --profile "$api" --profile "$api-seed" config --services | excluding "${versions[@]}" ${serving[@]+"${serving[@]}"})
+    fi
+
+    if [ "${#serving[@]}" -gt 0 ]; then
+      # Told which homeserver is up, since a server which joins the homeserver's network namespace
+      # names the service it is joining: `localhost` has to mean the homeserver for an OpenID token
+      # to be verified.
+      MATRIX_SERVICE="$version" docker compose --file "$compose" --profile "$api" up --detach --wait "${serving[@]}"
+    fi
+
+    # Run once the servers are up, in the foreground, so that what they seed is there before the
+    # suite starts. A seeder which has already run is refused by the server it is seeding, which is
+    # what a rig kept alive looks like, so that is not a failure here.
+    for seed in ${seeding[@]+"${seeding[@]}"}; do
+      MATRIX_SERVICE="$version" docker compose --file "$compose" --profile "$api" --profile "$api-seed" up --force-recreate --no-log-prefix "$seed" || true
+    done
+  fi
+}
+
+start() {
+  local version="$1"
+
+  if [ "$keep_alive" = "yes" ] && [ "$(running)" = "$version" ]; then
+    echo "Reusing the $backend $version homeserver, which is already running." >&2
+  else
+    docker compose --file "$compose" --profile "*" down
+    docker compose --file "$compose" up --detach --wait "$version"
+  fi
+
+  for api in ${apis[@]+"${apis[@]}"}; do
+    start_servers "$api" "$version"
+  done
+}
+
+# Neither --api nor --core: the whole suite, which is the core and every API the backend serves.
+if [ "${#apis[@]}" -eq 0 ] && [ "$core" = "no" ]; then
+  core="yes"
+  apis=(${apis_served[@]+"${apis_served[@]}"})
+fi
+
+# The APIs asked for which this backend cannot serve, which are dropped: their servers are not
+# brought up and their tests are not run. Said out loud, since a run of less than was asked for
+# should not look like a run of all of it.
+wanted=()
+
+for api in ${apis[@]+"${apis[@]}"}; do
+  if serves "$api"; then
+    wanted+=("$api")
+  else
+    echo "The $backend rig does not serve the $api API, so its tests are left out." >&2
+  fi
+done
+
+apis=(${wanted[@]+"${wanted[@]}"})
+
+# The paths the chosen APIs' tests live at, which is empty when none was chosen.
+#
+# An API has a structural test, a test per class, and the version layers those tests are built from.
+# A path which does not exist yet is left out, so an API whose tests are not written is just its
+# structural test.
+paths=()
+selection=()
+
+if [ "$core" = "yes" ]; then
+  selection+=("the core")
+
+  # Everything which is not an API: what is left once the APIs' own paths are taken out.
+  while IFS= read -r candidate; do
+    paths+=("$candidate")
+  done < <(cd "$root" && find test -name "*.rb" \
+    -not -path "test/operations/*" \
+    -not -path "test/async/matrix/api/*" \
+    -not -path "test/async/matrix/abstract/api/*" | sort)
+fi
+
+for api in ${apis[@]+"${apis[@]}"}; do
+  selection+=("$api")
+
+  # The specification's name as Ruby spells it: `client-server` is `client_server` on disk.
+  directory="${api//-/_}"
+
+  if [[ ! " ${apis_available[*]} " == *" $api "* ]]; then
+    echo "Unknown api $api, expected one of: ${apis_available[*]}" >&2
+    exit 1
+  fi
+
+  for candidate in "test/operations/$directory.rb" "test/async/matrix/api/$directory" "test/async/matrix/abstract/api/$directory"; do
+    if [ -e "$root/$candidate" ]; then
+      paths+=("$candidate")
+    fi
+  done
+done
+
+if [ "${#paths[@]}" -eq 0 ]; then
+  echo "Nothing to run against $backend." >&2
+  exit 0
+fi
+
+# Reported on the way out either way, so that it is said even when the suite fails.
+#
+# Every profile, because `docker compose down` only takes down the services of the profiles it was
+# given: the servers beside the homeserver would otherwise be left running, and the next version
+# brought up beside them.
+if [ "$keep_alive" = "yes" ]; then
+  trap 'echo "The rig is still running. Stop it with:" >&2
+    echo "  docker compose --file $backend/docker-compose.yml --profile '"'"'*'"'"' down" >&2' EXIT
+else
+  trap 'docker compose --file "$compose" --profile "*" down' EXIT
+fi
+
+run_tests() {
+  local version="$1"
+
+  if [[ ! " ${versions[*]} " == *" $version "* ]]; then
+    echo "Unknown version $version, expected one of: ${versions[*]}" >&2
+    return 1
+  fi
+
+  start "$version"
+
+  echo "Testing Matrix $version on $backend, for ${selection[*]}." >&2
+
+  MATRIX_VERSION="$version" MATRIX_BACKEND="$backend" bundle exec sus "${paths[@]}"
+}
+
+if [ "$all" = "yes" ]; then
+  chosen=("${versions[@]}")
+elif [ "${#chosen[@]}" -eq 0 ]; then
+  # No version asked for: the latest one.
+  chosen=("${versions[-1]}")
+fi
+
+for version in "${chosen[@]}"; do
+  run_tests "$version"
+done

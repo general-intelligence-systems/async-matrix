@@ -1,0 +1,278 @@
+name: Verify Latest Matrix Version
+
+# Watches the two things which can mean there is version work to do, neither of which announces
+# itself:
+#
+#   1. matrix-org/matrix-spec releases a version we do not test. A released version is a frozen tag,
+#      so comparing its tags against MATRIX_API_VERSIONS.txt - which is generated from the compose
+#      file, and so is exactly what bin/test can run - is the only way to find out.
+#
+#   2. Synapse catches up. When a specification version is released nothing implements it yet, so
+#      synapse/flake.nix points it at `develop` and the image is built from source. Once a Synapse
+#      release advertises it, that mapping should be repinned and the image rebuilt, otherwise we go
+#      on testing against a moving target.
+#
+# This workflow changes nothing: every step wants a person. It opens an issue carrying the
+# checklist, and edits that issue in place, since a weekly cron would otherwise pile up duplicates.
+
+on:
+  schedule:
+    # Mondays, 07:00 UTC.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{github.workflow}}
+  cancel-in-progress: false
+
+env:
+  SPECIFICATION: https://github.com/matrix-org/matrix-spec.git
+  SYNAPSE: https://github.com/element-hq/synapse.git
+  LABEL: matrix-spec
+
+jobs:
+  check:
+    name: Check for version work
+    runs-on: ubuntu-latest
+    
+    steps:
+    # The submodules are not needed: this compares remote tags against files in the working tree.
+    - uses: actions/checkout@v5
+    
+    - id: specification
+      name: Released specification versions we do not test
+      run: |
+        set -o pipefail
+        
+        if [ ! -s MATRIX_API_VERSIONS.txt ]; then
+          echo "::error::MATRIX_API_VERSIONS.txt is missing or empty."
+          exit 1
+        fi
+        
+        # Annotated tags also appear as `refs/tags/v1.19^{}`, which the anchor excludes:
+        released=$(git ls-remote --tags "$SPECIFICATION" \
+          | sed -n 's|.*refs/tags/\(v1\.[0-9]\{1,\}\)$|\1|p' \
+          | sort --version-sort --unique)
+        
+        if [ -z "$released" ]; then
+          echo "::error::Found no version tags in $SPECIFICATION."
+          exit 1
+        fi
+        
+        # Whole line, fixed string: v1.1 must not match v1.19.
+        missing=$(echo "$released" | grep --invert-match --line-regexp --fixed-strings \
+          --file MATRIX_API_VERSIONS.txt || true)
+        
+        echo "Released: $(echo "$released" | paste --serial --delimiters=' ')"
+        echo "Tested:   $(paste --serial --delimiters=' ' MATRIX_API_VERSIONS.txt)"
+        echo "Missing:  ${missing:-none}"
+        
+        {
+          echo "missing=$(echo "$missing" | paste --serial --delimiters=' ')"
+          echo "latest=$(echo "$released" | tail -1)"
+        } >> "$GITHUB_OUTPUT"
+    
+    - id: synapse
+      name: Versions on develop which a Synapse release now implements
+      run: |
+        set -o pipefail
+        
+        # Which versions the flake still builds from develop, rather than pinning to a release:
+        develop=$(grep --only-matching --extended-regexp \
+          '"v1\.[0-9]+" = \{ source = inputs\.synapse-develop' synapse/flake.nix \
+          | grep --only-matching --extended-regexp 'v1\.[0-9]+' | sort --version-sort --unique || true)
+        
+        release=$(git ls-remote --tags "$SYNAPSE" \
+          | sed -n 's|.*refs/tags/\(v[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)$|\1|p' \
+          | sort --version-sort --unique | tail -1)
+        
+        if [ -z "$release" ]; then
+          echo "::error::Found no release tags in $SYNAPSE."
+          exit 1
+        fi
+        
+        # The advertised list, read straight out of the release rather than by running the server.
+        # It moved from Python to Rust, so try both and take whichever answers.
+        advertised=""
+        for path in rust/src/handlers/versions.rs synapse/rest/client/versions.py; do
+          body=$(curl --silent --show-error --fail --location \
+            "https://raw.githubusercontent.com/element-hq/synapse/$release/$path" 2>/dev/null || true)
+          
+          advertised=$(echo "$body" | grep --only-matching --extended-regexp '"v1\.[0-9]+"' \
+            | tr --delete '"' | sort --version-sort --unique || true)
+          
+          [ -n "$advertised" ] && break
+        done
+        
+        if [ -z "$advertised" ]; then
+          echo "::warning::Could not read the advertised versions from Synapse $release."
+        fi
+        
+        if [ -n "$develop" ] && [ -n "$advertised" ]; then
+          caught_up=$(echo "$develop" | grep --line-regexp --fixed-strings \
+            --file <(echo "$advertised") || true)
+        else
+          caught_up=""
+        fi
+        
+        echo "Synapse release: $release"
+        echo "Advertises:      $(echo "$advertised" | paste --serial --delimiters=' ')"
+        echo "On develop:      $(echo "$develop" | paste --serial --delimiters=' ')"
+        echo "Caught up:       ${caught_up:-none}"
+        
+        {
+          echo "release=$release"
+          echo "caught_up=$(echo "$caught_up" | paste --serial --delimiters=' ')"
+        } >> "$GITHUB_OUTPUT"
+    
+    - name: Summarise the specification and Synapse gaps
+      env:
+        MISSING: ${{steps.specification.outputs.missing}}
+        CAUGHT_UP: ${{steps.synapse.outputs.caught_up}}
+        SYNAPSE_RELEASE: ${{steps.synapse.outputs.release}}
+      run: |
+        {
+          echo "### Matrix specification versions"
+          echo
+          if [ -n "$MISSING" ]; then
+            echo "- Released but not tested: **$MISSING**"
+          else
+            echo "- Every released version is tested."
+          fi
+          if [ -n "$CAUGHT_UP" ]; then
+            echo "- Synapse \`$SYNAPSE_RELEASE\` now implements: **$CAUGHT_UP** (built from develop today)"
+          else
+            echo "- No version on develop has been implemented by a Synapse release yet."
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+    
+    - name: Open or update the issue
+      if: steps.specification.outputs.missing != '' || steps.synapse.outputs.caught_up != ''
+      env:
+        GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        MISSING: ${{steps.specification.outputs.missing}}
+        LATEST: ${{steps.specification.outputs.latest}}
+        CAUGHT_UP: ${{steps.synapse.outputs.caught_up}}
+        SYNAPSE_RELEASE: ${{steps.synapse.outputs.release}}
+        REPOSITORY: ${{github.repository}}
+        REPOSITORY_OWNER: ${{github.repository_owner}}
+        RUN_URL: ${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}}
+      run: |
+        set -o pipefail
+        
+        if [ -n "$MISSING" ] && [ -n "$CAUGHT_UP" ]; then
+          title="Matrix specification: $MISSING to add, $CAUGHT_UP to repin"
+        elif [ -n "$MISSING" ]; then
+          title="Matrix specification $MISSING is released and not tested"
+        else
+          title="Synapse $SYNAPSE_RELEASE implements $CAUGHT_UP, which is still built from develop"
+        fi
+        
+        body=""
+        
+        if [ -n "$MISSING" ]; then
+          body+=$(cat <<BODY
+        ## Add $MISSING
+        
+        \`matrix-org/matrix-spec\` has released **$MISSING**, which \`MATRIX_API_VERSIONS.txt\` does not
+        list, so \`bin/test\` cannot run against it and Test does not cover it. A released
+        version is a frozen tag, so this will not resolve itself.
+        
+        For each version:
+        
+        - [ ] **Add a \`matrix-spec\` submodule for the tag.** There is one per released version in
+          \`./data\`, pinned to its tag, which is what the distilled specifications are generated from:
+        
+              git clone --depth 1 --branch $LATEST \\
+                https://github.com/matrix-org/matrix-spec.git data/matrix-spec-$LATEST
+              git submodule add https://github.com/matrix-org/matrix-spec.git data/matrix-spec-$LATEST
+              git config --file .gitmodules submodule.data/matrix-spec-$LATEST.shallow true
+              bin/fetch-spec $LATEST
+        
+        - [ ] **Add the version to \`lib/async/matrix/versions.rb\`**, so \`Client["$LATEST"]\` resolves.
+        
+        - [ ] **Map it to a Synapse in \`synapse/flake.nix\`.** Nothing implements a just released
+          version, so point it at \`develop\` as the existing entries do. \`bin/test\` reports a server
+          which does not advertise the version under test rather than passing silently.
+        
+        - [ ] **Add a service to \`synapse/docker-compose.yml\`**, with its own
+          \`synapse/homeserver.<version>.yaml\`. \`MATRIX_API_VERSIONS.txt\` regenerates itself from the
+          compose file through Update Matrix Versions List, so nothing else needs editing.
+        
+        - [ ] **Build and publish the image** by running **Build Test Images** for the new version.
+          Test pulls \`ghcr.io/$REPOSITORY_OWNER/synapse:spec-<version>\`, so without this the
+          job fails on a missing image.
+        
+        - [ ] **Regenerate the operation manifests** with \`bin/update-spec $LATEST\`, then
+          \`bin/generate-spec-deltas\` to record what the version changed beside each manifest.
+        
+        - [ ] **Regenerate the event manifests** with \`bin/update-event-spec $LATEST\`, then
+          \`bin/generate-event-spec-deltas\`. Events are generated by their own pair of scripts
+          because they are a different kind of thing: an operation is a call, an event is a value
+          which travels through one, and the operation manifests cannot describe it - \`sendMessage\`
+          takes the event type in its path, so its request body is opaque.
+        
+        - [ ] **Write the version layers**, in \`lib/async/matrix/abstract/api/\` and
+          \`lib/async/matrix/abstract/events/\` - or leave them no-ops where the deltas show the
+          version changed nothing we implement. Every version must be declared either way, which
+          \`AsyncMatrix/AbstractModuleVersionOrder\` enforces.
+        
+        - [ ] **Run \`bin/test $LATEST\`.**
+        BODY
+        )
+          body+=$'\n\n'
+        fi
+        
+        if [ -n "$CAUGHT_UP" ]; then
+          body+=$(cat <<BODY
+        ## Repin $CAUGHT_UP onto Synapse $SYNAPSE_RELEASE
+        
+        **$CAUGHT_UP** is built from \`develop\` in \`synapse/flake.nix\`, but Synapse
+        **$SYNAPSE_RELEASE** now advertises it at \`/_matrix/client/versions\`. A \`develop\` build is a
+        moving target: pinning to the release makes the rig reproducible, and it is also the build
+        which was actually tested upstream.
+        
+        For each version:
+        
+        - [ ] **Repin it in \`synapse/flake.nix\`** from \`source = inputs.synapse-develop\` to
+          \`published = "$SYNAPSE_RELEASE"\` - or to the earliest release which advertises it, which is
+          what the other entries record. The history of \`rust/src/handlers/versions.rs\` gives the
+          first release to add each version.
+        
+        - [ ] **Rebuild and publish the image** by running **Build Test Images** for that version, so
+          GHCR carries the release rather than a develop build.
+        
+        - [ ] **Run \`bin/test <version>\`**, which will now also confirm the server advertises it.
+        BODY
+        )
+          body+=$'\n\n'
+        fi
+        
+        body+=$(cat <<BODY
+        ---
+        
+        Opened by [Verify Latest Matrix Version]($RUN_URL). This issue is edited in place on each run, so it
+        stays current rather than being duplicated weekly.
+        BODY
+        )
+        
+        # The label may not exist yet, and `gh issue create --label` fails if it does not:
+        gh label create "$LABEL" --description "Tracking the Matrix specification" --force \
+          --repo "$REPOSITORY" || true
+        
+        existing=$(gh issue list --repo "$REPOSITORY" --state open --label "$LABEL" \
+          --limit 1 --json number --jq '.[0].number // empty')
+        
+        if [ -n "$existing" ]; then
+          echo "Updating issue #$existing."
+          
+          gh issue edit "$existing" --repo "$REPOSITORY" --title "$title" --body "$body"
+        else
+          echo "Opening a new issue."
+          
+          gh issue create --repo "$REPOSITORY" --label "$LABEL" --title "$title" --body "$body"
+        fi

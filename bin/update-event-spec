@@ -1,0 +1,370 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+# UPDATE-EVENT-SPEC(1)               General Commands Manual             UPDATE-EVENT-SPEC(1)
+#
+# NAME
+#      bin/update-event-spec — generate the event manifests from the specification
+#
+# SYNOPSIS
+#      bin/update-event-spec [version ...]
+#
+# DESCRIPTION
+#      Generates the event manifests in lib/async/matrix/abstract/events, one per event type
+#      per version. With no version, every version in MATRIX_API_VERSIONS.txt is rebuilt.
+#      What each version changed is written beside them by bin/generate-event-spec-deltas(1),
+#      which reads these files rather than the specification: extracting a surface and
+#      comparing two of them are separate jobs, and the comparison can then be re-run without
+#      reading the submodules.
+#
+#      Events are generated separately from operations because they are a different kind of
+#      thing. An operation is a call: a method, a path, parameters, a response. An event is a
+#      value which travels through those calls, and the operation schemas cannot describe it
+#      - sendMessage takes the event type in its path, so its request body is opaque. These
+#      manifests are the other half: the operations say how to call, the events say what goes
+#      in and what comes back.
+#
+#      Two things about events shape the output. The same type arrives in different framings:
+#      /sync omits the room ID, /messages carries it, a state event carries a state key, and
+#      an invite carries only a stripped subset, so the framing is recorded per entry,
+#      because it decides which envelope fields exist. And a type's content varies by a field
+#      within it, so those are recorded as variants.
+#
+# FILES
+#      data/matrix-spec-<version>
+#              The specifications, as submodules. Run bin/fetch-spec(1) first.
+#
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.yaml
+#              One manifest per event type per version.
+#
+# EXIT STATUS
+#      The bin/update-event-spec utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Rebuild every version:
+#
+#            bin/update-event-spec
+#
+#      Rebuild two:
+#
+#            bin/update-event-spec v1.18 v1.19
+#
+# SEE ALSO
+#      bin/fetch-spec(1), bin/generate-event-spec-deltas(1), bin/update-spec(1)
+#
+# async-matrix                          October 11, 2026                 UPDATE-EVENT-SPEC(1)
+
+require "yaml"
+require "fileutils"
+
+ROOT = File.expand_path("..", __dir__)
+DATA = File.join(ROOT, "data")
+OUTPUT = File.join(ROOT, "lib", "async", "matrix", "abstract", "events", "schemas")
+
+# The core schemas which say how an event is framed rather than what it means. A type refers to one of these, and that reference is what tells us where the event can appear.
+FRAMINGS = %w[
+  stripped_state sync_state_event state_event sync_room_event room_event call_event event
+].freeze
+
+# The content fields which tell variants of one type apart.
+DISCRIMINATORS = %w[msgtype method].freeze
+
+def versions
+  File.readlines(File.join(ROOT, "MATRIX_API_VERSIONS.txt"), chomp: true).reject(&:empty?)
+end
+
+def schema_directory(version)
+  File.join(DATA, "matrix-spec-#{version}", "data", "event-schemas")
+end
+
+# One line, so a manifest stays readable next to the code.
+def sentence(text)
+  if text
+    line = text.to_s.split.join(" ")
+    if line.include?(". ")
+      line = line.split(". ").first + "."
+    end
+
+    if line.length > 140
+      "#{line[0, 137]}..."
+    else
+      line
+    end
+  else
+    nil
+  end
+end
+
+# Event schemas reference each other by relative path, with no fragments, so a reference resolves to a sibling file rather than to a pointer inside this one.
+def dereference(node, base, cache, seen = [], depth = 0)
+  if depth > 24
+    node
+  else
+    case node
+    when Hash
+      if reference = node["$ref"]
+        path = File.expand_path(reference.delete_prefix("./"), base)
+
+        if seen.include?(path)
+          node.reject{|key, _| key == "$ref"}
+        else
+          target = load_document(path, cache)
+
+          if target.nil?
+            warn "  could not resolve #{reference}"
+            node.reject{|key, _| key == "$ref"}
+          else
+            resolved = dereference(target, File.dirname(path), cache, seen + [path], depth + 1)
+            rest = node.reject{|key, _| key == "$ref"}.transform_values do |value|
+              dereference(value, base, cache, seen, depth + 1)
+            end
+
+            if resolved.is_a?(Hash)
+              resolved.merge(rest)
+            else
+              resolved
+            end
+          end
+        end
+      else
+        node.transform_values{|value| dereference(value, base, cache, seen, depth + 1)}
+      end
+    when Array
+      node.map{|value| dereference(value, base, cache, seen, depth + 1)}
+    else
+      node
+    end
+  end
+end
+
+def load_document(path, cache)
+  unless cache.key?(path)
+    if File.exist?(path)
+      cache[path] = YAML.safe_load_file(path, aliases: true)
+    else
+      cache[path] = nil
+    end
+  end
+
+  cache[path]
+end
+
+# A schema as a field tree: the names, types and requiredness needed to read or build the event.
+def fields(schema, depth = 0)
+  if schema.is_a?(Hash) && depth <= 14
+    combined = %w[allOf oneOf anyOf].filter_map do |keyword|
+      entries = schema[keyword]
+
+      if entries
+        merged = {}
+
+        entries.each do |entry|
+          part = fields(entry, depth)
+
+          if part.is_a?(Hash)
+            merged.merge!(part)
+          end
+        end
+
+        merged.empty? ? nil : merged
+      else
+        nil
+      end
+    end.first
+
+    if combined
+      combined
+    elsif schema["type"] == "array"
+      inner = fields(schema["items"], depth + 1)
+
+      inner ? [inner] : "array"
+    else
+      properties = schema["properties"]
+      patterns = schema["patternProperties"]
+
+      if properties || patterns
+        required = Array(schema["required"])
+        out = {}
+
+        properties&.each do |name, value|
+          if value.is_a?(Hash)
+            out[name] = describe(value, required.include?(name), depth)
+          end
+        end
+
+        # A map keyed by something the specification does not name - a user ID, an event ID:
+        patterns&.each do |pattern, value|
+          if value.is_a?(Hash)
+            out["(*)"] = describe(value, false, depth).merge("keyed_by" => pattern)
+          end
+        end
+
+        out
+      else
+        schema["type"] || "object"
+      end
+    end
+  else
+    nil
+  end
+end
+
+# One field: its type, whether it is required, and its own fields if it has any.
+def describe(value, required, depth)
+  inner = fields(value, depth + 1)
+  out = {}
+
+  if value["enum"]
+    out["enum"] = value["enum"]
+  end
+
+  out["type"] = value["type"] || (inner.is_a?(Hash) ? "object" : "any")
+
+  if required
+    out["required"] = true
+  end
+
+  if inner.is_a?(Hash) && !inner.empty?
+    out["fields"] = inner
+  elsif inner.is_a?(Array)
+    out["fields"] = inner
+  end
+
+  out
+end
+
+# Where this event can appear, from the core schema it is built on. Read before dereferencing, because dereferencing is what dissolves the reference into the fields it contributes.
+def framing_for(raw)
+  references = Array(raw["allOf"]).filter_map{|entry| entry["$ref"]}
+
+  FRAMINGS.find do |framing|
+    references.any?{|reference| reference.to_s.include?("core-event-schema/#{framing}.yaml")}
+  end
+end
+
+# The content field which tells this variant apart from its siblings, and the value it takes.
+def discriminator_for(resolved)
+  content = resolved.dig("properties", "content") || {}
+  properties = content["properties"] || {}
+
+  DISCRIMINATORS.filter_map do |name|
+    values = properties.dig(name, "enum")
+
+    if values&.one?
+      [name, values.first]
+    else
+      nil
+    end
+  end.to_h
+end
+
+# The declared event type, which a variant shares with the type it is a variant of.
+def type_for(resolved, stem)
+  values = resolved.dig("properties", "type", "enum")
+
+  if values&.one?
+    values.first
+  else
+    stem.split("$").first
+  end
+end
+
+def entries_for(version)
+  directory = File.join(schema_directory(version), "schema")
+
+  if File.directory?(directory)
+    cache = {}
+
+    Dir.children(directory).grep(/\A[^.].*\.yaml\z/).sort.each_with_object({}) do |name, out|
+      path = File.join(directory, name)
+      raw = load_document(path, cache)
+
+      stem = name.delete_suffix(".yaml")
+
+      # v1.1 keeps stripped_state.yaml beside the types, where every later version has it under
+      # core-event-schema: it says how an event is framed rather than what one means, so it is a
+      # framing and not an event, and a manifest for it would ask for a class which has nothing to
+      # carry.
+      if raw.is_a?(Hash) && !FRAMINGS.include?(stem)
+        resolved = dereference(raw, directory, cache)
+        content = resolved.dig("properties", "content")
+
+        out[stem] = {
+          "type" => type_for(resolved, stem),
+          "framing" => framing_for(raw) || "event",
+          "variant" => discriminator_for(resolved),
+          "title" => resolved["title"],
+          "description" => sentence(resolved["description"]),
+          "content" => fields(content) || {},
+        }.reject{|_, value| value.nil? || value == {}}
+      end
+    end
+  else
+    {}
+  end
+end
+
+# Copy the tree, so that every occurrence of a resolved reference is written out in full.
+#
+# Left alone, YAML.dump writes the second occurrence as an alias, which `safe_load` cannot read.
+def disentangle(node)
+  case node
+  when Hash
+    node.to_h{|key, value| [key, disentangle(value)]}
+  when Array
+    node.map{|value| disentangle(value)}
+  when String
+    node.dup
+  else
+    node
+  end
+end
+
+# A manifest per event type, so the variants share one file.
+def family_of(stem)
+  stem.split("$").first
+end
+
+all = versions
+
+if ARGV.empty?
+  selected = all
+else
+  selected = ARGV
+end
+
+unknown = selected - all
+unless unknown.empty?
+  abort "Unknown versions: #{unknown.join(" ")}. Expected one of: #{all.join(" ")}"
+end
+
+FileUtils.mkdir_p(OUTPUT)
+
+catalogue = selected.to_h do |version|
+  [version, entries_for(version)]
+end
+
+selected.each do |version|
+  entries = catalogue[version]
+  families = entries.keys.group_by{|stem| family_of(stem)}
+
+  families.sort.each do |family, stems|
+    out = {
+      "version" => version,
+      "generated_from" => "data/matrix-spec-#{version}/data/event-schemas",
+      "events" => stems.sort.to_h{|stem| [stem, entries[stem]]},
+    }
+
+    File.write(
+      File.join(OUTPUT, "#{family}-#{version}.yaml"),
+      "# Generated by bin/update-event-spec from data/matrix-spec-#{version}. Do not edit.\n" + YAML.dump(disentangle(out))
+    )
+  end
+
+  warn format("  %-6s %3d schemas across %3d types", version, entries.size, families.size)
+end
+
+warn "\n#{catalogue[selected.last].size} schemas written for #{selected.size} versions."

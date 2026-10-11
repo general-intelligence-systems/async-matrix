@@ -1,0 +1,198 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+require "async/matrix/operations_context"
+
+# Cases for the relations of an event, layered by version.
+
+module Async
+  module Matrix
+    module Testing
+      module Abstract
+        module ClientServer
+          # Cases for {ruby Async::Matrix::ClientServer::Relations}.
+          module Relations
+            # No changes in v1.19.
+            module V1_19
+            end
+
+            # No changes in v1.18.
+            module V1_18
+            end
+
+            # No changes in v1.17.
+            module V1_17
+            end
+
+            # No changes in v1.16.
+            module V1_16
+            end
+
+            # No changes in v1.15.
+            module V1_15
+            end
+
+            # No changes in v1.14.
+            module V1_14
+            end
+
+            # No changes in v1.13.
+            module V1_13
+            end
+
+            # No changes in v1.12.
+            module V1_12
+            end
+
+            # No changes in v1.11.
+            module V1_11
+            end
+
+            # v1.10 added recursing into a thread's own relations.
+            module V1_10
+              def self.included(base)
+                base.let(:root){room.send_message("m.room.message", {msgtype: "m.text", body: "the event related to"})}
+
+                base.let(:reply) do
+                  room.send_message("m.room.message", {msgtype: "m.text", body: "the event relating", "m.relates_to": {rel_type: "m.thread", event_id: root.event_id}})
+                end
+
+                base.it "can getRelatingEvents with recurse" do
+                  related = reply
+
+                  events = client.relations.get_relating_events(room.id, root.event_id, recurse: true)
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                  expect(events.recursion_depth).not.to be_nil
+                end
+
+                base.it "can getRelatingEvents with dir" do
+                  reply
+
+                  events = client.relations.get_relating_events(room.id, root.event_id, dir: "f")
+
+                  expect(events).to be_a(client.api::RelatedEvents)
+                end
+              end
+            end
+
+            # No changes in v1.9.
+            module V1_9
+            end
+
+            # No changes in v1.8.
+            module V1_8
+            end
+
+            # No changes in v1.7.
+            module V1_7
+            end
+
+            # No changes in v1.6.
+            module V1_6
+            end
+
+            # No changes in v1.5.
+            module V1_5
+            end
+
+            # v1.4 added paging direction.
+            module V1_4
+              def self.included(base)
+                base.let(:root){room.send_message("m.room.message", {msgtype: "m.text", body: "the event related to"})}
+
+                base.let(:reply) do
+                  room.send_message("m.room.message", {msgtype: "m.text", body: "the event relating", "m.relates_to": {rel_type: "m.thread", event_id: root.event_id}})
+                end
+
+                base.it "can getRelatingEvents with dir" do
+                  related = reply
+
+                  events = client.relations.get_relating_events(room.id, root.event_id, dir: "f")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+
+                base.it "can getRelatingEventsWithRelType with dir" do
+                  related = reply
+
+                  events = client.relations.get_relating_events_with_rel_type(room.id, root.event_id, "m.thread", dir: "f")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+
+                base.it "can getRelatingEventsWithRelTypeAndEventType with dir" do
+                  related = reply
+
+                  events = client.relations.get_relating_events_with_rel_type_and_event_type(room.id, root.event_id, "m.thread", "m.room.message", dir: "f")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+              end
+            end
+
+            # v1.3 added reading the events which relate to an event.
+            module V1_3
+              def self.included(base)
+                base.let(:root){room.send_message("m.room.message", {msgtype: "m.text", body: "the event related to"})}
+
+                base.let(:reply) do
+                  room.send_message("m.room.message", {msgtype: "m.text", body: "the event relating", "m.relates_to": {rel_type: "m.thread", event_id: root.event_id}})
+                end
+
+                base.it "can getRelatingEvents" do
+                  related = reply
+
+                  events = client.relations.get_relating_events(room.id, root.event_id)
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+
+                base.it "can getRelatingEventsWithRelType" do
+                  related = reply
+
+                  events = client.relations.get_relating_events_with_rel_type(room.id, root.event_id, "m.thread")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+
+                base.it "can getRelatingEventsWithRelTypeAndEventType" do
+                  related = reply
+
+                  events = client.relations.get_relating_events_with_rel_type_and_event_type(room.id, root.event_id, "m.thread", "m.room.message")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+
+                # A relation of another type is not this relation, so the page is empty.
+                base.it "takes only the relation it is asked for" do
+                  reply
+
+                  expect(client.relations.get_relating_events_with_rel_type(room.id, root.event_id, "m.replace")).to be(:empty?)
+                end
+              end
+            end
+
+            # No changes in v1.2.
+            module V1_2
+            end
+
+            # No changes in v1.1.
+            module V1_1
+            end
+            # The cases required at the version under test.
+            CASES = Sus::Shared("relations cases") do
+              Async::Matrix::Versions.layers_for(Async::Matrix::TEST_VERSION).each do |name|
+                if Relations.const_defined?(name, false)
+                  include Relations.const_get(name, false)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end

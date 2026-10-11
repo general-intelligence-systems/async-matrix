@@ -1,0 +1,522 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+require "base64"
+require "digest"
+
+require "sus/fixtures/async/reactor_context"
+
+require "async/matrix/oauth"
+require "async/matrix/credentials"
+
+# Stands in for the authorization server, recording what each request carried.
+class FakeAuthorizationServer < ::Protocol::HTTP::Middleware
+  def initialize(status: 200, body: nil)
+    super(nil)
+
+    @status = status
+    @body = body
+    @requests = []
+  end
+
+  # @attribute [Array(Hash)] what each request carried when it arrived.
+  attr :requests
+
+  def call(request)
+    @requests << {
+      path: request.path,
+      content_type: request.headers["content-type"],
+      body: request.body&.join,
+    }
+
+    ::Protocol::HTTP::Response[@status, {"content-type" => "application/json"}, [@body || "{}"]]
+  end
+
+  def close
+  end
+end
+
+# The metadata the homeserver would have published.
+FakeMetadata = Struct.new(:issuer, :authorization_endpoint, :token_endpoint, :registration_endpoint, :revocation_endpoint)
+
+describe Async::Matrix::OAuth do
+  include Sus::Fixtures::Async::ReactorContext
+
+  let(:metadata) do
+    FakeMetadata.new(
+      "http://localhost:8091/",
+      "http://localhost:8091/authorize",
+      "http://localhost:8091/oauth2/token",
+      "http://localhost:8091/oauth2/registration",
+      "http://localhost:8091/oauth2/revocation",
+    )
+  end
+
+  let(:delegate) {FakeAuthorizationServer.new}
+
+  let(:resource) {Async::REST::Resource.new(delegate)}
+
+  let(:server) {Async::Matrix::OAuth::AuthorizationServer.new(resource, metadata)}
+
+  let(:verifier) {Async::Matrix::OAuth::Verifier.new("a-known-verifier")}
+
+  with Async::Matrix::OAuth::Verifier do
+    it "derives the challenge as the unpadded SHA-256 of the verifier" do
+      expected = Base64.urlsafe_encode64(Digest::SHA256.digest("a-known-verifier"), padding: false)
+
+      expect(verifier.challenge).to be == expected
+    end
+
+    it "does not pad the challenge" do
+      expect(verifier.challenge).not.to be(:include?, "=")
+    end
+
+    it "reports the method the challenge was derived with" do
+      expect(verifier.method).to be == "S256"
+    end
+
+    it "generates a different verifier each time" do
+      verifiers = 4.times.map{Async::Matrix::OAuth::Verifier.generate.verifier}
+
+      expect(verifiers.uniq.size).to be == 4
+    end
+
+    # RFC 7636 wants between 43 and 128 characters.
+    it "generates a verifier of a permitted length" do
+      length = Async::Matrix::OAuth::Verifier.generate.verifier.size
+
+      expect(length).to be >= 43
+      expect(length).to be <= 128
+    end
+  end
+
+  with "#authorization_url" do
+    let(:url) do
+      server.authorization_url(
+        client_id: "a-client",
+        redirect_uri: "http://127.0.0.1:1234/",
+        verifier: verifier,
+        scope: "a-scope",
+        state: "a-state",
+      )
+    end
+
+    let(:parameters) {::Protocol::URL::Encoding.decode(url.split("?", 2).last)}
+
+    it "is built on the endpoint the metadata named" do
+      expect(url).to be(:start_with?, "http://localhost:8091/authorize?")
+    end
+
+    it "asks for a code" do
+      expect(parameters["response_type"]).to be == "code"
+    end
+
+    it "carries the client, the redirect and the scope" do
+      expect(parameters["client_id"]).to be == "a-client"
+      expect(parameters["redirect_uri"]).to be == "http://127.0.0.1:1234/"
+      expect(parameters["scope"]).to be == "a-scope"
+      expect(parameters["state"]).to be == "a-state"
+    end
+
+    # A public client has no secret, so the challenge is what proves it is the same client later.
+    it "carries the challenge rather than the verifier" do
+      expect(parameters["code_challenge"]).to be == verifier.challenge
+      expect(parameters["code_challenge_method"]).to be == "S256"
+      expect(url).not.to be(:include?, "a-known-verifier")
+    end
+  end
+
+  with "#exchange" do
+    let(:delegate) do
+      FakeAuthorizationServer.new(body: "{\"access_token\":\"an-access-token\",\"refresh_token\":\"a-refresh-token\",\"token_type\":\"Bearer\",\"expires_in\":300}")
+    end
+
+    let(:tokens) do
+      server.exchange("a-code", client_id: "a-client", redirect_uri: "http://127.0.0.1:1234/", verifier: verifier)
+    end
+
+    it "posts to the token endpoint" do
+      tokens
+
+      expect(delegate.requests.first[:path]).to be == "/oauth2/token"
+    end
+
+    # The token endpoint takes a form, not JSON.
+    it "sends a form" do
+      tokens
+
+      expect(delegate.requests.first[:content_type]).to be == "application/x-www-form-urlencoded"
+    end
+
+    it "redeems the code with the verifier" do
+      tokens
+
+      form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+      expect(form["grant_type"]).to be == "authorization_code"
+      expect(form["code"]).to be == "a-code"
+      expect(form["code_verifier"]).to be == "a-known-verifier"
+      expect(form["client_id"]).to be == "a-client"
+    end
+
+    it "reports the tokens it was issued" do
+      expect(tokens.access_token).to be == "an-access-token"
+      expect(tokens.refresh_token).to be == "a-refresh-token"
+      expect(tokens.token_type).to be == "Bearer"
+    end
+
+    # OAuth reports a lifetime in seconds where Matrix reports milliseconds.
+    it "converts the lifetime to milliseconds" do
+      expect(tokens.expires_in).to be == 300
+      expect(tokens.expires_in_ms).to be == 300_000
+    end
+  end
+
+  with "#refresh" do
+    let(:delegate) do
+      FakeAuthorizationServer.new(body: "{\"access_token\":\"a-new-token\",\"expires_in\":300}")
+    end
+
+    it "exchanges the refresh token" do
+      server.refresh("a-refresh-token", client_id: "a-client")
+
+      form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+      expect(form["grant_type"]).to be == "refresh_token"
+      expect(form["refresh_token"]).to be == "a-refresh-token"
+      expect(form["client_id"]).to be == "a-client"
+    end
+
+    # The authorization server may omit a new refresh token, which leaves the old one standing.
+    it "reports no refresh token when none was issued" do
+      expect(server.refresh("a-refresh-token", client_id: "a-client").refresh_token).to be_nil
+    end
+  end
+
+  with "#register" do
+    let(:delegate) {FakeAuthorizationServer.new(body: "{\"client_id\":\"a-client\"}")}
+
+    it "posts the client metadata as JSON" do
+      registration = server.register(client_name: "async-matrix", application_type: "native")
+
+      expect(registration.client_id).to be == "a-client"
+      expect(delegate.requests.first[:path]).to be == "/oauth2/registration"
+      expect(delegate.requests.first[:content_type]).to be == "application/json"
+    end
+  end
+
+  with "a refusal" do
+    let(:delegate) do
+      FakeAuthorizationServer.new(status: 400, body: "{\"error\":\"invalid_grant\",\"error_description\":\"The provided access grant is invalid.\"}")
+    end
+
+    it "reports the OAuth error code" do
+      error = nil
+
+      begin
+        server.refresh("a-spent-token", client_id: "a-client")
+      rescue Async::Matrix::OAuth::Error => error
+      end
+
+      expect(error).to be_a(Async::Matrix::OAuth::Error)
+      expect(error).to be(:invalid_grant?)
+      expect(error.status).to be == 400
+    end
+
+    # A caller which already handles a refusal from the homeserver handles this one too.
+    it "is a request error" do
+      expect{server.refresh("a-spent-token", client_id: "a-client")}.to raise_exception(Async::Matrix::RequestError)
+    end
+
+  end
+
+  with "an endpoint on another host" do
+    let(:metadata) do
+      FakeMetadata.new("http://localhost:8091/", "http://localhost:8091/authorize", "http://elsewhere:9999/token", nil)
+    end
+
+    # Every endpoint is reached through the one connection, so one on another host cannot be used.
+    it "refuses to use it" do
+      expect{server.refresh("a-token", client_id: "a-client")}.to raise_exception(Async::Matrix::OAuth::Error)
+    end
+  end
+
+  with Async::Matrix::OAuth::Issuer do
+    let(:delegate) do
+      FakeAuthorizationServer.new(body: "{\"access_token\":\"a-renewed-token\",\"refresh_token\":\"a-new-refresh-token\",\"expires_in\":300}")
+    end
+
+    let(:issuer) {Async::Matrix::OAuth::Issuer.new(server, "a-client")}
+
+    it "renews with the client the tokens were issued to" do
+      issuer.refresh("a-refresh-token")
+
+      form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+      expect(form["client_id"]).to be == "a-client"
+    end
+
+    # The issuer is what makes the credentials renewable, without them knowing it is OAuth.
+    it "drives a renewal through the credentials" do
+      credentials = Async::Matrix::Credentials.new(issuer, access_token: "first", refresh_token: "a-refresh-token")
+
+      credentials.renew!
+
+      expect(credentials.access_token).to be == "a-renewed-token"
+      expect(credentials.refresh_token).to be == "a-new-refresh-token"
+      expect(credentials.expires_at).to be_a(Time)
+      expect(credentials.generation).to be == 1
+    end
+  end
+  with "#authorize" do
+    let(:authorization) do
+      server.authorize(client_id: "a-client", redirect_uri: "http://127.0.0.1:1234/")
+    end
+
+    it "reports an authorization in progress" do
+      expect(authorization).to be_a(Async::Matrix::OAuth::Authorization)
+    end
+
+    it "builds the URL on the endpoint the metadata named" do
+      expect(authorization.url).to be(:start_with?, "http://localhost:8091/authorize?")
+    end
+
+    it "carries the state it reports in the URL" do
+      expect(authorization.url).to be(:include?, "state=#{authorization.state}")
+    end
+
+    # Without this the caller cannot tell the redirect apart from one it did not ask for.
+    it "reports the state it asked for" do
+      expect(authorization.state).not.to be_nil
+    end
+
+    it "asks for a different state each time" do
+      states = 4.times.map{server.authorize(client_id: "a-client", redirect_uri: "http://127.0.0.1:1234/").state}
+
+      expect(states.uniq.size).to be == 4
+    end
+
+    it "asks for the API and a device by default" do
+      expect(authorization.url).to be(:include?, ::Protocol::URL::Encoding.escape(Async::Matrix::OAuth::AuthorizationServer::API_SCOPE))
+      expect(authorization.url).to be(:include?, ::Protocol::URL::Encoding.escape(Async::Matrix::OAuth::AuthorizationServer::DEVICE_SCOPE))
+    end
+
+    it "carries a challenge rather than a verifier" do
+      expect(authorization.url).to be(:include?, "code_challenge_method=S256")
+      expect(authorization.url).not.to be(:include?, "code_verifier")
+    end
+
+    # Minted here, so the caller is told which device it asked the server to create.
+    it "reports the device it asked for" do
+      expect(authorization.device_id).to be_a(String)
+      expect(authorization.url).to be(:include?, ::Protocol::URL::Encoding.escape(authorization.device_id))
+    end
+
+    it "asks for the device the caller named" do
+      chosen = server.authorize(client_id: "a-client", redirect_uri: "http://127.0.0.1:1234/", device_id: "MYDEVICE")
+
+      expect(chosen.device_id).to be == "MYDEVICE"
+      expect(chosen.url).to be(:include?, "MYDEVICE")
+    end
+
+    # The redirect may name the server back, so the authorization remembers which it asked.
+    it "remembers the issuer it asked" do
+      expect(authorization.issuer).to be == "http://localhost:8091/"
+    end
+
+    it "makes no request to build it" do
+      authorization
+
+      expect(delegate.requests).to be(:empty?)
+    end
+  end
+
+  with Async::Matrix::OAuth::Authorization do
+    let(:delegate) do
+      FakeAuthorizationServer.new(body: "{\"access_token\":\"an-access-token\",\"refresh_token\":\"a-refresh-token\",\"expires_in\":300}")
+    end
+
+    let(:authorization) do
+      Async::Matrix::OAuth::Authorization.new(resource,
+        url: "http://localhost:8091/authorize?state=a-known-state",
+        client_id: "a-client",
+        redirect_uri: "http://127.0.0.1:1234/",
+        state: "a-known-state",
+        verifier: verifier,
+        device_id: "a-device",
+        issuer: "http://localhost:8091/",
+      )
+    end
+
+    with "#exchange" do
+      it "reports the tokens it was issued" do
+        tokens = authorization.exchange("a-code", state: "a-known-state")
+
+        expect(tokens.access_token).to be == "an-access-token"
+        expect(tokens.refresh_token).to be == "a-refresh-token"
+        expect(tokens.expires_in_ms).to be == 300_000
+      end
+
+      it "redeems the code with the verifier" do
+        authorization.exchange("a-code", state: "a-known-state")
+
+        form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+        expect(form["grant_type"]).to be == "authorization_code"
+        expect(form["code"]).to be == "a-code"
+        expect(form["code_verifier"]).to be == "a-known-verifier"
+        expect(form["client_id"]).to be == "a-client"
+      end
+
+      # The caller does not supply it again, so it cannot disagree with the one the code was asked for.
+      it "redeems the code with the redirect it was asked for" do
+        authorization.exchange("a-code", state: "a-known-state")
+
+        form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+        expect(form["redirect_uri"]).to be == "http://127.0.0.1:1234/"
+      end
+
+      it "refuses a state which does not match" do
+        expect do
+          authorization.exchange("a-code", state: "another-state")
+        end.to raise_exception(Async::Matrix::OAuth::Error)
+      end
+
+      it "reports a state which does not match as a rejected grant" do
+        error = nil
+
+        begin
+          authorization.exchange("a-code", state: "another-state")
+        rescue Async::Matrix::OAuth::Error => raised
+          error = raised
+        end
+
+        expect(error).to be(:invalid_grant?)
+      end
+
+      # A code redeemed for the wrong flow is the attack the state guards against, so nothing is sent.
+      it "sends nothing when the state does not match" do
+        begin
+          authorization.exchange("a-code", state: "another-state")
+        rescue Async::Matrix::OAuth::Error
+          # Expected.
+        end
+
+        expect(delegate.requests).to be(:empty?)
+      end
+
+      # RFC 9207: a redirect naming another authorization server is answering for somebody else.
+      it "refuses an issuer which is not the one it asked" do
+        expect do
+          authorization.exchange("a-code", state: "a-known-state", iss: "http://elsewhere.invalid/")
+        end.to raise_exception(Async::Matrix::OAuth::Error)
+      end
+
+      it "accepts the issuer it asked" do
+        tokens = authorization.exchange("a-code", state: "a-known-state", iss: "http://localhost:8091/")
+
+        expect(tokens.access_token).to be == "an-access-token"
+      end
+
+      # A server which does not name itself back leaves nothing to check.
+      it "accepts a redirect which named no issuer" do
+        tokens = authorization.exchange("a-code", state: "a-known-state")
+
+        expect(tokens.access_token).to be == "an-access-token"
+      end
+
+      it "sends nothing when the issuer does not match" do
+        begin
+          authorization.exchange("a-code", state: "a-known-state", iss: "http://elsewhere.invalid/")
+        rescue Async::Matrix::OAuth::Error
+          # Expected.
+        end
+
+        expect(delegate.requests).to be(:empty?)
+      end
+
+      it "refuses a state of a different length without comparing it loosely" do
+        expect do
+          authorization.exchange("a-code", state: "a")
+        end.to raise_exception(Async::Matrix::OAuth::Error)
+      end
+    end
+
+    # The scope asked the server to create this device, so the caller has to be told which it is.
+    it "reports the device the scope asked for" do
+      expect(authorization.device_id).to be == "a-device"
+    end
+
+    it "withdraws a token it was issued" do
+      authorization.revoke("an-access-token", token_type_hint: "access_token")
+
+      form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+      expect(form["token"]).to be == "an-access-token"
+      expect(form["token_type_hint"]).to be == "access_token"
+    end
+
+    it "prints neither the state nor the verifier" do
+      expect(authorization.inspect).not.to be(:include?, "a-known-state")
+      expect(authorization.inspect).not.to be(:include?, "a-known-verifier")
+    end
+  end
+  with "#revoke" do
+    it "withdraws the token at the revocation endpoint" do
+      server.revoke("a-token", client_id: "a-client", token_type_hint: "refresh_token")
+
+      form = ::Protocol::URL::Encoding.decode(delegate.requests.first[:body])
+
+      expect(delegate.requests.first[:path]).to be == "/oauth2/revocation"
+      expect(form["token"]).to be == "a-token"
+      expect(form["client_id"]).to be == "a-client"
+      expect(form["token_type_hint"]).to be == "refresh_token"
+    end
+
+    it "omits a hint it was not given" do
+      server.revoke("a-token", client_id: "a-client")
+
+      expect(::Protocol::URL::Encoding.decode(delegate.requests.first[:body])).not.to be(:key?, "token_type_hint")
+    end
+
+    it "sends a secret for a client which has one" do
+      server.revoke("a-token", client_id: "a-client", client_secret: "a-secret")
+
+      expect(::Protocol::URL::Encoding.decode(delegate.requests.first[:body])["client_secret"]).to be == "a-secret"
+    end
+
+    with "a server which published no revocation endpoint" do
+      let(:metadata) do
+        FakeMetadata.new("http://localhost:8091/", "http://localhost:8091/authorize", "http://localhost:8091/oauth2/token", nil)
+      end
+
+      it "refuses rather than guessing where it is" do
+        expect{server.revoke("a-token", client_id: "a-client")}.to raise_exception(Async::Matrix::OAuth::Error)
+      end
+    end
+  end
+
+  with "a confidential client" do
+    it "sends its secret when it redeems a code" do
+      server.exchange("a-code", client_id: "a-client", redirect_uri: "http://127.0.0.1/", verifier: verifier, client_secret: "a-secret")
+
+      expect(::Protocol::URL::Encoding.decode(delegate.requests.first[:body])["client_secret"]).to be == "a-secret"
+    end
+
+    it "sends its secret when it renews" do
+      server.refresh("a-token", client_id: "a-client", client_secret: "a-secret")
+
+      expect(::Protocol::URL::Encoding.decode(delegate.requests.first[:body])["client_secret"]).to be == "a-secret"
+    end
+
+    # A public client has no secret, and sending an empty one is not the same as sending none.
+    it "sends no secret when it has none" do
+      server.refresh("a-token", client_id: "a-client")
+
+      expect(::Protocol::URL::Encoding.decode(delegate.requests.first[:body])).not.to be(:key?, "client_secret")
+    end
+  end
+end

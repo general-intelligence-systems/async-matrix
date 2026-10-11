@@ -1,0 +1,225 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+# GENERATE-EVENT-SPEC-DELTAS(1)      General Commands Manual    GENERATE-EVENT-SPEC-DELTAS(1)
+#
+# NAME
+#      bin/generate-event-spec-deltas — record what each version changed in the event
+#      manifests
+#
+# SYNOPSIS
+#      bin/generate-event-spec-deltas [type]
+#
+# DESCRIPTION
+#      Compares the per-version manifests written by bin/update-event-spec(1) and records
+#      what each specification version changed, as
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.deltas.yaml.  With no
+#      argument, every event type is compared.
+#
+#      This reads the manifests rather than the specification, so it needs neither the
+#      submodules nor the network, and it can be re-run on its own whenever the manifests
+#      change.
+#
+#      A deltas file holds every version a type exists at, in descending order, which is the
+#      order the layers appear in the Ruby beside it: open module V1_10 and the v1.10 deltas
+#      say what it must implement, or say the specification changed nothing and the empty
+#      layer is correct.
+#
+#      Changes are reported as leaf paths - content.info.type, content.body.required - rather
+#      than as nested subtrees, because a subtree diff of something like m.room.member prints
+#      the whole content shape and tells you nothing about what moved.
+#
+# FILES
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.yaml
+#              The manifests which are compared.
+#
+#      lib/async/matrix/abstract/events/schemas/<name>-<version>.deltas.yaml
+#              What each version changed.
+#
+# EXIT STATUS
+#      The bin/generate-event-spec-deltas utility exits 0 on success, and >0 if an error
+#      occurs.
+#
+# EXAMPLES
+#      Compare every type:
+#
+#            bin/generate-event-spec-deltas
+#
+#      One type:
+#
+#            bin/generate-event-spec-deltas m.room.message
+#
+# SEE ALSO
+#      bin/update-event-spec(1), bin/generate-spec-deltas(1)
+#
+# async-matrix                          October 11, 2026        GENERATE-EVENT-SPEC-DELTAS(1)
+
+require "yaml"
+
+ROOT = File.expand_path("..", __dir__)
+EVENTS = File.join(ROOT, "lib", "async", "matrix", "abstract", "events", "schemas")
+
+# Keys which describe rather than define, so a reworded sentence is not a change.
+IGNORED = %w[description title keyed_by].freeze
+
+def versions
+  File.readlines(File.join(ROOT, "MATRIX_API_VERSIONS.txt"), chomp: true).reject(&:empty?)
+end
+
+# An entry as a flat map of leaf path to value.
+#
+# The `fields` key is a container rather than a step, so it is skipped.
+def leaves(node, trail = [], out = {})
+  case node
+  when Hash
+    node.each do |key, value|
+      if IGNORED.include?(key)
+        next
+      end
+
+      leaves(value, key == "fields" ? trail : trail + [key.to_s], out)
+    end
+  when Array
+    # A schema array carries one descriptor for its members; anything else is a value in itself.
+    if node.size == 1 && node.first.is_a?(Hash)
+      leaves(node.first, trail[0..-2].to_a + ["#{trail.last}[]"], out)
+    else
+      out[trail.join(".")] = node
+    end
+  else
+    out[trail.join(".")] = node
+  end
+
+  out
+end
+
+def delta(before, after)
+  if before.nil?
+    {"introduced" => true}
+  elsif after.nil?
+    {"removed" => true}
+  else
+    previous = leaves(before)
+    current = leaves(after)
+    out = {}
+
+    added = (current.keys - previous.keys).sort
+    removed = (previous.keys - current.keys).sort
+    changed = (current.keys & previous.keys).reject{|path| previous[path] == current[path]}.sort
+
+    unless added.empty?
+      out["added"] = added.to_h{|path| [path, current[path]]}
+    end
+
+    unless removed.empty?
+      out["removed"] = removed.to_h{|path| [path, previous[path]]}
+    end
+
+    unless changed.empty?
+      out["changed"] = changed.to_h{|path| [path, {"from" => previous[path], "to" => current[path]}]}
+    end
+
+    out
+  end
+end
+
+all = versions
+
+# Every event type, discovered from the manifests bin/update-event-spec wrote.
+manifests = Dir.children(EVENTS).filter_map do |file|
+  match = /\A(?<name>.+)-(?<version>v\d+\.\d+)\.yaml\z/.match(file)
+
+  if match && !file.end_with?(".deltas.yaml")
+    match[:name]
+  else
+    nil
+  end
+end.uniq.sort
+
+unless ARGV.empty?
+  manifests = manifests.select{|manifest| ARGV.include?(manifest)}
+end
+
+if manifests.empty?
+  abort "No manifests found in #{EVENTS}. Run bin/update-event-spec first."
+end
+
+changed_total = 0
+
+manifests.each do |manifest|
+  # What the manifest looked like at each version, if the type existed there at all.
+  catalogue = all.to_h do |version|
+    path = File.join(EVENTS, "#{manifest}-#{version}.yaml")
+
+    if File.exist?(path)
+      [version, YAML.safe_load_file(path)["events"] || {}]
+    else
+      [version, nil]
+    end
+  end
+
+  deltas = {}
+
+  all.each do |version|
+    index = all.index(version)
+    after = catalogue[version]
+
+    if index.zero?
+      before = nil
+    else
+      before = catalogue[all[index - 1]]
+    end
+
+    # A version with no manifest at all - the event type did not exist yet:
+    if after.nil?
+      deltas[version] = {}
+      next
+    end
+
+    changes = {}
+
+    (Array(before&.keys) | after.keys).sort.each do |identifier|
+      difference = delta(before && before[identifier], after[identifier])
+
+      unless difference.empty?
+        changes[identifier] = difference
+      end
+    end
+
+    deltas[version] = changes
+  end
+
+  # The first version is where everything starts, which is not a change anyone needs to read:
+  interesting = deltas.reject{|version, _| version == all.first}.reject{|_, changes| changes.empty?}
+  changed_total += interesting.size
+
+  all.each do |version|
+    if catalogue[version].nil?
+      next
+    end
+
+    index = all.index(version)
+
+    out = {
+      "name" => manifest,
+      "version" => version,
+      "previous" => index.zero? ? nil : all[index - 1],
+      "changed" => !deltas[version].empty?,
+      "deltas" => deltas[version],
+    }
+
+    File.write(
+      File.join(EVENTS, "#{manifest}-#{version}.deltas.yaml"),
+      "# Generated by bin/generate-event-spec-deltas. Do not edit.\n" + YAML.dump(out)
+    )
+  end
+
+  unless interesting.empty?
+    warn format("  %-44s changed in: %s", manifest, interesting.keys.join(" "))
+  end
+end
+
+warn "\n#{manifests.size} event types, #{changed_total} versions with changes."

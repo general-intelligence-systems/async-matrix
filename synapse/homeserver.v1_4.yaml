@@ -1,0 +1,156 @@
+# Synapse configuration for Matrix specification v1.4, which is served by Synapse 1.70.0.
+#
+# Generated from homeserver.yaml, which it matches except for default_room_version:
+# Synapse 1.70.0 knows room versions up to 10 and refuses to start on one
+# it does not recognise.
+#
+# Do not edit by hand: edit homeserver.yaml and regenerate.
+
+server_name: "localhost"
+pid_file: /tmp/homeserver.pid
+public_baseurl: "http://localhost:8008/"
+
+listeners:
+  - port: 8008
+    type: http
+    tls: false
+    bind_addresses: ["0.0.0.0"]
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: sqlite3
+  args:
+    database: /tmp/homeserver.db
+
+media_store_path: /tmp/media_store
+signing_key_path: /config/signing.key
+
+# Blank app service registration, for the agent bridge to fill in.
+# The appservice registrations were removed along with the appservice services in
+# docker-compose.yml: this rig is only used to test the client.
+
+# Any user, any password, created on login -- so there is no user setup. A
+# throwaway rig; see /config/modules/any_password.py.
+modules:
+  - module: any_password.AnyPasswordAuthProvider
+
+registration_shared_secret: "vXw1vVyeEQi21fLZjKcPjoYo2qyDXVdIRbfechkhf64"
+macaroon_secret_key: "H96uEhb3k-QmRKhI9YyxC4BRSiRwF_BgNZJaIoPtel8"
+form_secret: "tNNR5rEuwuHa5q9XUyOkPGGPV3SZUat6iFxo9UA-BTE"
+
+enable_registration: false
+report_stats: false
+
+# Synapse 1.162 defaults to room version 12, whose room ids are hashes with no
+# ":server" part (MSC4291). matrix-nio -- and so matrix-commander -- still
+# assumes "!opaque:server" and appends the server name to any id it is given,
+# which turns a v12 id into one that does not exist. 11 keeps the classic shape.
+default_room_version: "10"
+
+# Quoted deliberately: PyYAML reads a bare `off` as False. This is the default
+# for locally-created rooms only -- it stops rooms coming up encrypted, it does
+# not forbid a client from turning encryption on afterwards. The appservice has
+# no crypto, so an encrypted room reaches it as undecryptable m.room.encrypted.
+encryption_enabled_by_default_for_room_type: "off"
+
+# Synapse 1.126 changed the default of room_list_publication_rules to deny, so a room which asks
+# to be published is not, and the public room list is empty whatever is in it. The rig is a
+# throwaway with nothing in it worth hiding, so everything may publish.
+room_list_publication_rules:
+  - user_id: "*"
+    alias: "*"
+    room_id: "*"
+    action: allow
+
+# The server-server suite reads the public room list and the server's own discovery document over
+# federation, neither of which Synapse serves unless it is asked to. Both are off by default:
+# publishing the room list to other servers is a choice, and so is answering for .well-known when
+# something else usually does.
+allow_public_rooms_over_federation: true
+serve_server_wellknown: true
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+suppress_key_server_warning: true
+
+# This is a throwaway local rig with nothing in it worth protecting, and rate limiting only makes
+# tests slow and flaky. Every limiter in synapse/config/ratelimiting.py is turned off below; the
+# defaults are given for reference, because several are far tighter than you would guess:
+# rc_room_creation allows a burst of 10 and then one room per ~62s, and rc_login allows a burst of
+# 5 and then one login per ~5 minutes.
+rc_message:                     # default: 0.2/s, burst 10
+  per_second: 1000
+  burst_count: 1000
+rc_registration:                # default: 0.17/s, burst 3
+  per_second: 1000
+  burst_count: 1000
+rc_registration_token_validity: # default: 0.1/s, burst 5
+  per_second: 1000
+  burst_count: 1000
+rc_login:
+  address:                      # default: 0.003/s, burst 5
+    per_second: 1000
+    burst_count: 1000
+  account:                      # default: 0.003/s, burst 5
+    per_second: 1000
+    burst_count: 1000
+  failed_attempts:              # default: 0.17/s, burst 3
+    per_second: 1000
+    burst_count: 1000
+rc_admin_redaction:             # default: 0.17/s, burst 3
+  per_second: 1000
+  burst_count: 1000
+rc_joins:
+  local:                        # default: 0.1/s, burst 10
+    per_second: 1000
+    burst_count: 1000
+  remote:                       # default: 0.01/s, burst 10
+    per_second: 1000
+    burst_count: 1000
+rc_joins_per_room:              # default: 1/s, burst 10
+  per_second: 1000
+  burst_count: 1000
+rc_room_creation:               # default: 0.016/s, burst 10
+  per_second: 1000
+  burst_count: 1000
+rc_invites:
+  per_room:                     # default: 0.3/s, burst 10
+    per_second: 1000
+    burst_count: 1000
+  per_user:                     # default: 0.003/s, burst 5
+    per_second: 1000
+    burst_count: 1000
+  per_issuer:                   # default: 0.3/s, burst 10
+    per_second: 1000
+    burst_count: 1000
+rc_third_party_invite:          # default: 0.0025/s, burst 5
+  per_second: 1000
+  burst_count: 1000
+rc_3pid_validation:             # default: 0.003/s, burst 5
+  per_second: 1000
+  burst_count: 1000
+rc_key_requests:                # default: 20/s, burst 100
+  per_second: 1000
+  burst_count: 1000
+rc_media_create:                # default: 10/s, burst 50
+  per_second: 1000
+  burst_count: 1000
+rc_presence:
+  per_user:                     # default: 0.1/s, burst 1
+    per_second: 1000
+    burst_count: 1000
+rc_delayed_event_mgmt:          # default: 1/s, burst 5
+  per_second: 1000
+  burst_count: 1000
+rc_reports:                     # default: 1/s, burst 5
+  per_second: 1000
+  burst_count: 1000
+rc_user_directory:              # default: 0.016/s, burst 200
+  per_second: 1000
+  burst_count: 1000
+rc_profile:                     # default: 1/s, burst 500
+  per_second: 1000
+  burst_count: 1000

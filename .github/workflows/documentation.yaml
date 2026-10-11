@@ -1,0 +1,100 @@
+name: Documentation
+
+# The documentation site in `docs/`, built and published to GitHub Pages.
+#
+# Fumadocs is a Next.js application, and Pages has no Node server, so the site is a static export:
+# `output: "export"` prerenders every route into `docs/out`, which is what is uploaded. The one
+# thing that costs is search, which becomes an index the browser downloads rather than a query the
+# server answers - see `docs/app/api/search/route.ts`.
+#
+# Pages serves the site from the repository's subpath, which `next build` has to be told about or
+# every asset URL is wrong. `actions/configure-pages` reports it, and nothing else knows it, so the
+# build cannot be reproduced locally without passing the same value.
+#
+# A pull request builds but does not publish.
+
+on:
+  push:
+    branches:
+      - main
+      - async-rest
+    paths:
+      - docs/**
+      - .github/workflows/documentation.yaml
+  pull_request:
+    paths:
+      - docs/**
+      - .github/workflows/documentation.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one part way through.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site for Pages
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: docs
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v7
+        with:
+          # Fumadocs requires Node 22 or newer.
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      
+      - name: Configure Pages for the repository subpath
+        id: pages
+        uses: actions/configure-pages@v6
+      
+      - name: Restore the Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: docs/.next/cache
+          key: ${{runner.os}}-nextjs-${{hashFiles('docs/package-lock.json')}}-${{hashFiles('docs/**.[jt]s', 'docs/**.[jt]sx', 'docs/content/**')}}
+          restore-keys: |
+            ${{runner.os}}-nextjs-${{hashFiles('docs/package-lock.json')}}-
+      
+      - name: Install the documentation dependencies
+        run: npm ci
+      
+      - name: Build the documentation site
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_PATH: ${{steps.pages.outputs.base_path}}
+      
+      # After the build, because `next typegen` types the routes the build discovers.
+      - name: Check the documentation types
+        run: npm run types:check
+      
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/out
+  
+  deploy:
+    name: Publish the site to Pages
+    if: github.event_name != 'pull_request'
+    
+    needs: build
+    runs-on: ubuntu-latest
+    
+    environment:
+      name: github-pages
+      url: ${{steps.deployment.outputs.page_url}}
+    
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

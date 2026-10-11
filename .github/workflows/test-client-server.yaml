@@ -1,0 +1,96 @@
+name: Test client-server
+
+# Runs the client-server suite across two dimensions: the Ruby version it runs on, and the Matrix specification
+# version it talks to. The images come from the Build Test Images workflow, and
+# synapse/docker-compose.yml has a service per specification version, so a job is just
+# `bin/test v1.11`.
+#
+# The matrix keys are ordered for the sake of the job names - `client-server suite, ruby 3.4, spec
+# v1.11` - the set of jobs is the product either way round. The separator is a comma because a run's
+# sidebar shows only what follows the last slash in a name, which would list every job as its
+# version and repeat each one once per Ruby.
+#
+# Ruby comes from ruby/setup-ruby rather than the flake: the devShell pins one Ruby through
+# bundlerEnv, so it cannot vary per job.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+# Without the lint group: the suite does not lint, and the cops need Ruby 4, so installing them
+# would fail the older Rubies before a test could run. See the Gemfile.
+#
+# At the workflow level, rather than on the setup-ruby step which installs them: BUNDLE_WITHOUT is
+# read from the environment and is not written to .bundle/config, so a step which does not see it
+# makes `bundle exec` demand the lint gems the install skipped, and Bundler fails with GemNotFound.
+env:
+  BUNDLE_WITHOUT: lint
+
+concurrency:
+  group: ${{github.workflow}}-client-server-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  versions:
+    name: Resolve the client-server versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{steps.resolve.outputs.matrix}}
+    steps:
+    - uses: actions/checkout@v5
+    
+    # MATRIX_API_VERSIONS.txt is generated from the compose file by the Update Matrix Versions List
+    # workflow, and is what bin/test reads too.
+    - id: resolve
+      name: List the versions the client-server suite runs against
+      run: |
+        if [ ! -s MATRIX_API_VERSIONS.txt ]; then
+          echo "::error::MATRIX_API_VERSIONS.txt is missing or empty."
+          exit 1
+        fi
+        
+        cat MATRIX_API_VERSIONS.txt
+        
+        echo "matrix=$(jq -R -s -c 'split("\n") | map(select(length > 0))' < MATRIX_API_VERSIONS.txt)" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: client-server suite, ruby ${{matrix.ruby}}, spec ${{matrix.version}}
+    needs: versions
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby:
+          - "3.3"
+          - "3.4"
+          - "4.0"
+        version: ${{fromJSON(needs.versions.outputs.matrix)}}
+    
+    steps:
+    - uses: actions/checkout@v5
+    
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{matrix.ruby}}
+        bundler-cache: true
+    
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{github.actor}}
+        password: ${{secrets.GITHUB_TOKEN}}
+    
+    - name: Run bin/test --api client-server
+      timeout-minutes: 20
+      env:
+        IMAGE_OWNER: ${{github.repository_owner}}
+      run: bin/test --api client-server ${{matrix.version}}
+    
+    - name: Synapse logs for spec ${{matrix.version}}
+      if: failure()
+      run: docker compose --file synapse/docker-compose.yml logs --no-color | tail -100

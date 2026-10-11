@@ -1,0 +1,17 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+require "async/matrix/application_service_context"
+require "async/matrix/operations_context"
+
+require_relative "../../abstract/api/application_service/ping"
+
+describe Async::Matrix::ApplicationService::Ping do
+  include Async::Matrix::ApplicationServiceContext
+  include Async::Matrix::OperationsContext
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ApplicationService::Ping::CASES
+end

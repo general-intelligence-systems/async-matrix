@@ -1,0 +1,71 @@
+name: Test identity
+
+# Runs what the identity API owes against its own schemas, at every specification version.
+#
+# No homeserver is brought up: the API has no classes yet, so every case is structural - the
+# namespace, the class the schemas name, and the methods a class would owe. A version sweep of that
+# costs seconds and needs nothing to talk to, which is why this workflow has no rig and no Ruby
+# matrix. When the API gains cases which make requests, this is where the rig goes.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Without the lint group: the suite does not lint, and the cops need Ruby 4, so installing them
+# would fail the older Rubies before a test could run. See the Gemfile.
+#
+# At the workflow level, rather than on the setup-ruby step which installs them: BUNDLE_WITHOUT is
+# read from the environment and is not written to .bundle/config, so a step which does not see it
+# makes `bundle exec` demand the lint gems the install skipped, and Bundler fails with GemNotFound.
+env:
+  BUNDLE_WITHOUT: lint
+
+concurrency:
+  group: ${{github.workflow}}-identity-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  versions:
+    name: Resolve the identity versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{steps.resolve.outputs.matrix}}
+    steps:
+    - uses: actions/checkout@v5
+    
+    - id: resolve
+      name: List the versions the identity operations run against
+      run: |
+        if [ ! -s MATRIX_API_VERSIONS.txt ]; then
+          echo "::error::MATRIX_API_VERSIONS.txt is missing or empty."
+          exit 1
+        fi
+        
+        echo "matrix=$(jq -R -s -c 'split("\n") | map(select(length > 0))' < MATRIX_API_VERSIONS.txt)" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: identity operations, spec ${{matrix.version}}
+    needs: versions
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{fromJSON(needs.versions.outputs.matrix)}}
+    
+    steps:
+    - uses: actions/checkout@v5
+    
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "3.4"
+        bundler-cache: true
+    
+    - name: Run test/operations/identity.rb
+      timeout-minutes: 10
+      env:
+        MATRIX_VERSION: ${{matrix.version}}
+      run: bundle exec sus test/operations/identity.rb

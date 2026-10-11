@@ -1,0 +1,95 @@
+name: Update Matrix Versions List
+
+# MATRIX_API_VERSIONS.txt is the list of Matrix specification versions which can be tested, one per
+# line. It is generated from synapse/docker-compose.yml, which has a service per version, so adding
+# a service is the only thing needed to add a version: bin/test and the Test workflows both
+# read the generated file.
+#
+# Every other backend has a compose file of the same shape, and this also checks that they offer the
+# same services, so that `bin/test <version>` means the same thing whichever backend it is pointed
+# at. A version added to one backend and not the others fails here rather than silently going
+# untested on the rest.
+
+on:
+  push:
+    paths:
+      - synapse/docker-compose.yml
+      - tuwunel/docker-compose.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Regenerate MATRIX_API_VERSIONS.txt
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Read the versions out of the Synapse compose file
+      run: |
+        set -o pipefail
+
+        # Every server which is not a homeserver is behind a profile named for the API it serves,
+        # so `config --services` lists the homeservers alone. The services are filtered to the
+        # "v1.N" ones anyway, so that a rig which grows a profileless server of its own does not
+        # quietly turn it into a specification version.
+        docker compose --file synapse/docker-compose.yml config --services \
+          | grep --extended-regexp '^v1\.[0-9]+$' \
+          | sort --version-sort > MATRIX_API_VERSIONS.txt
+
+        if [ ! -s MATRIX_API_VERSIONS.txt ]; then
+          echo "::error::The compose file defined no services."
+          exit 1
+        fi
+
+        cat MATRIX_API_VERSIONS.txt
+
+    # Synapse is the backend the list is generated from, so it is not checked against itself.
+    - name: Check the other backends offer the same versions
+      run: |
+        set -o pipefail
+
+        status=0
+
+        for compose in */docker-compose.yml; do
+          backend="$(dirname "$compose")"
+
+          if [ "$backend" = "synapse" ]; then
+            continue
+          fi
+
+          offered=$(docker compose --file "$compose" config --services \
+            | grep --extended-regexp '^v1\.[0-9]+$' \
+            | sort --version-sort)
+
+          if [ "$offered" = "$(cat MATRIX_API_VERSIONS.txt)" ]; then
+            echo "$backend offers every version."
+          else
+            echo "::error::$backend does not offer the same versions as synapse:"
+            diff <(cat MATRIX_API_VERSIONS.txt) <(echo "$offered") || true
+            status=1
+          fi
+        done
+
+        exit "$status"
+
+    - name: Commit MATRIX_API_VERSIONS.txt
+      run: |
+        if git diff --quiet -- MATRIX_API_VERSIONS.txt; then
+          echo "Already up to date."
+          exit 0
+        fi
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        git add MATRIX_API_VERSIONS.txt
+        git commit --message "Regenerate MATRIX_API_VERSIONS.txt from the compose file."
+        git push

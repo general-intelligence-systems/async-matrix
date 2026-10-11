@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+
+# FETCH-CHECKLISTS(1)                General Commands Manual              FETCH-CHECKLISTS(1)
+#
+# NAME
+#      bin/fetch-checklists — download the specification's release checklists
+#
+# SYNOPSIS
+#      bin/fetch-checklists [--dry-run] [version ...]
+#
+# DESCRIPTION
+#      Downloads the release checklists into data/changelog-checklists, one file per version,
+#      so that “what changed in v1.19, and have we implemented it” is a local file with boxes
+#      to tick. With no version, every version in MATRIX_API_VERSIONS.txt is fetched, and
+#      unstable with them.
+#
+#      A released version's checklist is frozen upstream and ticked off here, so it is
+#      downloaded once and never written over; delete a file to fetch it again. Checklists
+#      begin at v1.12 - earlier versions 404, which is reported rather than treated as a
+#      failure.
+#
+#      unstable moves with every merge into the specification, so it is the one which needs
+#      watching. It is written only when there is nothing to lose: no file yet, or no box
+#      ticked yet. Once a box is ticked the local file stands, and the upstream change is
+#      raised as an issue instead, because the ticks are the record of what has been
+#      implemented and only a person can carry them across.
+#
+# OPTIONS
+#      --dry-run
+#              Print the issue which would be raised, rather than raising it.
+#
+# REQUIREMENTS
+#      The GitHub CLI, gh(1), authenticated: the checklists are read through it, and an issue
+#      is raised through it.
+#
+# FILES
+#      data/changelog-checklists/<version>.md
+#              One checklist per version, ticked off by hand as things are implemented.
+#
+#      MATRIX_API_VERSIONS.txt
+#              The versions to fetch, when none is named.
+#
+# EXIT STATUS
+#      The bin/fetch-checklists utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Fetch every version, and unstable:
+#
+#            bin/fetch-checklists
+#
+#      Fetch two:
+#
+#            bin/fetch-checklists v1.18 unstable
+#
+#      See what would be raised without raising it:
+#
+#            bin/fetch-checklists --dry-run
+#
+# SEE ALSO
+#      bin/fetch-proposals(1), gh(1)
+#
+# async-matrix                          October 11, 2026                  FETCH-CHECKLISTS(1)
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+output="data/changelog-checklists"
+dry_run=""
+
+arguments=()
+for argument in "$@"; do
+	if [ "$argument" = "--dry-run" ]; then
+		dry_run="yes"
+	else
+		arguments+=("$argument")
+	fi
+done
+
+if [ ${#arguments[@]} -eq 0 ]; then
+	mapfile -t versions < MATRIX_API_VERSIONS.txt
+	versions+=(unstable)
+else
+	versions=("${arguments[@]}")
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+mkdir -p "$output"
+
+# A box's state is ours, not upstream's, so comparison reads both sides with every box cleared: the
+# only differences left are the ones upstream made.
+untick() {
+	sed 's/^\([[:space:]]*\)- \[[xX]\]/\1- [ ]/' "$1"
+}
+
+# Writes the checklist to $work/<version>.md, or reports why there is none and returns non-zero.
+download() {
+	local version="$1" status
+
+	status=$(curl --silent --show-error --location --max-time 30 \
+		--write-out '%{http_code}' \
+		--output "$work/$version.md" \
+		"https://spec.matrix.org/$version/changelog/$version/checklist.md")
+
+	if [ "$status" = "200" ]; then
+		return 0
+	fi
+
+	if [ "$status" = "404" ]; then
+		printf "%-9s no checklist published\n" "$version"
+	else
+		printf "%-9s HTTP %s\n" "$version" "$status" >&2
+	fi
+
+	return 1
+}
+
+# The local ticks are the thing worth protecting, so an upstream change to unstable becomes an issue
+# on origin rather than a write. The fingerprint of the upstream text is in the title, so a change
+# which is already reported is not reported again, and a further change gets its own issue.
+raise_issue() {
+	local fingerprint="$1" title="$2" body="$3"
+
+	if [ -n "$dry_run" ]; then
+		echo "--- would raise: $title"
+		echo "$body"
+		echo "--- end"
+
+		return 0
+	fi
+
+	if [ -n "$(gh issue list --state all --search "$fingerprint in:title" --json number --jq '.[].number')" ]; then
+		echo "unstable  changed upstream, already reported"
+
+		return 0
+	fi
+
+	gh issue create --title "$title" --body "$body" > /dev/null
+	echo "unstable  changed upstream, issue raised: $title"
+}
+
+update_unstable() {
+	local existing="$output/unstable.md" fingerprint difference ticked
+
+	if [ ! -f "$existing" ]; then
+		cp "$work/unstable.md" "$existing"
+		printf "%-9s %s\n" "unstable" "fetched, $(grep -c '^\s*- \[' "$existing") items"
+
+		return 0
+	fi
+
+	if [ "$(untick "$existing")" = "$(untick "$work/unstable.md")" ]; then
+		echo "unstable  up to date"
+
+		return 0
+	fi
+
+	# Nothing has been ticked, so there is no record to lose and the file can simply follow upstream.
+	ticked=$(grep -c '^\s*- \[[xX]\]' "$existing" || true)
+
+	if [ "$ticked" -eq 0 ]; then
+		cp "$work/unstable.md" "$existing"
+		echo "unstable  updated (nothing was ticked)"
+
+		return 0
+	fi
+
+	fingerprint=$(untick "$work/unstable.md" | sha256sum | cut -c1-12)
+	difference=$(diff --unified=1 \
+		--label "$existing (ours, $ticked ticked)" <(untick "$existing") \
+		--label "spec.matrix.org/unstable" <(untick "$work/unstable.md") || true)
+
+	raise_issue "$fingerprint" \
+		"Unstable spec checklist changed upstream ($fingerprint)" \
+		"$(printf '%s\n\n%s\n\n```diff\n%s\n```\n' \
+			"\`$existing\` has $ticked of $(grep -c '^\s*- \[' "$existing") boxes ticked, so \`bin/fetch-checklists\` left it alone. The changes below need carrying across by hand, keeping the ticks that still apply." \
+			"Source: <https://spec.matrix.org/unstable/changelog/unstable/checklist.md>" \
+			"$difference")"
+}
+
+for version in "${versions[@]}"; do
+	[ -n "$version" ] || continue
+
+	if [ "$version" = "unstable" ]; then
+		download unstable && update_unstable
+
+		continue
+	fi
+
+	if [ -f "$output/$version.md" ]; then
+		printf "%-9s %s\n" "$version" "already downloaded, $(grep -c '^\s*- \[[xX]\]' "$output/$version.md" || true) of $(grep -c '^\s*- \[' "$output/$version.md") ticked"
+
+		continue
+	fi
+
+	if download "$version"; then
+		cp "$work/$version.md" "$output/$version.md"
+		printf "%-9s %s\n" "$version" "fetched, $(grep -c '^\s*- \[' "$output/$version.md") items"
+	fi
+done

@@ -1,0 +1,10 @@
+# The policies the rig's identity server asks a user to accept, so that `getTerms` has something to
+# answer with and `agreeToTerms` has a version to accept.
+master_version: "1.0"
+docs:
+  terms_of_service:
+    version: "1.0"
+    langs:
+      en:
+        name: "Terms of Service"
+        url: "http://localhost:8092/terms/1.0/en.html"

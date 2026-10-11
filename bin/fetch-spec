@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+# FETCH-SPEC(1)                      General Commands Manual                    FETCH-SPEC(1)
+#
+# NAME
+#      bin/fetch-spec — initialize the specification submodules
+#
+# SYNOPSIS
+#      bin/fetch-spec [version ...]
+#
+# DESCRIPTION
+#      Initializes the matrix-spec submodules in data/, one per released specification
+#      version, each pinned to its tag. With no version, every version in
+#      MATRIX_API_VERSIONS.txt is fetched.
+#
+#      A released version is a frozen tag, so a submodule per version is a fixed reference
+#      rather than something which drifts.
+#
+#      They are declared shallow, so each is one commit rather than the whole history, and
+#      only the directories which are read are checked out: the specification repository is
+#      mostly a website, which is 122MB checked out in full against 58MB like this.
+#
+#      The directories kept are data/api, data/event-schemas and data/schemas.  The whole of
+#      data/api is needed rather than just client-server, because some client-server schemas
+#      reference the identity and application-service definitions.
+#
+# FILES
+#      MATRIX_API_VERSIONS.txt
+#              The versions to fetch, when none is named.
+#
+#      data/matrix-spec-<version>
+#              One submodule per version, which bin/update-spec(1) reads.
+#
+# EXIT STATUS
+#      The bin/fetch-spec utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Fetch every version:
+#
+#            bin/fetch-spec
+#
+#      Fetch two:
+#
+#            bin/fetch-spec v1.18 v1.19
+#
+# SEE ALSO
+#      bin/update-spec(1), bin/update-event-spec(1), git-submodule(1)
+#
+# async-matrix                          October 11, 2026                        FETCH-SPEC(1)
+
+set -o errexit
+set -o nounset
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+repository="https://github.com/matrix-org/matrix-spec.git"
+
+# The only directories we read. The whole of data/api is needed, not just client-server: some
+# client-server schemas reference the identity and application-service definitions.
+paths=(data/api data/event-schemas data/schemas)
+
+if [ $# -eq 0 ]; then
+	mapfile -t versions < MATRIX_API_VERSIONS.txt
+else
+	versions=("$@")
+fi
+
+for version in "${versions[@]}"; do
+	submodule="data/matrix-spec-$version"
+	
+	if ! git config --file .gitmodules --get "submodule.$submodule.path" > /dev/null 2>&1; then
+		echo "There is no submodule for $version. Add one with:" >&2
+		echo >&2
+		echo "  git clone --depth 1 --branch $version $repository $submodule" >&2
+		echo "  git submodule add $repository $submodule" >&2
+		echo "  git config --file .gitmodules submodule.$submodule.shallow true" >&2
+		
+		exit 1
+	fi
+	
+	git submodule update --init --depth 1 -- "$submodule"
+	
+	# Sparse checkout is local to a clone rather than something the parent repository records, so it
+	# is applied here instead of being inherited.
+	git -C "$submodule" sparse-checkout set --cone "${paths[@]}"
+	
+	printf "%-6s %s  %s endpoints\n" \
+		"$version" \
+		"$(git -C "$submodule" rev-parse --short HEAD)" \
+		"$(find "$submodule/data/api/client-server" -maxdepth 1 -name '*.yaml' | wc -l)"
+done

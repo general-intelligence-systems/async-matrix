@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+# Flags a `begin ... end` assigned to a variable.
+#
+# @example
+#   begin
+#     lvar = ...
+#   end
+
+require_relative "support/prism_source"
+
+module RuboCop
+  module Cop
+    module Local
+      class BeginBlockAssignment < Base
+        include PrismSource
+
+        MSG = "Do not assign a `begin...end` expression to a variable; " \
+              "move the assignment inside the begin block."
+
+        # Every way a variable is written to with a single value on the right.
+        WRITES = [
+          ::Prism::LocalVariableWriteNode,
+          ::Prism::InstanceVariableWriteNode,
+          ::Prism::ClassVariableWriteNode,
+          ::Prism::GlobalVariableWriteNode,
+        ].freeze
+
+        def on_new_investigation
+          self.prism_each(*WRITES).each do |node|
+            if node.value.is_a?(::Prism::BeginNode)
+              add_offense(self.prism_node_range(node))
+            end
+          end
+        end
+      end
+    end
+  end
+end

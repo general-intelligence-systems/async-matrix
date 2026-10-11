@@ -1,0 +1,302 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2026, by Nathan K.
+
+module Async
+  module Matrix
+    module Abstract
+      module ClientServer
+        # Layers for {ruby Async::Matrix::ClientServer::Admin}.
+        module Admin
+          # No changes in v1.19.
+          module V1_19
+          end
+
+          # v1.18 added locking and suspending a user.
+          module V1_18
+            # Whether a user is locked out, which stops them using the account at all.
+            #
+            # @parameter user_id [String] the user to ask about.
+            # @returns [UserLock] whether they are locked.
+            def get_admin_lock_user(user_id)
+              api::UserLock.get(@resource.with(path: self.lock_path_for(user_id)))
+            end
+
+            # Lock a user out, or let them back in.
+            #
+            # @parameter user_id [String] the user to lock or unlock.
+            # @parameter locked [Boolean] whether they should be locked out.
+            # @returns [UserLock] whether they are locked.
+            def set_admin_lock_user(user_id, locked)
+              api::UserLock.put(@resource.with(path: self.lock_path_for(user_id)), {locked: locked})
+            end
+
+            # Whether a user is suspended, which leaves them able to read but not to write.
+            #
+            # @parameter user_id [String] the user to ask about.
+            # @returns [UserSuspension] whether they are suspended.
+            def get_admin_suspend_user(user_id)
+              api::UserSuspension.get(@resource.with(path: self.suspend_path_for(user_id)))
+            end
+
+            # Suspend a user, or lift it.
+            #
+            # @parameter user_id [String] the user to suspend or restore.
+            # @parameter suspended [Boolean] whether they should be suspended.
+            # @returns [UserSuspension] whether they are suspended.
+            def set_admin_suspend_user(user_id, suspended)
+              api::UserSuspension.put(@resource.with(path: self.suspend_path_for(user_id)), {suspended: suspended})
+            end
+
+            # @parameter user_id [String] the user.
+            # @returns [String] the path of whether they are locked out.
+            def lock_path_for(user_id)
+              "#{V1}/admin/lock/#{::Protocol::URL::Encoding.escape(user_id)}"
+            end
+
+            # @parameter user_id [String] the user.
+            # @returns [String] the path of whether they are suspended.
+            def suspend_path_for(user_id)
+              "#{V1}/admin/suspend/#{::Protocol::URL::Encoding.escape(user_id)}"
+            end
+          end
+
+          # No changes in v1.17.
+          module V1_17
+          end
+
+          # No changes in v1.16.
+          module V1_16
+          end
+
+          # No changes in v1.15.
+          module V1_15
+          end
+
+          # No changes in v1.14.
+          module V1_14
+          end
+
+          # No changes in v1.13.
+          module V1_13
+          end
+
+          # No changes in v1.12.
+          module V1_12
+          end
+
+          # No changes in v1.11.
+          module V1_11
+          end
+
+          # No changes in v1.10.
+          module V1_10
+          end
+
+          # No changes in v1.9.
+          module V1_9
+          end
+
+          # No changes in v1.8.
+          module V1_8
+          end
+
+          # No changes in v1.7.
+          module V1_7
+          end
+
+          # No changes in v1.6.
+          module V1_6
+          end
+
+          # No changes in v1.5.
+          module V1_5
+          end
+
+          # No changes in v1.4.
+          module V1_4
+          end
+
+          # No changes in v1.3.
+          module V1_3
+          end
+
+          # No changes in v1.2.
+          module V1_2
+          end
+
+          # No changes in v1.1.
+          module V1_1
+          end
+        end
+
+        # Layers for {ruby Async::Matrix::ClientServer::UserLock}.
+        module UserLock
+          # No changes in v1.19.
+          module V1_19
+          end
+
+          # v1.18 added locking, whose response says whether it took.
+          module V1_18
+            # @returns [Boolean] whether the user is locked out.
+            def locked?
+              self.value[:locked]
+            end
+          end
+
+          # No changes in v1.17.
+          module V1_17
+          end
+
+          # No changes in v1.16.
+          module V1_16
+          end
+
+          # No changes in v1.15.
+          module V1_15
+          end
+
+          # No changes in v1.14.
+          module V1_14
+          end
+
+          # No changes in v1.13.
+          module V1_13
+          end
+
+          # No changes in v1.12.
+          module V1_12
+          end
+
+          # No changes in v1.11.
+          module V1_11
+          end
+
+          # No changes in v1.10.
+          module V1_10
+          end
+
+          # No changes in v1.9.
+          module V1_9
+          end
+
+          # No changes in v1.8.
+          module V1_8
+          end
+
+          # No changes in v1.7.
+          module V1_7
+          end
+
+          # No changes in v1.6.
+          module V1_6
+          end
+
+          # No changes in v1.5.
+          module V1_5
+          end
+
+          # No changes in v1.4.
+          module V1_4
+          end
+
+          # No changes in v1.3.
+          module V1_3
+          end
+
+          # No changes in v1.2.
+          module V1_2
+          end
+
+          # No changes in v1.1.
+          module V1_1
+          end
+        end
+
+        # Layers for {ruby Async::Matrix::ClientServer::UserSuspension}.
+        module UserSuspension
+          # No changes in v1.19.
+          module V1_19
+          end
+
+          # v1.18 added suspending, whose response says whether it took.
+          module V1_18
+            # @returns [Boolean] whether the user is suspended.
+            def suspended?
+              self.value[:suspended]
+            end
+          end
+
+          # No changes in v1.17.
+          module V1_17
+          end
+
+          # No changes in v1.16.
+          module V1_16
+          end
+
+          # No changes in v1.15.
+          module V1_15
+          end
+
+          # No changes in v1.14.
+          module V1_14
+          end
+
+          # No changes in v1.13.
+          module V1_13
+          end
+
+          # No changes in v1.12.
+          module V1_12
+          end
+
+          # No changes in v1.11.
+          module V1_11
+          end
+
+          # No changes in v1.10.
+          module V1_10
+          end
+
+          # No changes in v1.9.
+          module V1_9
+          end
+
+          # No changes in v1.8.
+          module V1_8
+          end
+
+          # No changes in v1.7.
+          module V1_7
+          end
+
+          # No changes in v1.6.
+          module V1_6
+          end
+
+          # No changes in v1.5.
+          module V1_5
+          end
+
+          # No changes in v1.4.
+          module V1_4
+          end
+
+          # No changes in v1.3.
+          module V1_3
+          end
+
+          # No changes in v1.2.
+          module V1_2
+          end
+
+          # No changes in v1.1.
+          module V1_1
+          end
+        end
+      end
+    end
+  end
+end

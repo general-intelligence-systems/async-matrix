@@ -1,0 +1,381 @@
+# The test rig: one service per Matrix specification version, each running the Synapse which
+# implements that version. The images are built and published by flake.nix in this directory.
+#
+#   docker compose up --detach --wait v1.11
+#
+# Only one runs at a time - they all bind the same port - so bin/test brings each up in turn. The
+# service name is the specification version, so starting the right server is just naming it.
+#
+# Each version mounts its own homeserver.<version>.yaml, generated from homeserver.yaml: an older
+# Synapse rejects settings a newer one accepts, so the configuration is versioned alongside the
+# server. MATRIX_API_VERSIONS.txt is generated from the services below.
+
+# Every server here which is not a homeserver carries a compose profile named for the API it serves:
+# `identity` is sydent, `push-gateway` is sygnal, `application-service` is the stub which answers in
+# a bridge's place, and `client-server` is the OAuth 2.0 stack. That is how the rig declares what it
+# has, and it is the whole of what bin/test knows about this file - it enables the profiles of the
+# APIs it was asked for and never names a service:
+#
+#   docker compose --profile identity up --detach --wait
+#
+# A backend whose rig has no server for an API declares no profile for it, and asking for that API
+# there is then a run of nothing. Which APIs this rig can serve is declared in test.env.
+#
+# A service which runs once and exits rather than serving goes in the `<api>-seed` profile instead,
+# so that it is run after that API's servers are up rather than waited on: `docker compose up
+# --wait` counts a container which has exited as a failure, however it exited.
+#
+# The profiles also keep these services out of `docker compose config --services`, so
+# MATRIX_API_VERSIONS.txt stays a list of specification versions. They bind their own ports, so they
+# run alongside whichever version is up.
+
+# A fixed project name, so that `docker compose down` finds the rig whatever directory it is run
+# from, rather than deriving a different project per working directory.
+name: async-matrix
+
+x-synapse: &synapse
+  # Always ask the registry, because the tag is rebuilt rather than retired: synapse:spec-v1.3 is
+  # "the Synapse which implements Matrix v1.3", and it points at a different Synapse whenever
+  # flake.nix changes which one that is. Without this, a run reuses whatever was pulled last and
+  # tests the version mapping of the day it was pulled, which fails in ways that read as library
+  # bugs. A pull of an unchanged tag costs one manifest request, since the layers are cached.
+  pull_policy: always
+  environment:
+    SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+    PYTHONPATH: /config/modules
+  ports:
+    - "${HOMESERVER_PORT:-7300}:8008"
+    # The identity server and the TLS terminator in front of federation share this namespace, so
+    # their ports are published here: a container which joins another's namespace cannot publish
+    # one of its own. The published ports all sit in an unused range, clear of the defaults
+    # services pick for themselves.
+    - "${SYDENT_PORT:-7302}:8090"
+  # The database and the media store, which homeserver.yaml puts under /tmp.
+  #
+  # In memory, because the rig's database is thrown away with the container either way, and on disk
+  # it is what the suite spends its time on: SQLite fsyncs per transaction, and a createRoom is
+  # fifty persisted events, which costs about 2.7 seconds against the container's overlay
+  # filesystem. Every case which touches a room pays that, and the ones which give up waiting are
+  # the `Connection from client lost before response was sent` in the homeserver's log.
+  tmpfs:
+    - /tmp
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
+    interval: 3s
+    timeout: 3s
+    retries: 30
+
+x-volumes:
+  signing-key: &signing-key ./signing.key:/config/signing.key:ro
+  modules: &modules ./modules:/config/modules:ro
+
+services:
+  v1.1:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.1
+    volumes:
+      - ./homeserver.v1_1.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.2:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.2
+    volumes:
+      - ./homeserver.v1_2.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.3:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.3
+    volumes:
+      - ./homeserver.v1_3.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.4:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.4
+    volumes:
+      - ./homeserver.v1_4.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.5:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.5
+    volumes:
+      - ./homeserver.v1_5.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.6:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.6
+    volumes:
+      - ./homeserver.v1_6.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.7:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.7
+    volumes:
+      - ./homeserver.v1_7.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.8:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.8
+    volumes:
+      - ./homeserver.v1_8.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.9:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.9
+    volumes:
+      - ./homeserver.v1_9.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.10:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.10
+    volumes:
+      - ./homeserver.v1_10.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.11:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.11
+    volumes:
+      - ./homeserver.v1_11.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.12:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.12
+    volumes:
+      - ./homeserver.v1_12.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.13:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.13
+    volumes:
+      - ./homeserver.v1_13.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.14:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.14
+    volumes:
+      - ./homeserver.v1_14.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.15:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.15
+    volumes:
+      - ./homeserver.v1_15.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.16:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.16
+    volumes:
+      - ./homeserver.v1_16.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.17:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.17
+    volumes:
+      - ./homeserver.v1_17.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.18:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.18
+    volumes:
+      - ./homeserver.v1_18.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  v1.19:
+    <<: *synapse
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.19
+    volumes:
+      - ./homeserver.v1_19.yaml:/config/homeserver.yaml:ro
+      - *signing-key
+      - *modules
+
+  # The identity server, which answers the identity service API: it holds which address belongs to
+  # which user, so that a client can invite somebody it has only an address for. A homeserver does
+  # not answer those paths, which is why this is a server of its own.
+  #
+  # One service rather than one per version: every operation the identity API defines is in all of
+  # the versions this rig covers, so there is nothing to vary. It binds its own port, so it runs
+  # alongside whichever homeserver version is up.
+  # Terminates TLS in front of the homeserver, on the federation port.
+  #
+  # The identity server verifies an OpenID token by asking the homeserver over federation, which is
+  # HTTPS: `use_tls_for_federation` is an argument to Sydent's constructor rather than a setting,
+  # and only its own test harness passes false. The homeserver speaks plain HTTP, so this sits in
+  # front of it. It joins the homeserver's network namespace, so 8448 and 8008 are the same
+  # `localhost` - which is what the homeserver calls itself, and so what the identity server has to
+  # resolve.
+  federation-tls:
+    profiles: [identity]
+    image: alpine/socat:latest
+    network_mode: "service:${MATRIX_SERVICE:-v1.19}"
+    volumes:
+      - ./tls:/config/tls:ro
+    command:
+      - OPENSSL-LISTEN:8448,reuseaddr,fork,cert=/config/tls/federation.pem,verify=0
+      - TCP:127.0.0.1:8008
+
+  sydent:
+    profiles: [identity]
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sydent:latest
+    pull_policy: always
+    # The same namespace as the homeserver, so that the name the homeserver calls itself resolves
+    # to it from here. Its port is published by the homeserver, above.
+    network_mode: "service:${MATRIX_SERVICE:-v1.19}"
+    depends_on:
+      - federation-tls
+    environment:
+      SYDENT_CONF: /config/sydent.conf
+    volumes:
+      - ./sydent.conf:/config/sydent.conf:ro
+      - ./sydent-terms.yaml:/config/sydent-terms.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8090/_matrix/identity/v2')\""]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # The push gateway, which a homeserver calls to have a notification delivered.
+  #
+  # No applications are configured, so a notification is one it rejects: see sygnal.yaml. It binds
+  # its own port, so it runs alongside whichever homeserver version is up.
+  sygnal:
+    profiles: [push-gateway]
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sygnal:latest
+    pull_policy: always
+    environment:
+      SYGNAL_CONF: /config/sygnal.yaml
+    volumes:
+      - ./sygnal.yaml:/config/sygnal.yaml:ro
+    ports:
+      - "${SYGNAL_PORT:-7303}:5000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('localhost', 5000), 2)\""]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # An application service, in as little as answers the specification: see appservice-stub.py.
+  #
+  # The application service API is served by a bridge, and every bridge is a bridge to something.
+  # The rig runs none, so this answers in its place - which is enough for the operations, since each
+  # is a request whose shape the suite is checking and whose answer it reads.
+  appservice:
+    profiles: [application-service]
+    image: python:3-slim
+    command: ["python", "/config/appservice-stub.py"]
+    volumes:
+      - ./appservice-stub.py:/config/appservice-stub.py:ro
+    ports:
+      - "${APPSERVICE_PORT:-7305}:8099"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/_matrix/app/v1/thirdparty/protocols')\""]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # The OAuth 2.0 stack. MAS stores its state in PostgreSQL, which it requires, and Synapse
+  # delegates authentication to it.
+
+  oauth-postgres:
+    profiles: [client-server]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mas
+      POSTGRES_PASSWORD: mas
+      POSTGRES_DB: mas
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username mas --dbname mas"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  oauth-mas:
+    profiles: [client-server]
+    image: ghcr.io/element-hq/matrix-authentication-service:latest
+    command: ["server", "--config", "/config/mas.yaml"]
+    depends_on:
+      oauth-postgres:
+        condition: service_healthy
+    volumes:
+      - ./mas.yaml:/config/mas.yaml:ro
+    ports:
+      - "${MAS_PORT:-7301}:8080"
+
+  # Registers the user the OAuth suite logs in as. MAS has no equivalent of the version rig's
+  # register-on-first-login module, so the user is seeded once, here.
+  #
+  # It waits for the homeserver, not just the database: registering a user provisions it into
+  # Synapse as well, and a user seeded while the homeserver was down exists in MAS alone. The
+  # authorization server then refuses every exchange, because the device it must create belongs
+  # to a user the homeserver has never heard of.
+  oauth-mas-user:
+    profiles: [client-server-seed]
+    image: ghcr.io/element-hq/matrix-authentication-service:latest
+    restart: "no"
+    command:
+      - manage
+      - register-user
+      - --config
+      - /config/mas.yaml
+      - --yes
+      - --ignore-password-complexity
+      - --password
+      - "${MATRIX_OAUTH_PASSWORD:-password}"
+      - "${MATRIX_OAUTH_USERNAME:-oauthtester}"
+    depends_on:
+      oauth-synapse:
+        condition: service_healthy
+    volumes:
+      - ./mas.yaml:/config/mas.yaml:ro
+
+  oauth-synapse:
+    profiles: [client-server]
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.19
+    pull_policy: always
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+    depends_on:
+      - oauth-mas
+    ports:
+      - "${OAUTH_SYNAPSE_PORT:-7310}:8008"
+    volumes:
+      - ./homeserver.oauth.yaml:/config/homeserver.yaml:ro
+      - ./signing.key:/config/signing.key:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30

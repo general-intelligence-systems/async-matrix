@@ -1,0 +1,259 @@
+# Note: async-rest also uses rubocop-md, which is not in this project's Gemfile.
+plugins:
+  - rubocop-socketry
+
+require:
+  - ./cops/begin_block_assignment.rb
+  - ./cops/no_conditional_assignment.rb
+  - ./cops/no_modifier_if.rb
+  - ./cops/no_return.rb
+  - ./cops/use_tap.rb
+  - ./cops/each_file_has_matching_test.rb
+  - ./cops/abstract_module_version_order.rb
+  - ./cops/abstract_module_no_changes_comment.rb
+  - ./cops/abstract_module_delta_has_code.rb
+  - ./cops/no_operation_respond_to.rb
+  - ./cops/comment_structure.rb
+  - ./cops/single_line_methods_for_events.rb
+
+AllCops:
+  DisabledByDefault: true
+
+# Socketry specific rules:
+
+# Indenting blank lines means trailing whitespace once indentation is spaces rather than tabs:
+Layout/ConsistentBlankLineIndentation:
+  Enabled: false
+
+Layout/BlockDelimiterSpacing:
+  Enabled: true
+
+Style/GlobalExceptionVariables:
+  Enabled: true
+
+# General Layout rules:
+
+Layout/IndentationStyle:
+  Enabled: true
+  EnforcedStyle: spaces
+
+Layout/InitialIndentation:
+  Enabled: true
+
+Layout/IndentationWidth:
+  Enabled: true
+  Width: 2
+
+Layout/IndentationConsistency:
+  Enabled: true
+  EnforcedStyle: normal
+
+Layout/BlockAlignment:
+  Enabled: true
+
+Layout/EndAlignment:
+  Enabled: true
+  EnforcedStyleAlignWith: start_of_line
+
+Layout/BeginEndAlignment:
+  Enabled: true
+  EnforcedStyleAlignWith: start_of_line
+
+Layout/RescueEnsureAlignment:
+  Enabled: true
+
+Layout/ElseAlignment:
+  Enabled: true
+
+Layout/DefEndAlignment:
+  Enabled: true
+
+Layout/CaseIndentation:
+  Enabled: true
+  EnforcedStyle: end
+
+Layout/CommentIndentation:
+  Enabled: true
+
+Layout/FirstHashElementIndentation:
+  Enabled: true
+  EnforcedStyle: consistent
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: true
+
+Layout/EmptyLinesAroundModuleBody:
+  Enabled: true
+
+Layout/EmptyLineAfterMagicComment:
+   Enabled: true
+
+Layout/SpaceInsideBlockBraces:
+  Enabled: true
+  EnforcedStyle: no_space
+  SpaceBeforeBlockParameters: false
+
+Layout/SpaceAroundBlockParameters:
+  Enabled: true
+  EnforcedStyleInsidePipes: no_space
+
+Layout/FirstArrayElementIndentation:
+  Enabled: true
+  EnforcedStyle: consistent
+
+Layout/ArrayAlignment:
+  Enabled: true
+  EnforcedStyle: with_fixed_indentation
+
+Layout/FirstArgumentIndentation:
+  Enabled: true
+  EnforcedStyle: consistent
+
+Layout/ArgumentAlignment:
+  Enabled: true
+  EnforcedStyle: with_fixed_indentation
+
+Layout/ClosingParenthesisIndentation:
+  Enabled: true
+
+Layout/TrailingWhitespace:
+  Enabled: true
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+Style/StringLiterals:
+  Enabled: true
+  EnforcedStyle: double_quotes
+
+# Project specific rules:
+
+# Every version layer must be declared, even when it changed nothing, and declared highest first.
+# The versions come from MATRIX_API_VERSIONS.txt, which is generated from the compose file, so a
+# version only has to be added in one place.
+AsyncMatrix/AbstractModuleVersionOrder:
+  Enabled: true
+  Include:
+    - "lib/async/matrix/abstract/**/*.rb"
+    # Test cases are layered by version too, so the same rule applies to them.
+    - "test/async/matrix/abstract/**/*.rb"
+
+# An empty version layer must say which version it stands for, so that a reader can tell "nothing
+# changed here" from "somebody left this unfinished".
+AsyncMatrix/AbstractModuleNoChangesComment:
+  Enabled: true
+  Include:
+    - "lib/async/matrix/abstract/**/*.rb"
+    - "test/async/matrix/abstract/**/*.rb"
+
+# A version whose deltas say it changed must answer for it in its layer. The deltas are generated from
+# the specification, so an empty layer beside a `changed: true` deltas file is a concept nobody has
+# read against its own schema. The earliest version is excused: it introduces the operations, and
+# what every version has belongs on the base class.
+AsyncMatrix/AbstractModuleDeltaHasCode:
+  Enabled: true
+  Include:
+    - "lib/async/matrix/abstract/**/*.rb"
+    # The deltas apply to the cases as much as to the code, so a changed version owes a case too.
+    - "test/async/matrix/abstract/**/*.rb"
+
+# Asking an object whether it has an operation is bypassing the versioning system: the class built
+# for a version is what says which operations that version has. The schemas name every operation of
+# every version, including the ones a later version withdrew, which are the names worth probing for.
+AsyncMatrix/NoOperationRespondTo:
+  Enabled: true
+
+# `lib` and `test` mirror each other file for file, so that whether something is tested is answered
+# by the path. Exceptions are listed rather than assumed.
+AsyncMatrix/EachFileHasMatchingTest:
+  Enabled: true
+  Include:
+    - "lib/**/*.rb"
+    - "test/**/*.rb"
+  Exclude:
+    # Describe the shape of the project - which classes exist, and which test files are guarded -
+    # rather than a file in lib, so they have no counterpart there.
+    - "test/operations/*.rb"
+    - "test/events.rb"
+
+# House style, shared with ratalada.
+
+# Bans assigning a `begin...end` expression; the assignment goes inside the block.
+Local/BeginBlockAssignment:
+  Enabled: true
+
+# Bans assigning an `if` / `case` expression; assign inside each branch instead.
+Local/NoConditionalAssignment:
+  Enabled: true
+
+# Bans modifier `if` / `unless`, so a guard cannot hide off the right edge of a long line.
+Local/NoModifierIf:
+  Enabled: true
+
+# Bans `return`. The method's last expression is its return value, and guards are structural.
+Local/NoReturn:
+  Enabled: true
+
+# Requires `tap` where a method assigns a local on its first line and returns it on its last.
+Local/UseTap:
+  Enabled: true
+
+# How a comment is built: measured against how async-rest, async-discord and async-ollama document
+# themselves, and parsed by decode so that an annotation is whatever decode recognises as one.
+#
+# A paragraph is one line however long - none of the 99 summary paragraphs in those projects is
+# wrapped, and async-rest's reach 544 characters. A summary is short, and no longer than the code it
+# describes earns: ten words, plus three per line of body, to a ceiling of thirty, which fits all 76
+# of their documented methods bar one. A module gets ten words, which is exactly what the one
+# commented module in async-rest uses. And a method described in prose documents its signature with
+# annotations rather than leaving it to the reader.
+#
+# Nothing is corrected automatically: a comment which breaks these has to be rewritten.
+Local/CommentStructure:
+  Enabled: true
+
+  # The word allowances: ten words, plus three per line of method body, to a ceiling of thirty. A
+  # module gets ten whatever its size.
+  MaximumWords: 30
+  BaseWords: 10
+  WordsPerLine: 3
+  ModuleWords: 10
+
+  # Each check is scoped on its own. No `Include` means everywhere; an `Include` narrows it, and
+  # `Exclude` then removes paths from what is left.
+  #
+  # A script in `bin` carries its documentation as a man page - the rendered output, as a comment -
+  # whose lines are wrapped and whose summaries are as long as the page needs by the formatter
+  # rather than by hand, so neither check applies there.
+  Wrapping:
+    Enabled: true
+    Exclude:
+      - "bin/*"
+
+  Length:
+    Enabled: true
+    Exclude:
+      - "bin/*"
+
+  # Annotations document an interface, so they are asked for where there is one. A script in `bin`
+  # and a case in `test` are called by nobody, and the generated layers under `abstract` carry the
+  # annotations of the methods they override.
+  Annotations:
+    Enabled: true
+    Include:
+      - "lib/**/*.rb"
+      - "fixtures/**/*.rb"
+    Exclude:
+      - "lib/async/matrix/abstract/**/*.rb"
+
+# A method whose body is a single expression is written as an endless method, so the body sits
+# beside the name. The event classes are generated one reader per field, so they are where the shape
+# is worth enforcing; elsewhere a method may be laid out for its own reasons.
+Local/SingleLineMethodsForEvents:
+  Enabled: true
+  Include:
+    - "lib/async/matrix/events/**/*.rb"
+    # The layers read fields the same way the classes do, and the cases they carry are blocks
+    # rather than single expressions, so the rule reaches them without asking anything of them.
+    - "lib/async/matrix/abstract/events/**/*.rb"
+    - "test/async/matrix/abstract/events/**/*.rb"

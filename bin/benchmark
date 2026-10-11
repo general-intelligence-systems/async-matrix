@@ -1,0 +1,593 @@
+#!/usr/bin/env bash
+
+# BENCHMARK(1)                       General Commands Manual                     BENCHMARK(1)
+#
+# NAME
+#      bin/benchmark — measure the library against itself
+#
+# SYNOPSIS
+#      bin/benchmark [--harness name] [--category name] [--version version]
+#                    [--compare revision] [--threshold percentage] [--gate name]
+#                    [--homeserver] [--backend name] [--keep-alive] [--list] [benchmark ...]
+#
+# DESCRIPTION
+#      bin/benchmark runs the benchmarks in benchmark/, each in a Ruby of its own, and writes
+#      what they measured into a directory per run under benchmark/data.
+#
+#      A benchmark says what to measure and a harness says how to measure it. The harness is
+#      chosen by the load path rather than by the benchmark, so the same benchmark can be
+#      timed, driven by benchmark-ips, or run under a profiler without being edited.
+#
+#      With no benchmark, every registered one is run. A benchmark is registered by being
+#      listed in benchmark/benchmarks.yml, so a file which merely supports one is not
+#      mistaken for one.
+#
+#      With --compare, each benchmark is run twice - against another revision's library and
+#      against this working copy's - and what changed is reported. The benchmarks and the
+#      harness come from this working copy both times, so that a benchmark which changed
+#      between the two revisions is not measuring itself; only lib/ differs. That is also what
+#      lets a revision from before the benchmarks existed be a baseline.
+#
+#      The two sides of a benchmark are run back to back rather than every baseline and then
+#      every current, because a machine drifts over the minutes a full run takes and running
+#      the sides apart turns that drift into the difference being reported.
+#
+#      A change is reported as a change only when it is larger than the runs it was measured
+#      from: each result carries how much that run varied, and the two deviations added
+#      together, or --threshold, whichever is larger, is what a difference has to beat.
+#      Allocation counts are judged against a tighter floor of their own, because the same
+#      code allocates the same objects however busy the machine is - which makes them the
+#      signal to trust where the machine is shared. See --gate.
+#
+#      Most of the benchmarks need nothing but a Ruby. The ones under homeserver/ need the rig
+#      bin/test brings up, and are left out of a run which did not ask for them: naming one is
+#      asking for it, so is --homeserver. When one is selected the backend's compose file is
+#      used to bring the version up and take it down again, exactly as bin/test does.
+#
+#      The benchmark under requests/ needs no homeserver, because it cannot use one. It
+#      measures whether requests under one reactor overlap, and a real homeserver answers one
+#      request at a time, so the figure against Synapse describes Synapse rather than this
+#      library - it reads 1.03x whatever the client does. It therefore runs against an
+#      in-process stub which answers after a fixed delay. See benchmark/requests/stub.rb.
+#
+# OPTIONS
+#      --harness name
+#              How to measure, which is a directory under benchmark/ holding a harness.rb.
+#              Defaults to harness, which times the block and counts what it allocated. The
+#              others answer a different question about the same benchmark:
+#
+#              harness-bips        a rate rather than a time, via benchmark-ips.
+#              harness-memory      what one run allocated and kept, and where from.
+#              harness-stackprof   where the time went, written out as a profile dump.
+#
+#      --category name
+#              Run only the benchmarks of that category: headline for the numbers worth
+#              quoting, micro for a single call measured as a rate, other for a benchmark
+#              which answers a question rather than guarding a number.
+#
+#      --version version
+#              The specification version to build for, where a benchmark builds one. Defaults
+#              to the latest the library knows about.
+#
+#      --compare revision
+#              Measure that revision's library as well as this working copy's, and report what
+#              changed. The revision is checked out into a temporary worktree, which is
+#              removed afterwards; the working copy is not touched, so a comparison can be run
+#              with uncommitted changes in it, which is the usual case.
+#
+#      --threshold percentage
+#              The floor a timing has to move to count as a change, where the runs varied by
+#              less than that. Defaults to 10.
+#
+#      --gate name
+#              What is allowed to fail the comparison. all, the default, is what somebody
+#              watching a run on their own machine wants. allocations is what a shared machine
+#              should use: a timing on a CI runner is not reproducible enough to block on, and
+#              gating on one teaches everybody to ignore the job. none reports and exits 0.
+#
+#      --homeserver
+#              Include the benchmarks which need the rig, which are left out otherwise.
+#
+#      --backend name
+#              The homeserver to benchmark against, which is a directory holding a compose
+#              file. Defaults to synapse, as bin/test does.
+#
+#      --keep-alive
+#              Leave the homeserver running afterwards, and reuse it when it is already the
+#              version wanted. What you want while iterating.
+#
+#      --list  Print the registered benchmarks with what each measures, and exit.
+#
+# ENVIRONMENT
+#      MATRIX_VERSION
+#              Read as the default for --version, and set for the benchmark, as it is for the
+#              suite.
+#
+#      BENCHMARK_RESULTS
+#              Set for each benchmark, to the file it is to write. A benchmark run by hand and
+#              not given one writes a file named for the time instead.
+#
+#      BENCHMARK_LIBRARY
+#              Set for each benchmark, to the lib/ it is to measure. This working copy's unless
+#              a baseline is being run. A benchmark run by hand and not given one measures this
+#              working copy.
+#
+#      WARMUP_ITERATIONS, MINIMUM_ITERATIONS, MINIMUM_TIME, MAXIMUM_ITERATIONS
+#              Read by the default harness: how many iterations are discarded, and the fewest
+#              iterations and least time to measure for. A run goes on until both are met, or
+#              until MAXIMUM_ITERATIONS, which is what stops a fast block being asked for
+#              millions of them.
+#
+#      REPORTED_ITERATIONS
+#              How many iterations the default harness prints one by one before going quiet.
+#
+#      WARMUP_TIME, MEASUREMENT_TIME
+#              Read by harness-bips, in seconds.
+#
+#      REPORTED_LOCATIONS
+#              Read by harness-memory: how many of the heaviest locations to print.
+#
+#      STACKPROF_MODE, STACKPROF_INTERVAL, PROFILED_ITERATIONS, REPORTED_FRAMES
+#              Read by harness-stackprof: what to sample (wall, cpu or object), how often, how
+#              many iterations to profile, and how many frames to print.
+#
+#      MATRIX_BACKEND, MATRIX_ACCOUNTS
+#              Set for a benchmark which needs the rig, to the backend and to how it is to get
+#              an account, which the backend declares in <backend>/test.env. As bin/test sets
+#              them for the suite.
+#
+#      MATRIX_HOMESERVER
+#              Read by the rig benchmarks, for where the homeserver is. Defaults to the port
+#              the compose file publishes.
+#
+#      REQUESTS, CONCURRENCIES, STUB_DELAY
+#              Read by requests/concurrency: how many requests each level makes, which levels
+#              to sweep, and how long the stub takes to answer. There has to be a delay:
+#              concurrency overlaps waiting, so a server which answers instantly has nothing
+#              to overlap and would show a flat curve however good the client is.
+#
+# FILES
+#      benchmark/benchmarks.yml
+#              The benchmarks which can be run, with a description and a category for each.
+#
+#      benchmark/harness/
+#              The default harness, and what every harness shares.
+#
+#      <backend>/docker-compose.yml
+#              The homeservers of one backend, one service per version. The same file bin/test
+#              uses.
+#
+#      <backend>/test.env
+#              What that backend's rig is, sourced for the environment a benchmark runs in.
+#              The same file bin/test reads.
+#
+#      MATRIX_API_VERSIONS.txt
+#              The versions the rig offers. The latest is brought up unless --version says
+#              otherwise.
+#
+#      benchmark/data/
+#              A directory per run, holding a JSON document per benchmark, and beside it the
+#              profile dump or allocation report where a harness wrote one. Not checked in.
+#
+# EXIT STATUS
+#      The bin/benchmark utility exits 0 on success, and >0 if an error occurs. With --compare
+#      it also exits >0 when something the gate counts got worse, which is what a workflow
+#      reads.
+#
+# EXAMPLES
+#      Run everything:
+#
+#            bin/benchmark
+#
+#      Run the numbers worth quoting:
+#
+#            bin/benchmark --category headline
+#
+#      Run one benchmark, or one directory of them:
+#
+#            bin/benchmark versions/build
+#            bin/benchmark versions
+#
+#      Measure a rate rather than a time:
+#
+#            bin/benchmark --harness harness-bips versions/cached
+#
+#      Find out where a benchmark's time goes, and read the profile:
+#
+#            bin/benchmark --harness harness-stackprof events/sync
+#            stackprof --text benchmark/data/<run>/events-sync.dump
+#
+#      Find out what it allocated:
+#
+#            bin/benchmark --harness harness-memory events/sync
+#
+#      Build for an older version:
+#
+#            bin/benchmark --version v1.1 versions/build
+#
+#      Find out whether the branch made anything worse:
+#
+#            bin/benchmark --compare main --category headline
+#
+#      Compare one benchmark, and insist on a percent:
+#
+#            bin/benchmark --compare HEAD~1 --threshold 1 events/wrap
+#
+#      What a workflow on a shared runner should ask:
+#
+#            bin/benchmark --compare origin/main --gate allocations
+#
+#      Prove the requests overlap:
+#
+#            bin/benchmark requests/concurrency
+#
+#      Benchmark against a real homeserver, reusing it between runs:
+#
+#            bin/benchmark --keep-alive homeserver
+#
+#      Against a different homeserver implementation:
+#
+#            bin/benchmark --homeserver --backend tuwunel
+#
+# SEE ALSO
+#      bin/test(1), benchmark/readme.md, benchmark/compare.rb,
+#      .github/workflows/benchmark.yaml
+#
+# async-matrix                          October 11, 2026                        BENCHMARK(1)
+
+set -o errexit
+set -o nounset
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+manifest="$root/benchmark/benchmarks.yml"
+
+harness="harness"
+category=""
+version="${MATRIX_VERSION:-}"
+list="no"
+compare=""
+threshold="10"
+gate="all"
+homeserver="no"
+backend="${MATRIX_BACKEND:-synapse}"
+keep_alive="no"
+chosen=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --harness)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--harness needs a name." >&2
+        exit 1
+      fi
+
+      harness="$1"
+      ;;
+    --harness=*)
+      harness="${1#--harness=}"
+      ;;
+    --category)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--category needs a name." >&2
+        exit 1
+      fi
+
+      category="$1"
+      ;;
+    --category=*)
+      category="${1#--category=}"
+      ;;
+    --version)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--version needs a version." >&2
+        exit 1
+      fi
+
+      version="$1"
+      ;;
+    --version=*)
+      version="${1#--version=}"
+      ;;
+    --compare)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--compare needs a revision." >&2
+        exit 1
+      fi
+
+      compare="$1"
+      ;;
+    --compare=*)
+      compare="${1#--compare=}"
+      ;;
+    --threshold)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--threshold needs a percentage." >&2
+        exit 1
+      fi
+
+      threshold="$1"
+      ;;
+    --threshold=*)
+      threshold="${1#--threshold=}"
+      ;;
+    --gate)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--gate needs all, allocations or none." >&2
+        exit 1
+      fi
+
+      gate="$1"
+      ;;
+    --gate=*)
+      gate="${1#--gate=}"
+      ;;
+    --homeserver)
+      homeserver="yes"
+      ;;
+    --backend)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--backend needs a name." >&2
+        exit 1
+      fi
+
+      backend="$1"
+      ;;
+    --backend=*)
+      backend="${1#--backend=}"
+      ;;
+    --keep-alive)
+      keep_alive="yes"
+      ;;
+    --list)
+      list="yes"
+      ;;
+    -*)
+      echo "Unknown option $1." >&2
+      exit 1
+      ;;
+    *)
+      chosen+=("${1%.rb}")
+      ;;
+  esac
+
+  shift
+done
+
+if [ "$list" = "yes" ]; then
+  ruby -ryaml -e '
+    benchmarks = YAML.load_file(ARGV.first)
+    width = benchmarks.keys.map(&:size).max
+
+    benchmarks.each do |name, entry|
+      puts format("%-#{width}s  %-8s  %s", name, entry["category"], entry["desc"])
+    end
+  ' "$manifest"
+
+  exit 0
+fi
+
+if [ ! -f "$root/benchmark/$harness/harness.rb" ]; then
+  echo "Unknown harness $harness: benchmark/$harness/harness.rb does not exist." >&2
+  exit 1
+fi
+
+# Which benchmarks to run, resolved against the manifest rather than against the directory: a name
+# may be a benchmark or a directory of them, and one which is neither is an error rather than a run
+# of nothing.
+selected=$(ruby -ryaml -e '
+  manifest, category, homeserver, *chosen = ARGV
+  benchmarks = YAML.load_file(manifest)
+
+  unknown = chosen.reject do |want|
+    benchmarks.key?(want) or benchmarks.keys.any?{|name| name.start_with?("#{want}/")}
+  end
+
+  unless unknown.empty?
+    warn "Unknown benchmark #{unknown.join(", ")}, expected one of: #{benchmarks.keys.join(", ")}"
+    exit 1
+  end
+
+  selected = benchmarks.keys
+
+  unless category.empty?
+    selected = selected.select{|name| benchmarks[name]["category"] == category}
+
+    if selected.empty?
+      warn "No benchmark has category #{category}."
+      exit 1
+    end
+  end
+
+  unless chosen.empty?
+    selected = selected.select do |name|
+      chosen.any?{|want| name == want or name.start_with?("#{want}/")}
+    end
+  end
+
+  # A benchmark which needs the rig is left out of a run which did not ask for one. Naming it is
+  # asking for it; so is --homeserver. Said rather than done quietly, because a run which measured
+  # less than it looks like is worse than one which refused.
+  unless homeserver == "yes" or !chosen.empty?
+    needing = selected.select{|name| benchmarks[name]["homeserver"]}
+
+    unless needing.empty?
+      warn "Leaving out #{needing.join(", ")}, which need a homeserver. Ask with --homeserver."
+    end
+
+    selected -= needing
+  end
+
+  if selected.empty?
+    warn "Nothing to run."
+    exit 1
+  end
+
+  puts selected
+' "$manifest" "$category" "$homeserver" ${chosen[@]+"${chosen[@]}"})
+
+output="$root/benchmark/data/$(date +%F-%H%M%S)"
+
+# What this run started, and has to take down again. One trap for all of it: a second `trap ... EXIT`
+# replaces the first rather than adding to it, so whichever lost would leak a container or a worktree.
+started_homeserver="no"
+baseline_worktree=""
+
+cleanup() {
+  if [ -n "$baseline_worktree" ]; then
+    git -C "$root" worktree remove --force "$baseline_worktree" > /dev/null 2>&1 || rm -rf "$baseline_worktree"
+  fi
+
+  if [ "$started_homeserver" = "yes" ]; then
+    if [ "$keep_alive" = "yes" ]; then
+      echo "The homeserver is still running. Stop it with:" >&2
+      echo "  docker compose --file $backend/docker-compose.yml down" >&2
+    else
+      docker compose --file "$compose" down
+    fi
+  fi
+}
+
+trap cleanup EXIT
+
+# Whether anything selected needs the rig, which decides whether a container is started at all.
+needs_homeserver="no"
+
+for name in $selected; do
+  case "$name" in
+    homeserver/*)
+      needs_homeserver="yes"
+      ;;
+  esac
+done
+
+compose="$root/$backend/docker-compose.yml"
+declaration="$root/$backend/test.env"
+
+if [ "$needs_homeserver" = "yes" ]; then
+  if [ ! -f "$compose" ]; then
+    echo "Unknown backend $backend: $compose does not exist." >&2
+    exit 1
+  fi
+
+  if [ ! -f "$declaration" ]; then
+    echo "Backend $backend has no test.env, which is where a backend says what its rig serves." >&2
+    exit 1
+  fi
+
+  # The version to bring up, which is the latest the rig offers unless one was asked for. The same
+  # list bin/test reads, generated from the compose file.
+  mapfile -t rig_versions < "$root/MATRIX_API_VERSIONS.txt"
+  rig_version="${version:-${rig_versions[-1]}}"
+
+  # What the backend's rig is, which the backend declares rather than this script knowing: how a
+  # benchmark gets an account, and wherever its servers answer. The same file bin/test reads, and
+  # each entry there keeps a value which is already set, so one given on the command line wins.
+  set -o allexport
+  # shellcheck source=/dev/null
+  . "$declaration"
+  set +o allexport
+
+  started_homeserver="yes"
+
+  running="$(docker compose --file "$compose" ps --services --filter status=running 2>/dev/null | head -1)"
+
+  if [ "$keep_alive" = "yes" ] && [ "$running" = "$rig_version" ]; then
+    echo "Reusing the $backend $rig_version homeserver, which is already running." >&2
+  else
+    docker compose --file "$compose" down
+    docker compose --file "$compose" up --detach --wait "$rig_version"
+  fi
+
+  echo "Benchmarking against $backend $rig_version." >&2
+
+  export MATRIX_BACKEND="$backend"
+  export MATRIX_VERSION="$rig_version"
+
+  version="$rig_version"
+fi
+
+# Run the selection against one library, which is this working copy's unless a baseline is being
+# measured. The benchmarks and the harness always come from this working copy: one which changed
+# between the two sides of a comparison would be measuring itself.
+run_benchmark() {
+  local name="$1" library="$2" results="$3" label="$4" tolerate="$5"
+
+  mkdir -p "$results"
+
+  echo "Benchmarking $name on $harness${label:+ ($label)}." >&2
+
+  environment=(
+    "BENCHMARK_RESULTS=$results/${name//\//-}.json"
+    "BENCHMARK_LIBRARY=$library"
+  )
+
+  if [ -n "$version" ]; then
+    environment+=("MATRIX_VERSION=$version")
+  fi
+
+  if env "${environment[@]}" bundle exec ruby \
+    -I "$root/benchmark/$harness" \
+    -I "$library" \
+    "$root/benchmark/$name.rb"
+  then
+    return 0
+  fi
+
+  # A benchmark which cannot run against the baseline is reported and skipped: it may measure
+  # something that revision does not have, which is a benchmark with no baseline rather than a
+  # failure. Against this working copy it is a failure.
+  if [ "$tolerate" = "yes" ]; then
+    echo "  $name did not run against $label; it may measure something that revision does not have." >&2
+  else
+    exit 1
+  fi
+}
+
+if [ -z "$compare" ]; then
+  for name in $selected; do
+    run_benchmark "$name" "$root/lib" "$output" "" "no"
+  done
+
+  echo "Results in $output." >&2
+  exit 0
+fi
+
+if ! git -C "$root" rev-parse --verify --quiet "$compare^{commit}" > /dev/null; then
+  echo "Unknown revision $compare." >&2
+  exit 1
+fi
+
+# A worktree rather than a checkout, so that the working copy is left exactly as it was: a
+# comparison is run with uncommitted changes in it more often than not, and that is the point.
+worktree="$(mktemp --directory --tmpdir "async-matrix-baseline-XXXXXX")"
+baseline_worktree="$worktree"
+
+git -C "$root" worktree add --detach --quiet "$worktree" "$compare"
+
+echo "Comparing this working copy against $compare ($(git -C "$root" rev-parse --short "$compare"))." >&2
+
+# The two sides of one benchmark are run back to back, rather than every baseline and then every
+# current. A machine drifts over the minutes a full run takes - a core clocks down, something else
+# wakes up - and running the sides apart turns that drift into the difference being reported.
+for name in $selected; do
+  run_benchmark "$name" "$worktree/lib" "$output/baseline" "$compare" "yes"
+  run_benchmark "$name" "$root/lib" "$output/current" "working copy" "no"
+done
+
+echo "Results in $output." >&2
+
+ruby "$root/benchmark/compare.rb" "$output/baseline" "$output/current" "$threshold" "$gate"
