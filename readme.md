@@ -61,6 +61,21 @@ response is a *representation*.
   - **Representations are lazy.** `client.get_joined_rooms` issues no request until something reads its
     value, and a room enumerated from a collection carries its ID without a further request.
 
+## Documentation
+
+`docs/` is a documentation site built with [Fumadocs](https://fumadocs.dev), which the
+Documentation workflow publishes to GitHub Pages as a static export. It is a Node project of its
+own, and the gem does not depend on it:
+
+``` shell
+cd docs
+npm install
+npm run dev     # http://localhost:3000
+```
+
+Its pages are MDX in `docs/content/docs`, written there rather than generated from this file and
+`guides/`, so a change to either has to be made in both places. See `docs/README.md`.
+
 ## Testing
 
 The tests run against a real homeserver, and against more than one of them. There is a rig per
