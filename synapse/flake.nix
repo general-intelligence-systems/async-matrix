@@ -63,13 +63,13 @@
           "v1.5" = { published = "v1.74.0"; };
           "v1.6" = { published = "v1.84.0"; };
 
-          # 1.84.0 advertises v1.7 but serves neither of the two operations v1.7 adds: the login
-          # token was behind msc3882_enabled and answered at /org.matrix.msc3882/login/token until
-          # 1.88.0 stabilised it at /login/get_token, and the media URI a client reserves before the
-          # bytes are ready arrived with rest/media/create_resource.py in 1.97.0. So v1.7 takes
-          # 1.97.0, being the earliest release which advertises it and serves what it defines - the
-          # same reason v1.3 takes 1.72.0 rather than the release which first advertised it.
-          "v1.7" = { published = "v1.97.0"; };
+          # Synapse never advertised v1.7 on its own, as it never did v1.3: 1.97.0 advertises as far
+          # as v1.6, and 1.98.0 jumps straight to v1.7 through v1.9. 1.84.0 would not do either way,
+          # since it serves neither operation v1.7 adds - the login token was behind msc3882_enabled
+          # at /org.matrix.msc3882/login/token until 1.88.0 stabilised it at /login/get_token, and
+          # the media URI a client reserves before the bytes are ready arrived with
+          # rest/media/create_resource.py in 1.97.0. So v1.7 takes 1.98.0 with v1.8 and v1.9.
+          "v1.7" = { published = "v1.98.0"; };
           "v1.8" = { published = "v1.98.0"; };
           "v1.9" = { published = "v1.98.0"; };
           "v1.10" = { published = "v1.107.0"; };

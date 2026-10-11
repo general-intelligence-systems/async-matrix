@@ -113,12 +113,13 @@ module RuboCop
               next
             end
 
-            node = layers[self.layer_name(version)]
+            nodes = layers[self.layer_name(version)] || []
 
-            if node.nil? or node.body
+            # A concept's file holds the resource and each representation it answers with, and the change belongs to whichever of them it concerns, so one layer carrying it answers for the version.
+            if nodes.empty? or nodes.any?(&:body)
               nil
             else
-              add_offense(self.prism_node_range(node.constant_path), message: format(MSG,
+              add_offense(self.prism_node_range(nodes.first.constant_path), message: format(MSG,
                 version: version,
                 deltas: self.readable(deltas),
               ))
@@ -133,11 +134,13 @@ module RuboCop
 
         # The version layers in this file, by name, which are the ones written below `Abstract`.
         #
+        # Every container in the file declares the same version, so a name holds one layer each.
+        #
         # @returns [Hash] the layers, keyed by constant name.
         def layers_in(nodes)
           nodes.each_with_object({}) do |node, layers|
             if /\AV\d+_\d+\z/.match?(node.name.to_s) and self.abstract?(node)
-              layers[node.name] = node
+              (layers[node.name] ||= []) << node
             end
           end
         end

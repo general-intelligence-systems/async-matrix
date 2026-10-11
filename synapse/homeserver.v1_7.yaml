@@ -1,7 +1,7 @@
-# Synapse configuration for Matrix specification v1.7, which is served by Synapse 1.97.0.
+# Synapse configuration for Matrix specification v1.7, which is served by Synapse 1.98.0.
 #
 # Generated from homeserver.yaml, which it matches except for login_via_existing_session:
-# Synapse 1.97.0 knows every room version homeserver.yaml names, so the default
+# Synapse 1.98.0 knows every room version homeserver.yaml names, so the default
 # is the one the base configuration carries.
 #
 # Do not edit by hand: edit homeserver.yaml and regenerate.
