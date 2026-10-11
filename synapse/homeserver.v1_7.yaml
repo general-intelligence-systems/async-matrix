@@ -1,8 +1,8 @@
-# Synapse configuration for Matrix specification v1.7, which is served by Synapse 1.84.0.
+# Synapse configuration for Matrix specification v1.7, which is served by Synapse 1.97.0.
 #
-# Generated from homeserver.yaml, which it matches except for default_room_version:
-# Synapse 1.84.0 knows room versions up to 10 and refuses to start on one
-# it does not recognise.
+# Generated from homeserver.yaml, which it matches except for login_via_existing_session:
+# Synapse 1.97.0 knows every room version homeserver.yaml names, so the default
+# is the one the base configuration carries.
 #
 # Do not edit by hand: edit homeserver.yaml and regenerate.
 
@@ -48,7 +48,7 @@ report_stats: false
 # ":server" part (MSC4291). matrix-nio -- and so matrix-commander -- still
 # assumes "!opaque:server" and appends the server name to any id it is given,
 # which turns a v12 id into one that does not exist. 11 keeps the classic shape.
-default_room_version: "10"
+default_room_version: "11"
 
 # Quoted deliberately: PyYAML reads a bare `off` as False. This is the default
 # for locally-created rooms only -- it stops rooms coming up encrypted, it does

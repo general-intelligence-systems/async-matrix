@@ -60,7 +60,7 @@ module Async
             module V1_9
             end
 
-            # v1.8 runs Synapse 1.98.0, which added 11.
+            # v1.8 runs Synapse 1.98.0, which knows up to 11.
             module V1_8
               def self.included(base)
                 base.let(:upgrade_version){"11"}
@@ -83,7 +83,7 @@ module Async
             module V1_4
             end
 
-            # v1.3 runs Synapse 1.72.0, which added 10.
+            # v1.3 runs Synapse 1.72.0, which knows up to 10.
             module V1_3
               def self.included(base)
                 base.let(:upgrade_version){"10"}
