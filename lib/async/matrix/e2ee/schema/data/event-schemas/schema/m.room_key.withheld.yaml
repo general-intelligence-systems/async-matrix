@@ -1,0 +1,51 @@
+---
+$schema: https://json-schema.org/draft/2020-12/schema
+
+allOf:
+  - $ref: core-event-schema/event.yaml
+
+description: |-
+  This event type is used to indicate that the sender is not sharing room keys
+  with the recipient. It is sent as a to-device event.
+
+  The following values for `code` are defined:
+
+  * `m.blacklisted`: the user/device was blacklisted.
+  * `m.unverified`: the user/device was not verified, and the sender is only
+    sharing keys with verified users/devices.
+  * `m.unauthorised`: the user/device is not allowed to have the key. For
+    example, this could be sent in response to a key request if the user/device
+    was not in the room when the original message was sent.
+  * `m.unavailable`: sent in reply to a key request if the device that the
+    key is requested from does not have the requested key.
+  * `m.no_olm`: an olm session could not be established.
+  * **[Added in `v1.19`]** `m.history_not_shared`: when used as part of a
+    [`RoomKeyBundle` structure](/client-server-api/#definition-roomkeybundle),
+    indicates to the recipient of the bundle that the corresponding room key
+    was not marked as
+    [shareable](/client-server-api/#shareable-encryption-sessions) by the
+    sender. Clients SHOULD NOT use this `code` in a `m.room_key.withheld`
+    event.
+
+  In most cases, this event refers to a specific room key. The one exception to
+  this is when the sender is unable to establish an olm session with the
+  recipient. When this happens, multiple sessions will be affected.  In order
+  to avoid filling the recipient\'s device mailbox, the sender should only send
+  one `m.room_key.withheld` message with no `room_id` nor `session_id`
+  set.  If the sender retries and fails to create an olm session again in the
+  future, it should not send another `m.room_key.withheld` message with a
+  `code` of `m.no_olm`, unless another olm session was previously
+  established successfully.  In response to receiving an
+  `m.room_key.withheld` message with a `code` of `m.no_olm`, the
+  recipient may start an olm session with the sender and send an `m.dummy`
+  message to notify the sender of the new olm session.  The recipient may
+  assume that this `m.room_key.withheld` message applies to all encrypted
+  room messages sent before it receives the message.
+properties:
+  content:
+    $ref: "components/room_key_withheld_content.yaml"
+  type:
+    enum:
+      - m.room_key.withheld
+    type: string
+type: object

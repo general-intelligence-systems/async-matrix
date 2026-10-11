@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    async-matrix (3.0.1)
+    async-matrix (4.0.0)
       async-rest (~> 0.20)
       base64 (~> 0.3)
       console (~> 1.29)
@@ -198,7 +198,7 @@ CHECKSUMS
   ast-merge (7.1.10) sha256=a60348effc169beddc650c686c1860de001d060528963cdc6ecfc1fc22d74c9a
   async (2.46.0) sha256=34f984733dbf63a997376346451ec995e858cacc3105e86ccfeaf8877b4f490b
   async-http (0.105.0) sha256=55191969d5cf61be5fbc2e0aadd51d77085318ba192a5ff5e12e3aba0826906a
-  async-matrix (3.0.1)
+  async-matrix (4.0.0)
   async-pool (0.12.0) sha256=5580493dc024bd704dab2ed0bf1307100722e49cbb825c7965f8501194f58506
   async-rest (0.20.0) sha256=72b0d467f65269a53a64fc12b828f3d81b4afa201b4eea0b98cddb990e7e95eb
   bake (0.25.0) sha256=a47bdc6a26addc048827debc36fe27bb4d5d71ac2958ad910b5386e9baf49869
