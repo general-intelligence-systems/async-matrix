@@ -14,7 +14,7 @@ describe Async::Matrix::E2EE::CanonicalJSON do
   let(:published) do
     machine.publish!
 
-    client.keys.query({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
+    client.keys.query_keys({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
   end
 
   with ".dump" do

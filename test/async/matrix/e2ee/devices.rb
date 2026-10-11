@@ -44,7 +44,7 @@ describe Async::Matrix::E2EE::Devices do
       second = unauthenticated.logged_in(other_username, Async::Matrix::TEST_PASSWORD)
       Async::Matrix::E2EE::Machine.new(second).publish!
 
-      expect(devices.of(other_user_id).map(&:device_id).sort).to be == [other_device_id, second.whoami.device_id].sort
+      expect(devices.of(other_user_id).map(&:device_id).sort).to be == [other_device_id, second.get_token_owner.device_id].sort
     end
   end
 
@@ -62,7 +62,7 @@ describe Async::Matrix::E2EE::Devices do
       other_machine.publish!
       devices.for([other_user_id])
 
-      other.devices.update(other_device_id, display_name: "Renamed")
+      other.devices.update_device(other_device_id, display_name: "Renamed")
 
       expect(devices.for([other_user_id])[other_user_id][other_device_id].display_name).to be_nil
     end
@@ -78,7 +78,7 @@ describe Async::Matrix::E2EE::Devices do
       other_machine.publish!
       devices.for([other_user_id])
 
-      other.devices.update(other_device_id, display_name: "Renamed")
+      other.devices.update_device(other_device_id, display_name: "Renamed")
       devices.invalidate(changed: [other_user_id])
 
       expect(devices).to be(:stale?, other_user_id)

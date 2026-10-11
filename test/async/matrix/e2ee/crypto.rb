@@ -34,7 +34,7 @@ describe Async::Matrix::E2EE::Crypto do
     bare_machine = Async::Matrix::E2EE::Machine.new(client, crypto: bare)
 
     expect{bare_machine.publish!}.to raise_exception(NotImplementedError)
-    expect(client.keys.query({user_id => []}).devices_of(user_id)).to be(:empty?)
+    expect(client.keys.query_keys({user_id => []}).devices_of(user_id)).to be(:empty?)
   end
 
   # The machine is written against this class, so an implementation which satisfies it satisfies the machine.

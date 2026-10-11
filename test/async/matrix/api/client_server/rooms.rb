@@ -22,13 +22,13 @@ describe Async::Matrix::ClientServer::Room do
       expect(room).to be_a(Async::Matrix::ClientServer::Room)
       expect(room.id).to be =~ /\A!/
 
-      expect(client.joined_rooms).to be(:include?, room.id)
+      expect(client.get_joined_rooms).to be(:include?, room.id)
     end
 
     it "enumerates joined rooms as rooms" do
       room
 
-      rooms = client.joined_rooms.to_a
+      rooms = client.get_joined_rooms.to_a
 
       expect(rooms).not.to be(:empty?)
       expect(rooms.first).to be_a(Async::Matrix::ClientServer::Room)
@@ -40,7 +40,7 @@ describe Async::Matrix::ClientServer::Room do
 
   with "#state" do
     it "can read the room state" do
-      state = room.state
+      state = room.get_room_state
 
       expect(state.name).to be == Async::Matrix::TEST_ROOM_NAME
       expect(state.topic).to be == Async::Matrix::TEST_ROOM_TOPIC
@@ -49,19 +49,19 @@ describe Async::Matrix::ClientServer::Room do
     end
 
     it "returns nil for absent state" do
-      expect(room.state["m.room.avatar"]).to be_nil
+      expect(room.get_room_state["m.room.avatar"]).to be_nil
     end
   end
 
   with "#joined_members" do
     it "lists the creator" do
-      expect(room.joined_members.user_ids).to be == [self.user_id]
+      expect(room.get_joined_members_by_room.user_ids).to be == [self.user_id]
     end
   end
 
   with "#send_message" do
     it "returns the event id" do
-      sent = room.send_message("hello")
+      sent = room.send_message("m.room.message", {msgtype: "m.text", body: "hello"})
 
       expect(sent.event_id).to be =~ /\A\$/
     end
@@ -70,8 +70,8 @@ describe Async::Matrix::ClientServer::Room do
       transaction_id = Async::Matrix::ClientServer::Room.transaction_id
       content = {msgtype: "m.text", body: "once"}
 
-      first = room.send_event("m.room.message", content, transaction_id: transaction_id)
-      again = room.send_event("m.room.message", content, transaction_id: transaction_id)
+      first = room.send_message("m.room.message", content, transaction_id: transaction_id)
+      again = room.send_message("m.room.message", content, transaction_id: transaction_id)
 
       expect(again.event_id).to be == first.event_id
     end
@@ -79,9 +79,9 @@ describe Async::Matrix::ClientServer::Room do
 
   with "#messages" do
     it "can page backwards through the timeline" do
-      3.times{|index| room.send_message("page #{index}")}
+      3.times{|index| room.send_message("m.room.message", {msgtype: "m.text", body: "page #{index}"})}
 
-      first = room.messages(limit: 2)
+      first = room.get_room_events(limit: 2)
 
       expect(first.events.size).to be == 2
       expect(first.finish).not.to be_nil
@@ -96,9 +96,9 @@ describe Async::Matrix::ClientServer::Room do
     end
 
     it "includes the messages which were sent" do
-      room.send_message("findable")
+      room.send_message("m.room.message", {msgtype: "m.text", body: "findable"})
 
-      bodies = room.messages(limit: 20).filter_map{|event| event.dig(:content, :body)}
+      bodies = room.get_room_events(limit: 20).filter_map{|event| event.dig(:content, :body)}
 
       expect(bodies).to be(:include?, "findable")
     end
@@ -111,15 +111,15 @@ describe Async::Matrix::ClientServer::Room do
     it "can join and leave a public room" do
       public_room = client.create_room(preset: "public_chat")
 
-      joined = other.join(public_room.id)
+      joined = other.join_room(public_room.id)
 
       expect(joined.id).to be == public_room.id
-      expect(other.joined_rooms).to be(:include?, public_room.id)
-      expect(public_room.joined_members.user_ids.size).to be == 2
+      expect(other.get_joined_rooms).to be(:include?, public_room.id)
+      expect(public_room.get_joined_members_by_room.user_ids.size).to be == 2
 
-      joined.leave
+      joined.leave_room
 
-      expect(other.joined_rooms).not.to be(:include?, public_room.id)
+      expect(other.get_joined_rooms).not.to be(:include?, public_room.id)
     end
   end
 end

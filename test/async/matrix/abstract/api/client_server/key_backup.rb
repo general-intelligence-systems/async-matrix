@@ -85,19 +85,19 @@ module Async
             module V1_2
               def self.included(base)
                 base.it "can putRoomKeyBySessionId" do
-                  expect(keys.put_session(room.id, "session", session_data: session_data).count).to be == 1
+                  expect(keys.put_room_key_by_session_id(room.id, "session", session_data: session_data).count).to be == 1
                 end
 
                 base.it "can getRoomKeyBySessionId" do
-                  keys.put_session(room.id, "session", session_data: session_data)
+                  keys.put_room_key_by_session_id(room.id, "session", session_data: session_data)
 
-                  expect(keys.of_session(room.id, "session").session_data[:ciphertext]).to be == "cipher"
+                  expect(keys.get_room_key_by_session_id(room.id, "session").session_data[:ciphertext]).to be == "cipher"
                 end
 
                 base.it "can deleteRoomKeyBySessionId" do
-                  keys.put_session(room.id, "session", session_data: session_data)
+                  keys.put_room_key_by_session_id(room.id, "session", session_data: session_data)
 
-                  expect(keys.delete_session(room.id, "session").count).to be == 0
+                  expect(keys.delete_room_key_by_session_id(room.id, "session").count).to be == 0
                 end
               end
             end
@@ -107,7 +107,7 @@ module Async
               def self.included(base)
                 # One version, for the cases which need one.
                 base.let(:backup) do
-                  client.key_backup.create(algorithm: "m.megolm_backup.v1.curve25519-aes-sha2", auth_data: {public_key: "abc"})
+                  client.key_backup.post_room_keys_version(algorithm: "m.megolm_backup.v1.curve25519-aes-sha2", auth_data: {public_key: "abc"})
                 end
 
                 base.let(:keys){client.key_backup.keys(backup.version)}
@@ -121,28 +121,28 @@ module Async
                 base.it "can getRoomKeysVersionCurrent" do
                   backup
 
-                  expect(client.key_backup.current.version).to be == backup.version
+                  expect(client.key_backup.get_room_keys_version_current.version).to be == backup.version
                 end
 
                 base.it "can getRoomKeysVersion" do
-                  expect(client.key_backup.describe(backup.version).algorithm).to be == "m.megolm_backup.v1.curve25519-aes-sha2"
+                  expect(client.key_backup.get_room_keys_version(backup.version).algorithm).to be == "m.megolm_backup.v1.curve25519-aes-sha2"
                 end
 
                 base.it "can putRoomKeysVersion" do
-                  client.key_backup.update(backup.version, algorithm: "m.megolm_backup.v1.curve25519-aes-sha2", auth_data: {public_key: "def"})
+                  client.key_backup.put_room_keys_version(backup.version, algorithm: "m.megolm_backup.v1.curve25519-aes-sha2", auth_data: {public_key: "def"})
 
-                  expect(client.key_backup.describe(backup.version).auth_data[:public_key]).to be == "def"
+                  expect(client.key_backup.get_room_keys_version(backup.version).auth_data[:public_key]).to be == "def"
                 end
 
                 base.it "can deleteRoomKeysVersion" do
                   version = backup.version
 
-                  client.key_backup.delete(version)
+                  client.key_backup.delete_room_keys_version(version)
 
                   error = nil
 
                   begin
-                    client.key_backup.describe(version)
+                    client.key_backup.get_room_keys_version(version)
                   rescue Async::Matrix::RequestError => error
                   end
 
@@ -152,37 +152,37 @@ module Async
                 base.it "can putRoomKeys" do
                   rooms = {room.id => {sessions: {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}}}}
 
-                  expect(keys.put(rooms).count).to be == 1
+                  expect(keys.put_room_keys(rooms).count).to be == 1
                 end
 
                 base.it "can getRoomKeys" do
-                  keys.put({room.id => {sessions: {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}}}})
+                  keys.put_room_keys({room.id => {sessions: {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}}}})
 
-                  expect(keys.all.sessions_of(room.id).keys.map(&:to_s)).to be(:include?, "session")
+                  expect(keys.get_room_keys.sessions_of(room.id).keys.map(&:to_s)).to be(:include?, "session")
                 end
 
                 base.it "can deleteRoomKeys" do
-                  keys.put({room.id => {sessions: {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}}}})
+                  keys.put_room_keys({room.id => {sessions: {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}}}})
 
-                  expect(keys.delete.count).to be == 0
+                  expect(keys.delete_room_keys.count).to be == 0
                 end
 
                 base.it "can putRoomKeysByRoomId" do
                   sessions = {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}}
 
-                  expect(keys.put_room(room.id, sessions).count).to be == 1
+                  expect(keys.put_room_keys_by_room_id(room.id, sessions).count).to be == 1
                 end
 
                 base.it "can getRoomKeysByRoomId" do
-                  keys.put_room(room.id, {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}})
+                  keys.put_room_keys_by_room_id(room.id, {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}})
 
-                  expect(keys.of_room(room.id).ids).to be(:include?, "session")
+                  expect(keys.get_room_keys_by_room_id(room.id).ids).to be(:include?, "session")
                 end
 
                 base.it "can deleteRoomKeysByRoomId" do
-                  keys.put_room(room.id, {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}})
+                  keys.put_room_keys_by_room_id(room.id, {"session" => {session_data: session_data, first_message_index: 0, forwarded_count: 0, is_verified: false}})
 
-                  expect(keys.delete_room(room.id).count).to be == 0
+                  expect(keys.delete_room_keys_by_room_id(room.id).count).to be == 0
                 end
               end
             end

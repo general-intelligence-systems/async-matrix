@@ -6,6 +6,24 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+# Records what each request carried, and sends it to the homeserver all the same.
+class RecordingDelegate < Protocol::HTTP::Middleware
+  def initialize(delegate)
+    super(delegate)
+
+    @sent = []
+  end
+
+  # @attribute [Array(Hash)] the headers of each request, as the homeserver received them.
+  attr :sent
+
+  def call(request)
+    @sent << request.headers.to_h
+
+    super
+  end
+end
+
 describe Async::Matrix::ClientServer::Client do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -21,14 +39,14 @@ describe Async::Matrix::ClientServer::Client do
 
   with "#whoami" do
     it "reports the authenticated user" do
-      expect(client.whoami.user_id).to be == self.user_id
+      expect(client.get_token_owner.user_id).to be == self.user_id
     end
 
     it "fails without an access token" do
       error = nil
 
       begin
-        unauthenticated.whoami.user_id
+        unauthenticated.get_token_owner.user_id
       rescue Async::Matrix::RequestError => error
       end
 
@@ -43,7 +61,7 @@ describe Async::Matrix::ClientServer::Client do
       error = nil
 
       begin
-        invalid.whoami.user_id
+        invalid.get_token_owner.user_id
       rescue Async::Matrix::RequestError => error
       end
 
@@ -52,12 +70,50 @@ describe Async::Matrix::ClientServer::Client do
     end
   end
 
+  with "the user agent" do
+    let(:recorder) {RecordingDelegate.new(unauthenticated.delegate)}
+
+    let(:recording) {subject[Async::Matrix::TEST_VERSION].new(recorder, unauthenticated.reference)}
+
+    # It was sent only by `authenticated`, so the homeserver's own logs recorded `"-"` against every login.
+    it "is sent on a request which is not authenticated" do
+      recording.get_login_flows.flows
+
+      expect(recorder.sent.last["user-agent"]).to be == Async::Matrix::ClientServer::Client::USER_AGENT
+    end
+
+    it "names the gem and its version" do
+      recording.versions.value
+
+      expect(recorder.sent.last["user-agent"]).to be == "async-matrix/#{Async::Matrix::VERSION}"
+    end
+
+    it "is sent alongside the authorization once authenticated" do
+      recording.logged_in(username, Async::Matrix::TEST_PASSWORD).get_token_owner.user_id
+
+      sent = recorder.sent.last
+
+      expect(sent["user-agent"]).to be == Async::Matrix::ClientServer::Client::USER_AGENT
+      expect(sent["authorization"]).to be(:start_with?, "Bearer ")
+    end
+
+    # A resource derived for a room or a representation must not lose it.
+    it "is sent on a request made through a derived resource" do
+      client = recording.logged_in(username, Async::Matrix::TEST_PASSWORD)
+      room = client.create_room(name: "User agent")
+
+      room.get_room_state.to_a
+
+      expect(recorder.sent.last["user-agent"]).to be == Async::Matrix::ClientServer::Client::USER_AGENT
+    end
+  end
+
   with "an unknown room" do
     it "raises a request error" do
       error = nil
 
       begin
-        client.room("!nonexistent:localhost").state.to_a
+        client.room("!nonexistent:localhost").get_room_state.to_a
       rescue Async::Matrix::RequestError => error
       end
 
@@ -71,7 +127,7 @@ describe Async::Matrix::ClientServer::Client do
       error = nil
 
       begin
-        client.join("#no-such-alias:localhost")
+        client.join_room("#no-such-alias:localhost")
       rescue Async::Matrix::RequestError => error
       end
 

@@ -161,9 +161,9 @@ describe Async::Matrix::Abstract do
       # v1.12 is not applied, so the parameter name comes from the v1.1 layer:
       expect(room.instance_method(:join_via_parameter).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_1)
 
-      # ...and `join`, which v1.1 overrides to carry `reason`, reaches the unversioned class through super:
-      expect(room.instance_method(:join).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_1)
-      expect(room.instance_method(:join).super_method.owner).to be_equal(Async::Matrix::ClientServer::Room)
+      # ...and `join_room_by_id`, which v1.1 overrides to carry `reason`, reaches the unversioned class through super:
+      expect(room.instance_method(:join_room_by_id).owner).to be_equal(Async::Matrix::Abstract::ClientServer::Room::V1_1)
+      expect(room.instance_method(:join_room_by_id).super_method.owner).to be_equal(Async::Matrix::ClientServer::Room)
     end
   end
 end

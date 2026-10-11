@@ -39,7 +39,7 @@ describe Async::Matrix::E2EE::Device do
   with "#display_name" do
     it "reads the name its owner gave it" do
       other_machine.publish!
-      other.devices.update(other_device_id, display_name: "Other's phone")
+      other.devices.update_device(other_device_id, display_name: "Other's phone")
 
       expect(machine.devices.of(other_user_id).first.display_name).to be == "Other's phone"
     end

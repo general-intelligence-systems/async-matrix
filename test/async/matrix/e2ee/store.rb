@@ -19,7 +19,8 @@ describe Async::Matrix::E2EE::Store do
 
   # The encrypted event the other user sent into the room, as it came back from sync.
   def encrypted_in(room)
-    other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
+    content = other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello"))
+    other_room(room).send_message(content.type, content.to_h)
 
     sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
 
@@ -59,7 +60,7 @@ describe Async::Matrix::E2EE::Store do
     it "notes why a session was refused" do
       room = prepared
 
-      other.to_device.send_event("m.room_key.withheld", {user_id => {client.whoami.device_id => {
+      other.to_device.send_to_device("m.room_key.withheld", {user_id => {client.get_token_owner.device_id => {
         algorithm: Async::Matrix::E2EE::Machine::MEGOLM,
         room_id: room.id,
         session_id: "refused-session",

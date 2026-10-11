@@ -13,7 +13,7 @@ describe Async::Matrix::E2EE::Machine do
   with "#user_id" do
     it "is whoever the access token belongs to" do
       expect(machine.user_id).to be == user_id
-      expect(machine.device_id).to be == client.whoami.device_id
+      expect(machine.device_id).to be == client.get_token_owner.device_id
     end
   end
 
@@ -54,7 +54,7 @@ describe Async::Matrix::E2EE::Machine do
     it "publishes the device keys, which the server then answers queries with" do
       machine.publish!
 
-      published = client.keys.query({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
+      published = client.keys.query_keys({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
 
       expect(published[:keys][:"curve25519:#{machine.device_id}"]).to be == crypto.identity_keys[:curve25519]
       expect(published[:algorithms]).to be == crypto.algorithms
@@ -63,10 +63,10 @@ describe Async::Matrix::E2EE::Machine do
     # A key published twice would be claimed twice, and both sessions built on it would be readable by whoever claimed it second.
     it "does not publish the same one time keys again" do
       machine.publish!
-      first = client.keys.claim({user_id => {machine.device_id => "signed_curve25519"}})
+      first = client.keys.claim_keys({user_id => {machine.device_id => "signed_curve25519"}})
 
       machine.publish!
-      second = client.keys.claim({user_id => {machine.device_id => "signed_curve25519"}})
+      second = client.keys.claim_keys({user_id => {machine.device_id => "signed_curve25519"}})
 
       expect(first.one_time_keys[user_id.to_sym]).not.to be == second.one_time_keys[user_id.to_sym]
     end
@@ -113,7 +113,7 @@ describe Async::Matrix::E2EE::Machine do
     it "notes a session which was deliberately withheld" do
       room = shared_room
 
-      client.to_device.send_event("m.room_key.withheld", {other_user_id => {other_device_id => {
+      client.to_device.send_to_device("m.room_key.withheld", {other_user_id => {other_device_id => {
         algorithm: Async::Matrix::E2EE::Machine::MEGOLM,
         room_id: room.id,
         session_id: "withheld-session",
@@ -128,7 +128,7 @@ describe Async::Matrix::E2EE::Machine do
 
     # A homeserver sends device events this library has never heard of, and encryption is not the only thing which uses them.
     it "ignores a device message which is not about keys" do
-      client.to_device.send_event("com.example.nonsense", {other_user_id => {other_device_id => {hello: "world"}}})
+      client.to_device.send_to_device("com.example.nonsense", {other_user_id => {other_device_id => {hello: "world"}}})
 
       sync = receive_device_message(other_machine, other)
 
@@ -168,8 +168,8 @@ describe Async::Matrix::E2EE::Machine do
 
     # The homeserver stores it as it is given, which is what makes the room end to end encrypted.
     it "is what the server stores, and nothing of the message" do
-      sent = room.send(content)
-      stored = room.event(sent.event_id)
+      sent = room.send_message(content.type, content.to_h)
+      stored = room.get_one_room_event(sent.event_id)
 
       expect(stored.content[:ciphertext]).to be == content.ciphertext
       expect(stored.content).not.to be(:key?, :body)
@@ -191,7 +191,8 @@ describe Async::Matrix::E2EE::Machine do
       machine.publish!
 
       session = other_machine.share(room.id, [user_id])
-      other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
+      content = other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello"))
+      other_room(room).send_message(content.type, content.to_h)
 
       receive_device_message(machine, client)
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
@@ -201,13 +202,14 @@ describe Async::Matrix::E2EE::Machine do
 
       expect(read.content).to be_a(Async::Matrix::Events::TextMessage)
       expect(read.content.body).to be == "hello"
-      expect(read.sender).to be == other.whoami.user_id
+      expect(read.sender).to be == other.get_token_owner.user_id
       expect(store).to be(:session?, room.id, session[:session_id])
     end
 
     # A message this client sent comes back in a sync batch like anybody else's, and a client shows it.
     it "reads back a message of our own" do
-      room.send(machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "ours")))
+      content = machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "ours"))
+      room.send_message(content.type, content.to_h)
 
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
       encrypted = sync.each_event.find{|event| event.type == "m.room.encrypted"}
@@ -219,7 +221,8 @@ describe Async::Matrix::E2EE::Machine do
     it "keeps an event whose session has not arrived, rather than failing" do
       room = shared_room
       other_machine.share(room.id, [])
-      other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello")))
+      content = other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello"))
+      other_room(room).send_message(content.type, content.to_h)
 
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
       encrypted = sync.each_event.find{|event| event.type == "m.room.encrypted"}
@@ -231,7 +234,8 @@ describe Async::Matrix::E2EE::Machine do
     it "reads the events which were waiting, once the key arrives" do
       room = shared_room
       session = other_machine.share(room.id, [])
-      other_room(room).send(other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "late")))
+      content = other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "late"))
+      other_room(room).send_message(content.type, content.to_h)
 
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
       machine.decrypt(sync.each_event.find{|event| event.type == "m.room.encrypted"}, room_id: room.id)

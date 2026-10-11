@@ -85,7 +85,7 @@ module Async
         # @parameter user_ids [Array(String)] the users to query.
         # @returns [Hash] the devices, by user ID and then device ID.
         def query(user_ids)
-          queried = @client.keys.query(user_ids.each_with_object({}){|user_id, asked| asked[user_id] = []})
+          queried = @client.keys.query_keys(user_ids.each_with_object({}){|user_id, asked| asked[user_id] = []})
 
           Console.debug(self, "Queried device lists.", user_ids: user_ids, failures: queried.failures.keys)
 

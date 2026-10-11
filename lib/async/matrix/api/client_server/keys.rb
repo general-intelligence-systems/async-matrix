@@ -122,7 +122,7 @@ module Async
         # @parameter device_keys [Hash | nil] the identity keys, signed by the device.
         # @parameter one_time_keys [Hash | nil] the one time keys, by algorithm and ID.
         # @returns [UploadedKeys] how many one time keys the server now holds.
-        def upload(**options)
+        def upload_keys(**options)
           self.upload_payload(self.upload_fields(**options))
         end
 
@@ -132,7 +132,7 @@ module Async
         # @parameter timeout [Integer | nil] how long to wait for other homeservers.
         # @parameter token [String | nil] the sync token the query is made as of.
         # @returns [QueriedKeys] the keys.
-        def query(device_keys, timeout: nil, token: nil)
+        def query_keys(device_keys, timeout: nil, token: nil)
           payload = {device_keys: device_keys, timeout: timeout}.compact
 
           if token
@@ -151,7 +151,7 @@ module Async
         # @parameter one_time_keys [Hash] the algorithm wanted, by user ID and device ID.
         # @parameter timeout [Integer | nil] how long to wait for other homeservers.
         # @returns [ClaimedKeys] the keys, which the server will not hand out again.
-        def claim(one_time_keys, timeout: nil)
+        def claim_keys(one_time_keys, timeout: nil)
           payload = {one_time_keys: one_time_keys, timeout: timeout}.compact
 
           api::ClaimedKeys.post(@resource.with(path: "#{V3}/keys/claim"), payload)
@@ -162,7 +162,7 @@ module Async
         # @parameter from [String] the sync token to start from.
         # @parameter to [String] the sync token to end at.
         # @returns [KeyChanges] the users whose devices changed.
-        def changes(from:, to:)
+        def get_keys_changes(from:, to:)
           parameters = {from: from, to: to}
 
           api::KeyChanges.get(@resource.with(path: "#{V3}/keys/changes", parameters: parameters))

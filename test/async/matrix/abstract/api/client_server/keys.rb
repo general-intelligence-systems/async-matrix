@@ -68,7 +68,7 @@ module Async
                   expect(client.keys.query_accepts_token?).to be == false
 
                   expect do
-                    client.keys.query({self.user_id => []}, token: "s0")
+                    client.keys.query_keys({self.user_id => []}, token: "s0")
                   end.to raise_exception(ArgumentError)
                 end
               end
@@ -94,7 +94,7 @@ module Async
             module V1_2
               def self.included(base)
                 base.it "uploads fallback keys" do
-                  uploaded = client.keys.upload(fallback_keys: {"signed_curve25519:AAAAAQ": {key: "key", fallback: true, signatures: {}}})
+                  uploaded = client.keys.upload_keys(fallback_keys: {"signed_curve25519:AAAAAQ": {key: "key", fallback: true, signatures: {}}})
 
                   expect(uploaded.one_time_key_counts).to be_a(Hash)
                 end
@@ -105,17 +105,17 @@ module Async
             module V1_1
               def self.included(base)
                 base.it "can uploadKeys" do
-                  uploaded = client.keys.upload(one_time_keys: {"signed_curve25519:AAAAAQ": {key: "key", signatures: {}}})
+                  uploaded = client.keys.upload_keys(one_time_keys: {"signed_curve25519:AAAAAQ": {key: "key", signatures: {}}})
 
                   expect(uploaded.count("signed_curve25519")).to be_a(Integer)
                 end
 
                 base.it "can queryKeys" do
-                  expect(client.keys.query({self.user_id => []}).failures).to be == {}
+                  expect(client.keys.query_keys({self.user_id => []}).failures).to be == {}
                 end
 
                 base.it "can claimKeys" do
-                  claimed = client.keys.claim({self.user_id => {client.whoami.device_id => "signed_curve25519"}})
+                  claimed = client.keys.claim_keys({self.user_id => {client.get_token_owner.device_id => "signed_curve25519"}})
 
                   expect(claimed.failures).to be == {}
                 end
@@ -123,7 +123,7 @@ module Async
                 base.it "can getKeysChanges" do
                   token = client.sync(timeout: 0).next_batch
 
-                  expect(client.keys.changes(from: token, to: token).changed).to be_a(Array)
+                  expect(client.keys.get_keys_changes(from: token, to: token).changed).to be_a(Array)
                 end
               end
             end

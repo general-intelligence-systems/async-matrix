@@ -91,7 +91,7 @@ module Async
                 base.it "can sendToDevice" do
                   messages = {self.user_id => {"*" => {algorithm: "m.megolm.v1.aes-sha2", room_id: "!r:localhost"}}}
 
-                  expect(client.to_device.send_event("m.room_key", messages).value).to be_a(Hash)
+                  expect(client.to_device.send_to_device("m.room_key", messages).value).to be_a(Hash)
                 end
               end
             end

@@ -49,6 +49,21 @@ module Async
         # The user agent supplied with every request.
         USER_AGENT = "async-matrix/#{VERSION}"
 
+        # Every client carries the user agent, authenticated or not.
+        #
+        # `Resource.open` cannot supply it, because it forwards `headers:` into a positional parameter. Both `open` and `with` build through here.
+        #
+        # @parameter delegate [Async::HTTP::Middleware] what handles requests.
+        # @parameter reference [Protocol::URL::Reference] the base path and parameters.
+        # @parameter headers [Protocol::HTTP::Headers] the headers every request carries.
+        def initialize(delegate, reference = ::Protocol::URL::Reference.parse, headers = ::Protocol::HTTP::Headers.new)
+          super(delegate, reference, headers)
+
+          unless @headers["user-agent"]
+            @headers = @headers.merge("user-agent" => USER_AGENT)
+          end
+        end
+
         # @returns [Representation] the specification versions supported by the homeserver.
         def versions
           api::Representation.get(self.with(path: "/_matrix/client/versions"))
@@ -59,10 +74,7 @@ module Async
         # @parameter access_token [String] the access token obtained from {#login}.
         # @returns [Client] an authenticated client.
         def authenticated(access_token)
-          self.with(headers: {
-            "authorization" => "Bearer #{access_token}",
-            "user-agent" => USER_AGENT,
-          })
+          self.with(headers: {"authorization" => "Bearer #{access_token}"})
         end
 
         # Log in using a password.
@@ -93,7 +105,7 @@ module Async
         # The ways this homeserver will let a user log in. No authentication is required.
         #
         # @returns [LoginFlows] the supported login flows.
-        def login_flows
+        def get_login_flows
           api::LoginFlows.get(self.with(path: "#{V3}/login"))
         end
 
@@ -112,12 +124,12 @@ module Async
         end
 
         # @returns [Whoami] the identity associated with this client's access token.
-        def whoami
+        def get_token_owner
           api::Whoami.get(self.with(path: "#{V3}/account/whoami"))
         end
 
         # @returns [JoinedRooms] the rooms this user has joined.
-        def joined_rooms
+        def get_joined_rooms
           api::JoinedRooms.new(self.with(path: "#{V3}/joined_rooms"))
         end
 
@@ -143,7 +155,7 @@ module Async
         #
         # @parameter id_or_alias [String] the room ID or alias, e.g. `#general:localhost`.
         # @returns [Room] the joined room.
-        def join(id_or_alias, **payload)
+        def join_room(id_or_alias, **payload)
           path = "#{V3}/join/#{::Protocol::URL::Encoding.escape(id_or_alias)}"
 
           joined = api::RoomReference.post(self.with(path: path), payload)

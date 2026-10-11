@@ -29,7 +29,7 @@ require "async/matrix"
 Async::Matrix::Client.open("http://localhost:8008") do |unauthenticated|
 	client = unauthenticated.logged_in("alice", "password")
 	
-	puts client.whoami.user_id
+	puts client.get_token_owner.user_id
 	# @alice:localhost
 end
 ```
@@ -57,7 +57,7 @@ Nothing is fetched until it is read, so listing rooms is cheap, and each room en
 list already knows its own ID:
 
 ``` ruby
-client.joined_rooms.each do |room|
+client.get_joined_rooms.each do |room|
 	puts room.id
 end
 ```
@@ -66,7 +66,7 @@ A timeline is paged with opaque tokens. {ruby Async::Matrix::Messages#following}
 where the previous page ended, and returns `nil` at the end:
 
 ``` ruby
-page = room.messages(dir: "b", limit: 20)
+page = room.get_room_events(dir: "b", limit: 20)
 
 while page
 	page.each do |event|

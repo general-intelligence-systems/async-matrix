@@ -52,12 +52,12 @@ module Async
 
         # @returns [String] the user this machine encrypts as.
         def user_id
-          @user_id ||= @client.whoami.user_id
+          @user_id ||= @client.get_token_owner.user_id
         end
 
         # @returns [String] the device this machine encrypts as.
         def device_id
-          @device_id ||= @client.whoami.device_id
+          @device_id ||= @client.get_token_owner.device_id
         end
 
         # Publish this device's identity keys and a batch of one time keys.
@@ -66,7 +66,7 @@ module Async
         def publish!
           @crypto.generate_one_time_keys(@crypto.one_time_key_target)
 
-          uploaded = @client.keys.upload(
+          uploaded = @client.keys.upload_keys(
             device_keys: self.device_keys,
             one_time_keys: self.signed_one_time_keys,
           )
@@ -170,7 +170,7 @@ module Async
             Console.debug(self, "Sharing a session.", room_id: room_id, session_id: session[:session_id], recipients: recipients.size, rotate: rotate)
 
             unless recipients.empty?
-              @client.to_device.send_event("m.room_key", self.addressed(recipients, {
+              @client.to_device.send_to_device("m.room_key", self.addressed(recipients, {
                 algorithm: MEGOLM,
                 room_id: room_id,
                 session_id: session[:session_id],

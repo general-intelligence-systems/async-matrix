@@ -104,7 +104,7 @@ module Async
             # Join this room, optionally explaining why.
             #
             # @parameter reason [String | nil] the reason for joining.
-            def join(reason: nil, **payload)
+            def join_room_by_id(reason: nil, **payload)
               if reason
                 payload[:reason] = reason
               end
@@ -115,7 +115,7 @@ module Async
             # Leave this room, optionally explaining why.
             #
             # @parameter reason [String | nil] the reason for leaving.
-            def leave(reason: nil, **payload)
+            def leave_room(reason: nil, **payload)
               if reason
                 payload[:reason] = reason
               end

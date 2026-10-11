@@ -40,7 +40,7 @@ describe Async::Matrix::ClientServer::Login do
 
   with "#logged_in" do
     it "derives a client which is authenticated" do
-      expect(client.whoami.user_id).to be == self.user_id
+      expect(client.get_token_owner.user_id).to be == self.user_id
     end
   end
 
@@ -53,7 +53,7 @@ describe Async::Matrix::ClientServer::Login do
       error = nil
 
       begin
-        session.whoami.user_id
+        session.get_token_owner.user_id
       rescue Async::Matrix::RequestError => error
       end
 

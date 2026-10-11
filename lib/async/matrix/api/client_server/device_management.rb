@@ -95,13 +95,13 @@ module Async
         end
 
         # @returns [Devices] every device this user has.
-        def all
+        def get_devices
           api::Devices.get(@resource.with(path: "#{V3}/devices"))
         end
 
         # @parameter device_id [String] the device to look up.
         # @returns [Device] the device.
-        def get(device_id)
+        def get_device(device_id)
           api::Device.get(@resource.with(path: self.path_for(device_id)))
         end
 
@@ -110,7 +110,7 @@ module Async
         # @parameter device_id [String] the device to rename.
         # @parameter display_name [String] the name to give it.
         # @returns [Representation] the empty response.
-        def update(device_id, display_name:)
+        def update_device(device_id, display_name:)
           payload = {display_name: display_name}
 
           api::Representation.put(@resource.with(path: self.path_for(device_id)), payload)
@@ -121,7 +121,7 @@ module Async
         # @parameter device_id [String] the device to remove.
         # @parameter auth [Hash | nil] the user interactive authentication to answer with.
         # @returns [Representation] the empty response.
-        def delete(device_id, auth: nil)
+        def delete_device(device_id, auth: nil)
           payload = {auth: auth}.compact
 
           api::Representation.delete(@resource.with(path: self.path_for(device_id)), payload)
@@ -132,7 +132,7 @@ module Async
         # @parameter device_ids [Array(String)] the devices to remove.
         # @parameter auth [Hash | nil] the user interactive authentication to answer with.
         # @returns [Representation] the empty response.
-        def delete_all(device_ids, auth: nil)
+        def delete_devices(device_ids, auth: nil)
           payload = {devices: device_ids, auth: auth}.compact
 
           api::Representation.post(@resource.with(path: "#{V3}/delete_devices"), payload)

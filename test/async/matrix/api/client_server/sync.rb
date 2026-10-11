@@ -35,7 +35,7 @@ describe Async::Matrix::ClientServer::Sync do
     it "enumerates timeline events with their room id" do
       body = "synced"
 
-      room.send_message(body)
+      room.send_message("m.room.message", {msgtype: "m.text", body: body})
 
       sync = sync_until_message(body)
 
@@ -51,7 +51,7 @@ describe Async::Matrix::ClientServer::Sync do
     it "enumerates messages" do
       body = "a message"
 
-      room.send_message(body)
+      room.send_message("m.room.message", {msgtype: "m.text", body: body})
 
       sync = sync_until_message(body)
 
@@ -75,7 +75,7 @@ describe Async::Matrix::ClientServer::Sync do
 
       writer = Async do
         sleep 0.2
-        room.send_message(body)
+        room.send_message("m.room.message", {msgtype: "m.text", body: body})
       end
 
       following = sync.following(timeout: 10_000)
@@ -90,7 +90,7 @@ describe Async::Matrix::ClientServer::Sync do
 
       sync = current_sync
 
-      room.send_message("next batch")
+      room.send_message("m.room.message", {msgtype: "m.text", body: "next batch"})
 
       following = sync.following(timeout: 5000)
 

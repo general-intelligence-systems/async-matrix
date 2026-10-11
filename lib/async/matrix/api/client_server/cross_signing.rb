@@ -57,7 +57,7 @@ module Async
         # @parameter user_signing_key [Hash | nil] the key which signs other users.
         # @parameter auth [Hash | nil] the user interactive authentication to answer with.
         # @returns [Representation] the empty response.
-        def upload(master_key: nil, self_signing_key: nil, user_signing_key: nil, auth: nil)
+        def upload_cross_signing_keys(master_key: nil, self_signing_key: nil, user_signing_key: nil, auth: nil)
           payload = {
             master_key: master_key,
             self_signing_key: self_signing_key,
@@ -72,7 +72,7 @@ module Async
         #
         # @parameter signatures [Hash] the signatures, by user ID and then key or device ID.
         # @returns [UploadedSignatures] which signatures were rejected.
-        def upload_signatures(signatures)
+        def upload_cross_signing_signatures(signatures)
           api::UploadedSignatures.post(@resource.with(path: "#{V3}/keys/signatures/upload"), signatures)
         end
 

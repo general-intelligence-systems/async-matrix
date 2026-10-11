@@ -89,7 +89,7 @@ module Async
             module V1_1
               def self.included(base)
                 base.it "can uploadCrossSigningSignatures" do
-                  expect(client.cross_signing.upload_signatures({})).to be(:accepted?)
+                  expect(client.cross_signing.upload_cross_signing_signatures({})).to be(:accepted?)
                 end
 
                 # The server checks the key before it asks for authentication, and we have nothing to sign it with.
@@ -97,7 +97,7 @@ module Async
                   error = nil
 
                   begin
-                    client.cross_signing.upload(master_key: {user_id: self.user_id, usage: ["master"], keys: {}})
+                    client.cross_signing.upload_cross_signing_keys(master_key: {user_id: self.user_id, usage: ["master"], keys: {}})
                   rescue Async::Matrix::RequestError => error
                   end
 

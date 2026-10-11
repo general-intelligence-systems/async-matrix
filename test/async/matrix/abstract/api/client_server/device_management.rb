@@ -89,19 +89,19 @@ module Async
             module V1_1
               def self.included(base)
                 base.it "can getDevices" do
-                  expect(client.devices.all.ids).to be(:include?, client.whoami.device_id)
+                  expect(client.devices.get_devices.ids).to be(:include?, client.get_token_owner.device_id)
                 end
 
                 base.it "can getDevice" do
-                  device_id = client.whoami.device_id
+                  device_id = client.get_token_owner.device_id
 
-                  expect(client.devices.get(device_id).device_id).to be == device_id
+                  expect(client.devices.get_device(device_id).device_id).to be == device_id
                 end
 
                 base.it "can updateDevice" do
-                  client.devices.update(client.whoami.device_id, display_name: "Renamed")
+                  client.devices.update_device(client.get_token_owner.device_id, display_name: "Renamed")
 
-                  expect(client.devices.get(client.whoami.device_id).display_name).to be == "Renamed"
+                  expect(client.devices.get_device(client.get_token_owner.device_id).display_name).to be == "Renamed"
                 end
 
                 # Logging a device out is guarded by user interactive authentication.
@@ -109,7 +109,7 @@ module Async
                   error = nil
 
                   begin
-                    client.devices.delete(client.whoami.device_id)
+                    client.devices.delete_device(client.get_token_owner.device_id)
                   rescue Async::Matrix::RequestError => error
                   end
 
@@ -120,7 +120,7 @@ module Async
                   error = nil
 
                   begin
-                    client.devices.delete_all([client.whoami.device_id])
+                    client.devices.delete_devices([client.get_token_owner.device_id])
                   rescue Async::Matrix::RequestError => error
                   end
 

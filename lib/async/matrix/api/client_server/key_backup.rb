@@ -155,7 +155,7 @@ module Async
         end
 
         # @returns [BackedUpRoomKeys] every session in this version.
-        def all
+        def get_room_keys
           api::BackedUpRoomKeys.get(self.keys)
         end
 
@@ -163,18 +163,18 @@ module Async
         #
         # @parameter rooms [Hash] the rooms to write, by room ID.
         # @returns [KeyBackupUpdate] what the server now holds.
-        def put(rooms)
+        def put_room_keys(rooms)
           api::KeyBackupUpdate.put(self.keys, {rooms: rooms})
         end
 
         # @returns [KeyBackupUpdate] what the server now holds.
-        def delete
+        def delete_room_keys
           api::KeyBackupUpdate.delete(self.keys)
         end
 
         # @parameter room_id [String] the room to read.
         # @returns [BackedUpSessions] that room's sessions.
-        def of_room(room_id)
+        def get_room_keys_by_room_id(room_id)
           api::BackedUpSessions.get(self.keys(room_id))
         end
 
@@ -183,20 +183,20 @@ module Async
         # @parameter room_id [String] the room to write.
         # @parameter sessions [Hash] the sessions, by session ID.
         # @returns [KeyBackupUpdate] what the server now holds.
-        def put_room(room_id, sessions)
+        def put_room_keys_by_room_id(room_id, sessions)
           api::KeyBackupUpdate.put(self.keys(room_id), {sessions: sessions})
         end
 
         # @parameter room_id [String] the room to delete.
         # @returns [KeyBackupUpdate] what the server now holds.
-        def delete_room(room_id)
+        def delete_room_keys_by_room_id(room_id)
           api::KeyBackupUpdate.delete(self.keys(room_id))
         end
 
         # @parameter room_id [String] the room the session belongs to.
         # @parameter session_id [String] the session to read.
         # @returns [BackedUpSession] the session.
-        def of_session(room_id, session_id)
+        def get_room_key_by_session_id(room_id, session_id)
           api::BackedUpSession.get(self.keys(room_id, session_id))
         end
 
@@ -209,7 +209,7 @@ module Async
         # @parameter forwarded_count [Integer] how many times it was forwarded.
         # @parameter is_verified [Boolean] whether it came from a verified device.
         # @returns [KeyBackupUpdate] what the server now holds.
-        def put_session(room_id, session_id, session_data:, first_message_index: 0, forwarded_count: 0, is_verified: false)
+        def put_room_key_by_session_id(room_id, session_id, session_data:, first_message_index: 0, forwarded_count: 0, is_verified: false)
           payload = {
             session_data: session_data,
             first_message_index: first_message_index,
@@ -223,7 +223,7 @@ module Async
         # @parameter room_id [String] the room the session belongs to.
         # @parameter session_id [String] the session to delete.
         # @returns [KeyBackupUpdate] what the server now holds.
-        def delete_session(room_id, session_id)
+        def delete_room_key_by_session_id(room_id, session_id)
           api::KeyBackupUpdate.delete(self.keys(room_id, session_id))
         end
 
@@ -282,20 +282,20 @@ module Async
         # @parameter algorithm [String] how the sessions are encrypted.
         # @parameter auth_data [Hash] what the algorithm needs in order to be used.
         # @returns [KeyBackupReference] the version which was created.
-        def create(algorithm:, auth_data:)
+        def post_room_keys_version(algorithm:, auth_data:)
           payload = {algorithm: algorithm, auth_data: auth_data}
 
           api::KeyBackupReference.post(@resource.with(path: "#{V3}/room_keys/version"), payload)
         end
 
         # @returns [KeyBackupVersion] the version the server would have a client use.
-        def current
+        def get_room_keys_version_current
           api::KeyBackupVersion.get(@resource.with(path: "#{V3}/room_keys/version"))
         end
 
         # @parameter version [String] the version to look up.
         # @returns [KeyBackupVersion] that version.
-        def describe(version)
+        def get_room_keys_version(version)
           api::KeyBackupVersion.get(@resource.with(path: self.path_for(version)))
         end
 
@@ -305,7 +305,7 @@ module Async
         # @parameter algorithm [String] how the sessions are encrypted.
         # @parameter auth_data [Hash] what the algorithm needs in order to be used.
         # @returns [Representation] the empty response.
-        def update(version, algorithm:, auth_data:)
+        def put_room_keys_version(version, algorithm:, auth_data:)
           payload = {algorithm: algorithm, auth_data: auth_data, version: version}
 
           api::Representation.put(@resource.with(path: self.path_for(version)), payload)
@@ -315,7 +315,7 @@ module Async
         #
         # @parameter version [String] the version to delete.
         # @returns [Representation] the empty response.
-        def delete(version)
+        def delete_room_keys_version(version)
           api::Representation.delete(@resource.with(path: self.path_for(version)))
         end
 

@@ -17,7 +17,7 @@ Async::Matrix::Client.open("http://localhost:8008") do |unauthenticated|
 	room = client.create_room(name: "Hello", topic: "Built with async-rest")
 	room.send_message("Hello, World!")
 	
-	client.joined_rooms.each do |room|
+	client.get_joined_rooms.each do |room|
 		puts "#{room.id}: #{room.state.name}"
 	end
 	
@@ -58,7 +58,7 @@ response is a *representation*.
     {Async::Matrix::Room} is a navigator onto a room's state, members and timeline, carrying the
     room ID alongside its resource.
 
-  - **Representations are lazy.** `client.joined_rooms` issues no request until something reads its
+  - **Representations are lazy.** `client.get_joined_rooms` issues no request until something reads its
     value, and a room enumerated from a collection carries its ID without a further request.
 
 ## Testing

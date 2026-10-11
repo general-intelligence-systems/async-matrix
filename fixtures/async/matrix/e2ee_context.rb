@@ -27,7 +27,7 @@ module Async
 
       let(:other_user_id) {"@#{other_username}:localhost"}
 
-      let(:other_device_id) {other.whoami.device_id}
+      let(:other_device_id) {other.get_token_owner.device_id}
 
       let(:other_crypto) {Async::Matrix::E2EE::Plaintext.new(one_time_key_target: 2)}
 
@@ -99,7 +99,7 @@ module Async
       # @returns [Async::Matrix::ClientServer::Room] the room.
       def shared_room
         client.create_room(preset: "public_chat").tap do |room|
-          other.join(room.id)
+          other.join_room(room.id)
         end
       end
     end

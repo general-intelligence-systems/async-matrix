@@ -20,7 +20,7 @@ describe Async::Matrix::E2EE::Plaintext do
     it "answers the same keys the homeserver was given" do
       machine.publish!
 
-      published = client.keys.query({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
+      published = client.keys.query_keys({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
 
       expect(published[:keys][:"ed25519:#{machine.device_id}"]).to be == crypto.identity_keys[:ed25519]
       expect(crypto.identity_keys).to be == crypto.identity_keys
@@ -63,8 +63,8 @@ describe Async::Matrix::E2EE::Plaintext do
       crypto.generate_one_time_keys(1)
       made = crypto.one_time_keys.values.first
 
-      client.keys.upload(device_keys: machine.device_keys, one_time_keys: machine.signed_one_time_keys)
-      claimed = client.keys.claim({user_id => {machine.device_id => "signed_curve25519"}})
+      client.keys.upload_keys(device_keys: machine.device_keys, one_time_keys: machine.signed_one_time_keys)
+      claimed = client.keys.claim_keys({user_id => {machine.device_id => "signed_curve25519"}})
 
       expect(claimed.one_time_keys[user_id.to_sym][machine.device_id.to_sym].values.first[:key]).to be == made
     end
@@ -138,8 +138,8 @@ describe Async::Matrix::E2EE::Plaintext do
     # What the homeserver stored is what is read, so nothing in between may alter it.
     it "reads what the homeserver stored, rather than what was encrypted" do
       content = machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "stored"))
-      sent = room.send(content)
-      stored = room.event(sent.event_id)
+      sent = room.send_message(content.type, content.to_h)
+      stored = room.get_one_room_event(sent.event_id)
 
       plaintext = crypto.decrypt(room.id, session_id: content.session_id, ciphertext: stored.content[:ciphertext])
 

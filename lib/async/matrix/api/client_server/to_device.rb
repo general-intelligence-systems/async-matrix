@@ -50,25 +50,10 @@ module Async
         # @parameter messages [Hash] the content, by user ID and then device ID.
         # @parameter transaction_id [String] a unique ID which makes this idempotent.
         # @returns [Representation] the empty response.
-        def send_event(type, messages, transaction_id: self.class.transaction_id)
+        def send_to_device(type, messages, transaction_id: self.class.transaction_id)
           path = "#{V3}/sendToDevice/#{::Protocol::URL::Encoding.escape(type)}/#{::Protocol::URL::Encoding.escape(transaction_id)}"
 
           api::Representation.put(@resource.with(path: path), {messages: messages})
-        end
-
-        # Send content described by one of the {Async::Matrix::Events} classes.
-        #
-        # @parameter content [Events::Content] the content to send.
-        # @parameter devices [Hash] which devices to send it to, by user ID.
-        # @returns [Representation] the empty response.
-        def send(content, devices)
-          messages = devices.each_with_object({}) do |(user_id, device_ids), addressed|
-            addressed[user_id] = device_ids.each_with_object({}) do |device_id, bodies|
-              bodies[device_id] = content.to_h
-            end
-          end
-
-          self.send_event(content.type, messages)
         end
 
         def close

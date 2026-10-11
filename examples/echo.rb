@@ -18,7 +18,7 @@ PASSWORD = ENV.fetch("MATRIX_PASSWORD", "password")
 
 Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |unauthenticated|
   client = unauthenticated.logged_in(USER, PASSWORD)
-  me = client.whoami.user_id
+  me = client.get_token_owner.user_id
 
   Console.info(self, "Logged in.", user_id: me)
 
@@ -41,7 +41,9 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
       in {room_id:, sender:, content: Async::Matrix::Events::TextMessage(body:)}
         Console.info(self, "Received a message.", room_id: room_id, sender: sender, body: body)
 
-        client.room(room_id).send(Async::Matrix::Events::TextMessage.build(body: "You said: #{body}"))
+        content = Async::Matrix::Events::TextMessage.build(body: "You said: #{body}")
+
+        client.room(room_id).send_message(content.type, content.to_h)
       in {sender:, content: Async::Matrix::Events::Message(msgtype:)}
         Console.info(self, "Ignoring a message we do not handle.", sender: sender, msgtype: msgtype)
       end

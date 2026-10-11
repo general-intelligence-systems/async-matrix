@@ -45,7 +45,7 @@ module Async
             module V1_12
               def self.included(base)
                 base.it "joins through the servers named by via" do
-                  expect(room.join(via: ["localhost"]).room_id).to be == room.id
+                  expect(room.join_room_by_id(via: ["localhost"]).room_id).to be == room.id
                 end
               end
             end
@@ -86,9 +86,9 @@ module Async
             module V1_3
               def self.included(base)
                 base.it "pages the timeline without a from token" do
-                  room.send_message("paged without a token")
+                  room.send_message("m.room.message", {msgtype: "m.text", body: "paged without a token"})
 
-                  expect(room.messages(limit: 1).events).not.to be(:empty?)
+                  expect(room.get_room_events(limit: 1).events).not.to be(:empty?)
                 end
               end
             end
@@ -107,66 +107,66 @@ module Async
                 base.it "can getJoinedRooms" do
                   room
 
-                  expect(client.joined_rooms.ids).to be(:include?, room.id)
+                  expect(client.get_joined_rooms.ids).to be(:include?, room.id)
                 end
 
                 base.it "can getRoomState" do
-                  expect(room.state.name).to be == Async::Matrix::TEST_ROOM_NAME
+                  expect(room.get_room_state.name).to be == Async::Matrix::TEST_ROOM_NAME
                 end
 
                 base.it "can getJoinedMembersByRoom" do
-                  expect(room.joined_members.user_ids).to be(:include?, self.user_id)
+                  expect(room.get_joined_members_by_room.user_ids).to be(:include?, self.user_id)
                 end
 
                 base.it "can getRoomEvents" do
-                  room.send_message("paged")
+                  room.send_message("m.room.message", {msgtype: "m.text", body: "paged"})
 
-                  expect(room.messages(limit: 10).events).not.to be(:empty?)
+                  expect(room.get_room_events(limit: 10).events).not.to be(:empty?)
                 end
 
                 base.it "can sendMessage" do
-                  expect(room.send_message("sent").event_id).to be =~ /\A\$/
+                  expect(room.send_message("m.room.message", {msgtype: "m.text", body: "sent"}).event_id).to be =~ /\A\$/
                 end
 
                 base.it "can joinRoomById" do
                   # Joining a room you are in succeeds, which is the simplest way to exercise it.
-                  expect(room.join.room_id).to be == room.id
+                  expect(room.join_room_by_id.room_id).to be == room.id
                 end
 
                 base.it "can joinRoom" do
-                  expect(client.join(room.id).id).to be == room.id
+                  expect(client.join_room(room.id).id).to be == room.id
                 end
 
                 base.it "can leaveRoom" do
-                  room.leave
+                  room.leave_room
 
-                  expect(client.joined_rooms.ids).not.to be(:include?, room.id)
+                  expect(client.get_joined_rooms.ids).not.to be(:include?, room.id)
                 end
 
                 base.it "can getMembersByRoom" do
-                  expect(room.members.user_ids).to be(:include?, self.user_id)
+                  expect(room.get_members_by_room.user_ids).to be(:include?, self.user_id)
                 end
 
                 base.it "can getOneRoomEvent" do
-                  sent = room.send_message("fetched by id")
+                  sent = room.send_message("m.room.message", {msgtype: "m.text", body: "fetched by id"})
 
-                  expect(room.event(sent.event_id).content[:body]).to be == "fetched by id"
+                  expect(room.get_one_room_event(sent.event_id).content[:body]).to be == "fetched by id"
                 end
 
                 base.it "can setRoomStateWithKey" do
-                  expect(room.set_state("m.room.topic", {topic: "set"}).event_id).to be =~ /\A\$/
+                  expect(room.set_room_state_with_key("m.room.topic", {topic: "set"}).event_id).to be =~ /\A\$/
                 end
 
                 base.it "can getRoomStateWithKey" do
-                  room.set_state("m.room.topic", {topic: "read back"})
+                  room.set_room_state_with_key("m.room.topic", {topic: "read back"})
 
-                  expect(room.state_event("m.room.topic").content[:topic]).to be == "read back"
+                  expect(room.get_room_state_with_key("m.room.topic").content[:topic]).to be == "read back"
                 end
 
                 base.it "can forgetRoom" do
-                  room.leave
+                  room.leave_room
 
-                  expect(room.forget).not.to be_nil
+                  expect(room.forget_room).not.to be_nil
                 end
               end
             end

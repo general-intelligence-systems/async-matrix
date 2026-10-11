@@ -262,12 +262,12 @@ module Async
         alias to_s id
 
         # @returns [State] the current state of the room.
-        def state
+        def get_room_state
           api::State.get(@resource.with(path: "state"))
         end
 
         # @returns [JoinedMembers] the members currently joined to the room.
-        def joined_members
+        def get_joined_members_by_room
           api::JoinedMembers.get(@resource.with(path: "joined_members"))
         end
 
@@ -277,7 +277,7 @@ module Async
         # @parameter limit [Integer] the maximum number of events to return.
         # @parameter from [String | nil] the pagination token to start from.
         # @returns [Messages] the page of events.
-        def messages(dir: "b", limit: DEFAULT_LIMIT, from: nil, **parameters)
+        def get_room_events(dir: "b", limit: DEFAULT_LIMIT, from: nil, **parameters)
           if from.nil? and self.pagination_requires_from?
             raise ArgumentError, "A from token is required before v1.3!"
           end
@@ -291,47 +291,23 @@ module Async
           api::Messages.get(@resource.with(path: "messages", parameters: parameters))
         end
 
-        # Send an event into the room.
+        # Send a message event into the room, which is any event the timeline carries rather than state.
         #
         # @parameter type [String] the event type, e.g. `m.room.message`.
         # @parameter content [Hash] the event content.
         # @parameter transaction_id [String] a unique ID which makes this request idempotent.
         # @returns [SentEvent] the sent event.
-        def send_event(type, content, transaction_id: self.class.transaction_id)
+        def send_message(type, content, transaction_id: self.class.transaction_id)
           path = "send/#{::Protocol::URL::Encoding.escape(type)}/#{::Protocol::URL::Encoding.escape(transaction_id)}"
 
           api::SentEvent.put(@resource.with(path: path), content)
-        end
-
-        # Send an event, whose class names both the type and the content.
-        #
-        # @example
-        # 	room.send(Async::Matrix::Events::TextMessage.build(body: "Hello!"))
-        #
-        # @parameter content [Events::Content] the content to send.
-        # @parameter transaction_id [String] a unique ID which makes this request idempotent.
-        # @returns [SentEvent] the sent event.
-        def send(content, transaction_id: self.class.transaction_id)
-          self.send_event(content.type, content.to_h, transaction_id: transaction_id)
-        end
-
-        # Send a message into the room.
-        #
-        # @parameter body [String] the message body.
-        # @parameter msgtype [String] the message type, e.g. `m.text`.
-        # @returns [SentEvent] the sent event.
-        def send_message(body, msgtype: "m.text", **content)
-          content[:msgtype] = msgtype
-          content[:body] = body
-
-          self.send_event("m.room.message", content)
         end
 
         # Join this room.
         #
         # @parameter via [Array(String) | nil] the servers to attempt the join through.
         # @returns [RoomReference] the joined room.
-        def join(via: nil, **payload)
+        def join_room_by_id(via: nil, **payload)
           parameters = {self.join_via_parameter => via}.compact
 
           api::RoomReference.post(@resource.with(path: "join", parameters: parameters), payload)
@@ -341,7 +317,7 @@ module Async
         #
         # @parameter payload [Hash] the fields to send, such as a reason.
         # @returns [Representation] the empty response.
-        def leave(**payload)
+        def leave_room(**payload)
           api::Representation.post(@resource.with(path: "leave"), payload)
         end
 
@@ -349,7 +325,7 @@ module Async
         #
         # @parameter payload [Hash] the fields to send.
         # @returns [Representation] the empty response.
-        def forget(**payload)
+        def forget_room(**payload)
           api::Representation.post(@resource.with(path: "forget"), payload)
         end
 
@@ -359,7 +335,7 @@ module Async
         # @parameter membership [String | nil] only include members in this membership state.
         # @parameter not_membership [String | nil] exclude members in this membership state.
         # @returns [Members] the membership events.
-        def members(at: nil, membership: nil, not_membership: nil)
+        def get_members_by_room(at: nil, membership: nil, not_membership: nil)
           parameters = {at: at, membership: membership, not_membership: not_membership}.compact
 
           api::Members.get(@resource.with(path: "members", parameters: parameters))
@@ -369,7 +345,7 @@ module Async
         #
         # @parameter event_id [String] the ID of the event.
         # @returns [Event] the event.
-        def event(event_id)
+        def get_one_room_event(event_id)
           path = "event/#{::Protocol::URL::Encoding.escape(event_id)}"
 
           api::Event.get(@resource.with(path: path))
@@ -381,7 +357,7 @@ module Async
         # @parameter state_key [String] the state key, which is usually empty.
         # @parameter format [String | nil] `content` for the content alone, `event` for the event.
         # @returns [StateEvent] the state event.
-        def state_event(type, state_key = "", format: nil)
+        def get_room_state_with_key(type, state_key = "", format: nil)
           parameters = {format: format}.compact
 
           api::StateEvent.get(@resource.with(path: self.state_path(type, state_key), parameters: parameters))
@@ -393,7 +369,7 @@ module Async
         # @parameter content [Hash] the content of the state event.
         # @parameter state_key [String] the state key, which is usually empty.
         # @returns [SentEvent] the sent event.
-        def set_state(type, content, state_key = "")
+        def set_room_state_with_key(type, content, state_key = "")
           api::SentEvent.put(@resource.with(path: self.state_path(type, state_key)), content)
         end
 

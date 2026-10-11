@@ -93,7 +93,7 @@ module Async
             module V1_2
               def self.included(base)
                 base.it "reports whether the user is a guest" do
-                  expect(client.whoami.guest?).to be == false
+                  expect(client.get_token_owner.guest?).to be == false
                 end
               end
             end
@@ -102,7 +102,7 @@ module Async
             module V1_1
               def self.included(base)
                 base.it "can getLoginFlows" do
-                  expect(unauthenticated.login_flows.types).to be(:include?, "m.login.password")
+                  expect(unauthenticated.get_login_flows.types).to be(:include?, "m.login.password")
                 end
 
                 base.it "can login" do
@@ -110,7 +110,7 @@ module Async
                 end
 
                 base.it "can getTokenOwner" do
-                  expect(client.whoami.user_id).to be == self.user_id
+                  expect(client.get_token_owner.user_id).to be == self.user_id
                 end
 
                 base.it "can logout" do
