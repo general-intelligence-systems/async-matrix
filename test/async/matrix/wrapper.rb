@@ -34,6 +34,27 @@ class RateLimitedDelegate < Protocol::HTTP::Middleware
   end
 end
 
+# Answers 429 to everything, as a homeserver under sustained load does.
+class AlwaysRateLimitedDelegate < Protocol::HTTP::Middleware
+  def initialize
+    super(nil)
+
+    @requests = 0
+  end
+
+  # @attribute [Integer] how many requests arrived.
+  attr :requests
+
+  def call(request)
+    @requests += 1
+
+    Protocol::HTTP::Response[429, {"retry-after" => "0", "content-type" => "application/json"}, ["{\"errcode\":\"M_LIMIT_EXCEEDED\",\"error\":\"Too Many Requests\",\"retry_after_ms\":0}"]]
+  end
+
+  def close
+  end
+end
+
 describe Async::Matrix::Wrapper do
   include Sus::Fixtures::Async::ReactorContext
 
@@ -109,7 +130,39 @@ describe Async::Matrix::Wrapper do
     end
   end
 
+  with "a rate limit which never lifts" do
+    let(:delegate) {AlwaysRateLimitedDelegate.new}
+
+    # {MAXIMUM_RETRY_DELAY} bounds one wait, not the total, so a server answering `retry-after: 0` forever would spin here.
+    it "stops after the maximum number of attempts" do
+      begin
+        Async::Matrix::Representation.get(resource)
+      rescue Async::Matrix::RequestError
+        # The rate limit, reported rather than retried.
+      end
+
+      expect(delegate.requests).to be == Async::Matrix::Wrapper::MAXIMUM_ATTEMPTS
+    end
+
+    it "reports the rate limit to the caller" do
+      error = nil
+
+      begin
+        Async::Matrix::Representation.get(resource)
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(error).to be_a(Async::Matrix::RequestError)
+      expect(error).to be(:limit_exceeded?)
+      expect(error.status).to be == 429
+    end
+  end
+
   it "waits no longer than its maximum" do
     expect(subject::MAXIMUM_RETRY_DELAY).to be == 30.0
+  end
+
+  it "sends a request no more times than its maximum" do
+    expect(subject::MAXIMUM_ATTEMPTS).to be == 3
   end
 end
