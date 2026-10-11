@@ -58,6 +58,26 @@ module Async
           self.value.dig(:rooms, :invite) || {}
         end
 
+        # @returns [Hash] the events addressed to this device, which carry encryption keys.
+        def to_device
+          self.value.dig(:to_device, :events) || []
+        end
+
+        # @returns [Array(String)] the users whose device lists changed.
+        def changed_devices
+          self.value.dig(:device_lists, :changed) || []
+        end
+
+        # @returns [Array(String)] the users who are no longer shared with.
+        def left_devices
+          self.value.dig(:device_lists, :left) || []
+        end
+
+        # @returns [Hash] how many one time keys the server still holds, by algorithm.
+        def one_time_keys_count
+          self.value[:device_one_time_keys_count] || {}
+        end
+
         # @returns [Boolean] whether anything happened in this batch.
         def empty?
           self.joined.empty? and self.invited.empty?

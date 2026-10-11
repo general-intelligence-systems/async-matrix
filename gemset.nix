@@ -32,7 +32,7 @@
     version = "0.105.0";
   };
   async-matrix = {
-    dependencies = ["async-rest"];
+    dependencies = ["async-rest" "base64"];
     groups = ["default"];
     platforms = [];
     source = {
@@ -81,6 +81,16 @@
     source = {
       remotes = ["https://rubygems.org"];
       sha256 = "1fv2pz4jsqx2vhbim2c3wy6xh9qq2nf0ci4qakv57hv16kx9xih2";
+      type = "gem";
+    };
+    version = "0.3.0";
+  };
+  base64 = {
+    groups = ["default"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "0yx9yn47a8lkfcjmigk79fykxvr80r4m1i35q82sxzynpbm7lcr7";
       type = "gem";
     };
     version = "0.3.0";

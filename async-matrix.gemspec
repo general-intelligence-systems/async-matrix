@@ -21,4 +21,5 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.3"
 
   spec.add_dependency "async-rest", "~> 0.20"
+  spec.add_dependency "base64", "~> 0.3"
 end
