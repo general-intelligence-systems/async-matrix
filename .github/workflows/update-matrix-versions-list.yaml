@@ -36,10 +36,10 @@ jobs:
       run: |
         set -o pipefail
 
-        # The compose file also defines the servers which are not homeservers - sydent, sygnal, the
-        # application service stub, the TLS terminator in front of federation - so the services are
-        # filtered to the "v1.N" ones before being sorted. The OAuth stack is behind a profile and
-        # `config --services` leaves it out already.
+        # Every server which is not a homeserver is behind a profile named for the API it serves,
+        # so `config --services` lists the homeservers alone. The services are filtered to the
+        # "v1.N" ones anyway, so that a rig which grows a profileless server of its own does not
+        # quietly turn it into a specification version.
         docker compose --file synapse/docker-compose.yml config --services \
           | grep --extended-regexp '^v1\.[0-9]+$' \
           | sort --version-sort > MATRIX_API_VERSIONS.txt

@@ -14,7 +14,9 @@ module Async
     # The homeserver to test against. The rig in `synapse/` provides one, with rate limiting disabled and a module which registers a user on first login.
     HOMESERVER = ENV.fetch("MATRIX_HOMESERVER", "http://localhost:7300")
 
-    # The homeserver which delegates authentication to matrix-authentication-service. The rig in `synapse/` runs one behind the `oauth` compose profile, which binds its own port so it may run alongside a version.
+    # The homeserver which delegates authentication to matrix-authentication-service. The rig in `synapse/` runs one behind the `client-server` compose profile, which binds its own port so it may run alongside a version.
+    #
+    # Empty where the backend's rig runs none, which is how a rig says the OAuth 2.0 flow cannot be tested against it: see `tuwunel/test.env`, and the tests which need one are left out of the run.
     OAUTH_HOMESERVER = ENV.fetch("MATRIX_OAUTH_HOMESERVER", "http://localhost:7310")
 
     # The specification version under test. `bin/test` runs the suite once per version, against a server which implements that version. Deliberately not `VERSION`, which is the gem's own.

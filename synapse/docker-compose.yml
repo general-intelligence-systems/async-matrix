@@ -10,12 +10,24 @@
 # Synapse rejects settings a newer one accepts, so the configuration is versioned alongside the
 # server. MATRIX_API_VERSIONS.txt is generated from the services below.
 
-# The OAuth 2.0 stack is behind the `oauth` profile, so `docker compose config --services` leaves
-# it out and MATRIX_API_VERSIONS.txt stays a list of specification versions:
+# Every server here which is not a homeserver carries a compose profile named for the API it serves:
+# `identity` is sydent, `push-gateway` is sygnal, `application-service` is the stub which answers in
+# a bridge's place, and `client-server` is the OAuth 2.0 stack. That is how the rig declares what it
+# has, and it is the whole of what bin/test knows about this file - it enables the profiles of the
+# APIs it was asked for and never names a service:
 #
-#   docker compose --profile oauth up --detach --wait
+#   docker compose --profile identity up --detach --wait
 #
-# It binds its own ports, so it can run alongside whichever version is up.
+# A backend whose rig has no server for an API declares no profile for it, and asking for that API
+# there is then a run of nothing. Which APIs this rig can serve is declared in test.env.
+#
+# A service which runs once and exits rather than serving goes in the `<api>-seed` profile instead,
+# so that it is run after that API's servers are up rather than waited on: `docker compose up
+# --wait` counts a container which has exited as a failure, however it exited.
+#
+# The profiles also keep these services out of `docker compose config --services`, so
+# MATRIX_API_VERSIONS.txt stays a list of specification versions. They bind their own ports, so they
+# run alongside whichever version is up.
 
 # A fixed project name, so that `docker compose down` finds the rig whatever directory it is run
 # from, rather than deriving a different project per working directory.
@@ -32,7 +44,7 @@ x-synapse: &synapse
     SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
     PYTHONPATH: /config/modules
   ports:
-    - "${SYNAPSE_PORT:-7300}:8008"
+    - "${HOMESERVER_PORT:-7300}:8008"
     # The identity server and the TLS terminator in front of federation share this namespace, so
     # their ports are published here: a container which joins another's namespace cannot publish
     # one of its own. The published ports all sit in an unused range, clear of the defaults
@@ -226,6 +238,7 @@ services:
   # `localhost` - which is what the homeserver calls itself, and so what the identity server has to
   # resolve.
   federation-tls:
+    profiles: [identity]
     image: alpine/socat:latest
     network_mode: "service:${MATRIX_SERVICE:-v1.19}"
     volumes:
@@ -235,6 +248,7 @@ services:
       - TCP:127.0.0.1:8008
 
   sydent:
+    profiles: [identity]
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sydent:latest
     pull_policy: always
     # The same namespace as the homeserver, so that the name the homeserver calls itself resolves
@@ -258,6 +272,7 @@ services:
   # No applications are configured, so a notification is one it rejects: see sygnal.yaml. It binds
   # its own port, so it runs alongside whichever homeserver version is up.
   sygnal:
+    profiles: [push-gateway]
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sygnal:latest
     pull_policy: always
     environment:
@@ -278,6 +293,7 @@ services:
   # The rig runs none, so this answers in its place - which is enough for the operations, since each
   # is a request whose shape the suite is checking and whose answer it reads.
   appservice:
+    profiles: [application-service]
     image: python:3-slim
     command: ["python", "/config/appservice-stub.py"]
     volumes:
@@ -294,7 +310,7 @@ services:
   # delegates authentication to it.
 
   oauth-postgres:
-    profiles: [oauth]
+    profiles: [client-server]
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: mas
@@ -307,7 +323,7 @@ services:
       retries: 30
 
   oauth-mas:
-    profiles: [oauth]
+    profiles: [client-server]
     image: ghcr.io/element-hq/matrix-authentication-service:latest
     command: ["server", "--config", "/config/mas.yaml"]
     depends_on:
@@ -326,7 +342,7 @@ services:
   # authorization server then refuses every exchange, because the device it must create belongs
   # to a user the homeserver has never heard of.
   oauth-mas-user:
-    profiles: [oauth]
+    profiles: [client-server-seed]
     image: ghcr.io/element-hq/matrix-authentication-service:latest
     restart: "no"
     command:
@@ -346,7 +362,7 @@ services:
       - ./mas.yaml:/config/mas.yaml:ro
 
   oauth-synapse:
-    profiles: [oauth]
+    profiles: [client-server]
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.19
     pull_policy: always
     environment:

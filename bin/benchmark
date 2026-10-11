@@ -133,7 +133,8 @@
 #
 #      MATRIX_BACKEND, MATRIX_ACCOUNTS
 #              Set for a benchmark which needs the rig, to the backend and to how it is to get
-#              an account, which the backend decides. As bin/test sets them for the suite.
+#              an account, which the backend declares in <backend>/test.env. As bin/test sets
+#              them for the suite.
 #
 #      MATRIX_HOMESERVER
 #              Read by the rig benchmarks, for where the homeserver is. Defaults to the port
@@ -155,6 +156,10 @@
 #      <backend>/docker-compose.yml
 #              The homeservers of one backend, one service per version. The same file bin/test
 #              uses.
+#
+#      <backend>/test.env
+#              What that backend's rig is, sourced for the environment a benchmark runs in.
+#              The same file bin/test reads.
 #
 #      MATRIX_API_VERSIONS.txt
 #              The versions the rig offers. The latest is brought up unless --version says
@@ -470,10 +475,16 @@ for name in $selected; do
 done
 
 compose="$root/$backend/docker-compose.yml"
+declaration="$root/$backend/test.env"
 
 if [ "$needs_homeserver" = "yes" ]; then
   if [ ! -f "$compose" ]; then
     echo "Unknown backend $backend: $compose does not exist." >&2
+    exit 1
+  fi
+
+  if [ ! -f "$declaration" ]; then
+    echo "Backend $backend has no test.env, which is where a backend says what its rig serves." >&2
     exit 1
   fi
 
@@ -482,16 +493,13 @@ if [ "$needs_homeserver" = "yes" ]; then
   mapfile -t rig_versions < "$root/MATRIX_API_VERSIONS.txt"
   rig_version="${version:-${rig_versions[-1]}}"
 
-  # How the suite gets an account, which the backend decides rather than the benchmark. See
-  # bin/test, which says the same thing at more length.
-  case "$backend" in
-    synapse)
-      accounts="login"
-      ;;
-    *)
-      accounts="register"
-      ;;
-  esac
+  # What the backend's rig is, which the backend declares rather than this script knowing: how a
+  # benchmark gets an account, and wherever its servers answer. The same file bin/test reads, and
+  # each entry there keeps a value which is already set, so one given on the command line wins.
+  set -o allexport
+  # shellcheck source=/dev/null
+  . "$declaration"
+  set +o allexport
 
   started_homeserver="yes"
 
@@ -507,7 +515,6 @@ if [ "$needs_homeserver" = "yes" ]; then
   echo "Benchmarking against $backend $rig_version." >&2
 
   export MATRIX_BACKEND="$backend"
-  export MATRIX_ACCOUNTS="$accounts"
   export MATRIX_VERSION="$rig_version"
 
   version="$rig_version"

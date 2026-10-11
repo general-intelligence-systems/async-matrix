@@ -15,6 +15,14 @@
 # List checks that this file offers the same services, so that `bin/test <version>` means the same
 # thing whichever backend it is pointed at.
 
+# The homeserver is published on the port every backend's rig publishes it on, which is what the
+# suite is told to talk to: see test.env.
+#
+# There is nothing here but homeservers. The identity, push gateway and application service APIs are
+# each served by a server of its own, and this rig runs none of them, so it declares no compose
+# profile named for any of them - where synapse/docker-compose.yml declares one per API it serves.
+# Tuwunel federates with nobody here either, so test.env claims the client-server API alone.
+
 # A fixed project name, so that `docker compose down` finds the rig whatever directory it is run
 # from. It is not the project name the Synapse rig uses: with one name between them, `docker
 # compose ps` here would report that rig's containers as this one's, since the service names are
@@ -26,7 +34,7 @@ x-tuwunel: &tuwunel
   environment:
     TUWUNEL_CONFIG: /config/tuwunel.toml
   ports:
-    - "${TUWUNEL_PORT:-8008}:8008"
+    - "${HOMESERVER_PORT:-7300}:8008"
   volumes:
     - ./tuwunel.toml:/config/tuwunel.toml:ro
   # The image ships this probe, and the rig only overrides how often it is asked: upstream polls
