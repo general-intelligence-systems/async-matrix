@@ -36,7 +36,12 @@ jobs:
       run: |
         set -o pipefail
 
+        # The compose file also defines the servers which are not homeservers - sydent, sygnal, the
+        # application service stub, the TLS terminator in front of federation - so the services are
+        # filtered to the "v1.N" ones before being sorted. The OAuth stack is behind a profile and
+        # `config --services` leaves it out already.
         docker compose --file synapse/docker-compose.yml config --services \
+          | grep --extended-regexp '^v1\.[0-9]+$' \
           | sort --version-sort > MATRIX_API_VERSIONS.txt
 
         if [ ! -s MATRIX_API_VERSIONS.txt ]; then
@@ -60,7 +65,9 @@ jobs:
             continue
           fi
 
-          offered=$(docker compose --file "$compose" config --services | sort --version-sort)
+          offered=$(docker compose --file "$compose" config --services \
+            | grep --extended-regexp '^v1\.[0-9]+$' \
+            | sort --version-sort)
 
           if [ "$offered" = "$(cat MATRIX_API_VERSIONS.txt)" ]; then
             echo "$backend offers every version."

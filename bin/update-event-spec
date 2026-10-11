@@ -282,8 +282,13 @@ def entries_for(version)
       path = File.join(directory, name)
       raw = load_document(path, cache)
 
-      if raw.is_a?(Hash)
-        stem = name.delete_suffix(".yaml")
+      stem = name.delete_suffix(".yaml")
+
+      # v1.1 keeps stripped_state.yaml beside the types, where every later version has it under
+      # core-event-schema: it says how an event is framed rather than what one means, so it is a
+      # framing and not an event, and a manifest for it would ask for a class which has nothing to
+      # carry.
+      if raw.is_a?(Hash) && !FRAMINGS.include?(stem)
         resolved = dereference(raw, directory, cache)
         content = resolved.dig("properties", "content")
 

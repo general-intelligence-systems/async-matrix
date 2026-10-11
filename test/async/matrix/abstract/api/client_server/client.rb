@@ -44,8 +44,9 @@ module Async
                 # @attribute [Boolean] whether it was closed.
                 attr :closed
 
-                def refresh(refresh_token, client_id:)
-                  @renewals << {refresh_token: refresh_token, client_id: client_id}
+                # Asked for whether or not the client has one: {Async::Matrix::OAuth::Issuer} renews with a nil secret rather than without the field.
+                def refresh(refresh_token, client_id:, client_secret: nil)
+                  @renewals << {refresh_token: refresh_token, client_id: client_id, client_secret: client_secret}
 
                   FakeTokens.new("a-renewed-token", "a-new-refresh-token", 300_000)
                 end
@@ -91,7 +92,7 @@ module Async
 
                   authorized.delegate.credentials.renew!
 
-                  expect(server.renewals).to be == [{refresh_token: "a-refresh-token", client_id: "a-client"}]
+                  expect(server.renewals).to be == [{refresh_token: "a-refresh-token", client_id: "a-client", client_secret: nil}]
                 end
 
                 base.it "adopts the tokens a renewal issued" do

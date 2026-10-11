@@ -18,17 +18,19 @@ module Async
       # A case is named exactly `can <type>`, as the operations are, so that a case which exercises a type end to end can be told from one which describes a detail of it.
       PATTERN = /\Acan\s+(?<type>\S+)\z/
 
-      # A content field whose name cannot be an accessor, and the one which reads it instead.
+      # A content field whose name cannot be an accessor, and the names which read it instead.
       #
       # Three kinds appear. A name every object answers to - `methods`, `hash` - would be overridden.
       # A name this library already uses would read the wrong thing: `type` is the event type and `version` is the specification version, so `m.room.create` and the call events need their own. And a name which is not an identifier at all - the dotted fields, and the `(*)` of content keyed by a pattern, which is read by iterating it.
+      #
+      # More than one name per field, because the type it belongs to decides what it is called: the `type` of `m.room.create` is the kind of room, and the `type` of `m.room.message.feedback` is the kind of feedback. A class satisfies the field by reading it under any of them.
       RENAMED = {
-        "methods" => :verification_methods,
-        "method" => :verification_method,
-        "hash" => :hash_method,
-        "type" => :room_type,
-        "version" => :voip_version,
-        "(*)" => :each,
+        "methods" => [:verification_methods],
+        "method" => [:verification_method],
+        "hash" => [:hash_method],
+        "type" => [:room_type, :feedback_type],
+        "version" => [:voip_version],
+        "(*)" => [:each],
       }.freeze
 
       class << self
@@ -97,12 +99,14 @@ module Async
         # @parameter field [String] the field the schema declares.
         # @returns [Boolean] whether it is reachable.
         def reads?(klass, field)
-          name = RENAMED.fetch(field, field.to_sym)
+          names = RENAMED.fetch(field, [field.to_sym])
 
-          if klass.instance_methods.include?(name)
-            klass.instance_method(name).owner.to_s.start_with?("Async::Matrix")
-          else
-            false
+          names.any? do |name|
+            if klass.instance_methods.include?(name)
+              klass.instance_method(name).owner.to_s.start_with?("Async::Matrix")
+            else
+              false
+            end
           end
         end
 
@@ -165,7 +169,16 @@ module Async
           end
         end
 
-        (entry["content"] || {}).each_key do |field|
+        # The schema writes a content which declares no fields of its own as the bare type it is - `content: object` - where one with fields is a map of them. There is nothing to read either way, so a scalar is no fields.
+        declared = entry["content"]
+
+        if declared.is_a?(Hash)
+          content = declared
+        else
+          content = {}
+        end
+
+        content.each_key do |field|
           it "reads the #{field} of #{key}" do
             expect(EventSchemas.reads?(klass, field)).to be == true
           end

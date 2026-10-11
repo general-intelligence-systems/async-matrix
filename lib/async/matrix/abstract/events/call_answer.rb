@@ -84,8 +84,9 @@ module Async
           module V1_2
           end
 
-          # No changes in v1.1.
+          # v1.1 described the answer, which v1.7 dropped.
           module V1_1
+            def answer = @value[:answer]
           end
         end
       end
