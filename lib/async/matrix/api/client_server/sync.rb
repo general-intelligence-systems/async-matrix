@@ -12,11 +12,9 @@ require_relative "../../abstract/api/client_server/sync"
 module Async
   module Matrix
     module ClientServer
-      # A single sync batch: the delta of everything visible to the user since the previous batch.
+      # A single sync batch: the delta since the previous one.
       #
-      # `/sync` is a long poll. The server holds the request open for up to `timeout` milliseconds
-      # waiting for something to happen, so a sync loop is a sequence of requests, each one starting
-      # from the {#next_batch} token of the last.
+      # `/sync` is a long poll, so a loop is a sequence of requests, each starting from the last {#next_batch}.
       class Sync < Representation
         include Versioned
 
@@ -24,6 +22,8 @@ module Async
         DEFAULT_TIMEOUT = 30_000
 
         # The absolute path of the sync endpoint.
+        #
+        # @returns [String] the path.
         def self.path
           "#{V3}/sync"
         end
@@ -65,8 +65,7 @@ module Async
 
         # Enumerate over every timeline event in this batch.
         #
-        # Note that the room IDs are symbols, because the JSON parser symbolizes all names, so they
-        # are converted back to strings here.
+        # Note that the room IDs are symbols, because the JSON parser symbolizes all names, so they are converted back to strings here.
         #
         # @yields {|event| ...}
         #   @parameter event [Events::Envelope] the event, which names the room it came from.
@@ -76,8 +75,7 @@ module Async
               events = room.dig(:timeline, :events) or next
 
               events.each do |event|
-                # `/sync` groups events by room rather than naming the room on each one, so the
-                # envelope is told which room it came from:
+                # `/sync` groups events by room rather than naming the room on each one, so the envelope is told which room it came from:
                 yield self.events.wrap(event, room_id: room_id.to_s)
               end
             end
@@ -104,8 +102,7 @@ module Async
           end
         end
 
-        # The following batch, continuing from this one. This will block until the server has
-        # something to report, or until the timeout expires.
+        # The following batch, continuing from this one. This will block until the server has something to report, or until the timeout expires.
         #
         # @parameter timeout [Integer] how long the server should wait, in milliseconds.
         # @returns [Sync] the following batch.

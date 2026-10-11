@@ -1,21 +1,13 @@
 # frozen_string_literal: true
 
-# Bans the `return` keyword. A method's last expression is its return value;
-# early exits must be expressed through `if` / `unless` / `case` structure,
-# not by short-circuiting out of the middle of a block.
+# Bans the `return` keyword.
 #
-# Autocorrection handles ONE shape — the guard clause at the top level of a
-# method body:
-#
+# @example
 #   if cond          →    if cond
 #     return X              X
 #   end                   else
 #   rest                    rest
 #                         end
-#
-# Everything else (a `return` inside a block, a loop, or a `rescue`) is left
-# alone: unwinding those changes which construct the value escapes from, and
-# there is no rewrite that is correct without reading the surrounding intent.
 module RuboCop
   module Cop
     module Local
@@ -26,10 +18,7 @@ module RuboCop
 
         def on_new_investigation
           super
-          # One guard per body per pass — two corrections inside the same body
-          # would overlap and clobber each other. `rubocop -a` re-runs the cop
-          # until it stops changing anything, so chained guards still unwind,
-          # one per pass.
+          # One guard per body per pass — two corrections inside the same body would overlap and clobber each other. `rubocop -a` re-runs the cop until it stops changing anything, so chained guards still unwind, one per pass.
           @corrected_bodies = {}
         end
 
@@ -48,9 +37,7 @@ module RuboCop
 
         private
 
-        # Returns [body_node, index_of_guard] when +node+ is the whole body of
-        # an `if`/`unless` that is itself a plain statement in a method body
-        # with at least one statement after it. Otherwise nil.
+        # The guard's body and index, when the node is one.
         def correctable_guard(node)
           if_node = node.parent
 
@@ -73,15 +60,7 @@ module RuboCop
           end
         end
 
-        # "Everything after the guard" is only the method's value if this
-        # statement list is in TAIL position — the method body itself, or a
-        # branch of a conditional that is itself in tail position (which is
-        # what a chain of guards unwinds into, one pass at a time).
-        #
-        # Recursion stops at anything else, and in particular at a `block`: a
-        # `return` inside one exits the enclosing METHOD, not the block, so
-        # turning it into a trailing value would change what the block yields.
-        # `rescue` / `ensure` bodies stop it too.
+        # Whether this statement list is in tail position.
         def tail_position?(node)
           parent = node.parent
 
@@ -115,8 +94,7 @@ module RuboCop
           end
           rest_source = rest.map{|s| reindent(s, indent)}.join("\n")
 
-          # `unless cond / return X / end` means "X unless cond", so the
-          # branches swap rather than the condition being negated.
+          # `unless cond / return X / end` means "X unless cond", so the branches swap rather than the condition being negated.
           if if_node.keyword == "unless"
             first, second = rest_source, guard_value
           else
@@ -126,11 +104,7 @@ module RuboCop
           "if #{if_node.condition.source}\n#{first}\n#{indent}else\n#{second}\n#{indent}end"
         end
 
-        # Move a statement to a new indent. Only line 1 is positioned
-        # absolutely — `source` has already stripped its leading whitespace.
-        # Lines 2..n still carry their ORIGINAL absolute indentation, so they
-        # get shifted by the delta instead, which is what keeps a multi-line
-        # body's internal shape intact.
+        # Move a statement to a new indent.
         def reindent(node, indent)
           target = indent.length + 2
           delta  = target - node.loc.column

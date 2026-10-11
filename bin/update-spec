@@ -4,22 +4,17 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Generates the specification manifests in lib/async/matrix/abstract, one beside each Ruby file, so
-# that the two can be read side by side: the manifest has the same shape as the code it describes.
+# Generates the specification manifests in lib/async/matrix/abstract, one beside each Ruby file, so that the two can be read side by side: the manifest has the same shape as the code it describes.
 #
+# @example
 #   bin/update-spec              # every version in MATRIX_API_VERSIONS.txt
 #   bin/update-spec v1.18 v1.19  # only rebuild these versions' deltas
 #
-# A manifest holds the whole surface at the newest version, which is what the class body
-# implements, followed by one entry per specification version holding only what that version
-# changed, which is what the version layer implements. An empty entry means the specification
-# changed nothing, so an empty layer beside it is correct.
+# A manifest holds the whole surface at the newest version, which is what the class body implements, followed by one entry per specification version holding only what that version changed, which is what the version layer implements. An empty entry means the specification changed nothing, so an empty layer beside it is correct.
 #
-# Every operation in the client-server API appears in exactly one manifest. Those which no class
-# implements yet get a manifest with no Ruby beside it, which is the map of what is left to build.
+# Every operation in the client-server API appears in exactly one manifest. Those which no class implements yet get a manifest with no Ruby beside it, which is the map of what is left to build.
 #
-# The specifications come from the submodules in ./data, one per released version, so this needs no
-# network. Run bin/fetch-spec first.
+# The specifications come from the submodules in ./data, one per released version, so this needs no network. Run bin/fetch-spec first.
 
 require "yaml"
 require "uri"
@@ -31,9 +26,7 @@ OUTPUT = File.join(ROOT, "lib", "async", "matrix", "abstract", "api")
 
 METHODS = %w[get put post delete patch].freeze
 
-# The specification describes five APIs. Each is namespaced, both here and in lib, because they are
-# separate protocols which happen to share a repository: a client implements client-server, a bridge
-# implements application-service, and nothing should be able to confuse the two.
+# The specification describes five APIs. Each is namespaced, both here and in lib, because they are separate protocols which happen to share a repository: a client implements client-server, a bridge implements application-service, and nothing should be able to confuse the two.
 #
 # The directory is named as the specification names it; the namespace is the Ruby spelling of it.
 APIS = {
@@ -44,9 +37,7 @@ APIS = {
   "push-gateway" => "push_gateway",
 }.freeze
 
-# The specification files each existing manifest covers, so that a manifest sits beside the Ruby it
-# describes. Anything not claimed here is generated into a manifest named after its specification
-# file, which keeps coverage complete without inventing names for concepts we have not modelled.
+# The specification files each existing manifest covers, so that a manifest sits beside the Ruby it describes. Anything not claimed here is generated into a manifest named after its specification file, which keeps coverage complete without inventing names for concepts we have not modelled.
 GROUPS = {
   "client_server" => {
     "rooms" => %w[
@@ -79,8 +70,7 @@ def sentence(text)
   end
 end
 
-# Follow every $ref, which json_schemer resolves against the document's base URI - including the
-# `#/components/...` pointers the specification uses for shared parameters.
+# Follow every $ref, which json_schemer resolves against the document's base URI - including the `#/components/...` pointers the specification uses for shared parameters.
 def dereference(node, schema, base, seen = [], depth = 0)
   if depth > 24
     node
@@ -146,8 +136,7 @@ def fields(schema, depth = 0)
       properties = schema["properties"]
       patterns = schema["patternProperties"]
 
-      # A map keyed by something the specification does not name - a room ID, a user ID. Up to v1.10
-      # these were `additionalProperties`; from v1.11 they are `patternProperties` with a key pattern.
+      # A map keyed by something the specification does not name - a room ID, a user ID. Up to v1.10 these were `additionalProperties`; from v1.11 they are `patternProperties` with a key pattern.
       # Both describe the same thing, and without handling both, everything inside them is lost.
       additional = schema["additionalProperties"]
       unless additional.is_a?(Hash)
@@ -182,9 +171,7 @@ def fields(schema, depth = 0)
           out[name] = entry
         end
 
-        # A keyed map is always `(*)`, whichever construct expressed it, with the key pattern kept as
-        # metadata. Otherwise the switch from `additionalProperties` to `patternProperties` at v1.11
-        # reads as 127 fields removed and 131 added, when nothing about the API changed.
+        # A keyed map is always `(*)`, whichever construct expressed it, with the key pattern kept as metadata. Otherwise the switch from `additionalProperties` to `patternProperties` at v1.11 reads as 127 fields removed and 131 added, when nothing about the API changed.
         patterns&.each do |pattern, value|
           unless value.is_a?(Hash)
             next
@@ -235,9 +222,7 @@ def operations(version, api)
 
       schema = JSONSchemer.schema(document, base_uri: base, ref_resolver: resolver)
 
-      # The specification was Swagger 2.0 up to v1.7 and OpenAPI 3.1 from v1.8. The two describe
-      # the same API in different shapes, so both are normalised here - otherwise the delta at
-      # v1.8 reports every operation as rewritten, which says nothing about the API.
+      # The specification was Swagger 2.0 up to v1.7 and OpenAPI 3.1 from v1.8. The two describe the same API in different shapes, so both are normalised here - otherwise the delta at v1.8 reports every operation as rewritten, which says nothing about the API.
       if document["swagger"]
         prefix = document["basePath"].to_s
       else

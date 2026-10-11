@@ -4,23 +4,17 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Compares the per-version manifests written by bin/update-event-spec and records what each
-# specification version changed, as
-# lib/async/matrix/abstract/events/schemas/<name>-<version>.deltas.yaml.
+# Compares the per-version manifests written by bin/update-event-spec and records what each specification version changed, as lib/async/matrix/abstract/events/schemas/<name>-<version>.deltas.yaml.
 #
+# @example
 #   bin/generate-event-spec-deltas                  # every event type
 #   bin/generate-event-spec-deltas m.room.message   # one type
 #
-# This reads the manifests rather than the specification, so it needs neither the submodules nor
-# the network, and it can be re-run on its own whenever the manifests change.
+# This reads the manifests rather than the specification, so it needs neither the submodules nor the network, and it can be re-run on its own whenever the manifests change.
 #
-# A deltas file holds every version a type exists at, in descending order, which is the order the
-# layers appear in the Ruby beside it: open `module V1_10` and the v1.10 deltas say what it must
-# implement, or say the specification changed nothing and the empty layer is correct.
+# A deltas file holds every version a type exists at, in descending order, which is the order the layers appear in the Ruby beside it: open `module V1_10` and the v1.10 deltas say what it must implement, or say the specification changed nothing and the empty layer is correct.
 #
-# Changes are reported as leaf paths - `content.info.type`, `content.body.required` - rather than as
-# nested subtrees, because a subtree diff of something like m.room.member prints the whole content
-# shape and tells you nothing about what moved.
+# Changes are reported as leaf paths - `content.info.type`, `content.body.required` - rather than as nested subtrees, because a subtree diff of something like m.room.member prints the whole content shape and tells you nothing about what moved.
 
 require "yaml"
 
@@ -36,8 +30,7 @@ end
 
 # An entry as a flat map of leaf path to value.
 #
-# The `fields` key is a container rather than a step in the path, so it is skipped: a nested field
-# reads as `content.info.thumbnail_info`, and an array's member as `content.chunk[]`.
+# The `fields` key is a container rather than a step, so it is skipped.
 def leaves(node, trail = [], out = {})
   case node
   when Hash

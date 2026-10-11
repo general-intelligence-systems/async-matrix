@@ -1,34 +1,27 @@
 # frozen_string_literal: true
 
-# Checks the structure of a comment, which decode parses into three parts: the summary, the
-# annotations, and the summary belonging to each annotation.
+# Checks the structure of a comment, which decode parses into three parts: the summary, the annotations, and the summary belonging to each annotation.
 #
+# @example
 #   # Connect to the given endpoint, returning the HTTP client and reference.   <- summary
 #   # @parameter endpoint [Endpoint] used to connect to the remote system.      <- annotation
 #   # @returns [Tuple(Client, Reference)] the client and reference.
 #
-# Four things are checked, each measured against how async-rest, async-discord and async-ollama
-# document themselves:
+# Four things are checked, each measured against how async-rest, async-discord and async-ollama document themselves:
 #
-# A paragraph occupies one line. None of the 99 summary paragraphs in those three projects is
-# wrapped, and async-rest's run to 544 characters.
+# A paragraph occupies one line. None of the 99 summary paragraphs in those three projects is wrapped, and async-rest's run to 544 characters.
 #
-# A summary is short, and no longer than the code it describes earns. Across 76 documented methods
-# the median summary is 4 to 9 words whatever the length of the method, so the allowance starts at
-# ten words and grows by three per line of body, to a ceiling of thirty.
+# A summary is short, and no longer than the code it describes earns. Across 76 documented methods the median summary is 4 to 9 words whatever the length of the method, so the allowance starts at ten words and grows by three per line of body, to a ceiling of thirty.
 #
 # A module's summary is ten words or fewer. The only commented module in async-rest is exactly ten.
 #
-# A documented method says what it takes and returns. A summary with no annotations describes the
-# method in prose and leaves the signature undocumented, which is what annotations are for. A
-# method with no comment at all is not this cop's business: that is documentation coverage, which
-# decode reports on separately.
+# A documented method says what it takes and returns. A summary with no annotations describes the method in prose and leaves the signature undocumented, which is what annotations are for. A method with no comment at all is not this cop's business: that is documentation coverage, which decode reports on separately.
 #
-# Nothing here is corrected automatically. A comment which breaks these rules has to be rewritten
-# rather than reflowed, and a correction which only moved the words around would hide that.
+# Nothing here is corrected automatically. A comment which breaks these rules has to be rewritten rather than reflowed, and a correction which only moved the words around would hide that.
 #
 # Each check is configured on its own, because they are not all worth applying everywhere:
 #
+# @example
 #   Local/CommentStructure:
 #     Annotations:
 #       Include:
@@ -39,10 +32,7 @@
 #     Wrapping:
 #       Enabled: true
 #
-# A check with no `Include` runs everywhere; given one, it runs only where a path matches. `Exclude`
-# then removes paths from whatever is left. `Annotations` defaults to `lib` alone: a script in `bin`
-# and a case in `test` have no interface for anyone else to call, so annotating them documents
-# nothing.
+# A check with no `Include` runs everywhere; given one, it runs only where a path matches. `Exclude` then removes paths from whatever is left. `Annotations` defaults to `lib` alone: a script in `bin` and a case in `test` have no interface for anyone else to call, so annotating them documents nothing.
 
 require "decode/language/ruby/generic"
 
@@ -186,30 +176,28 @@ module RuboCop
           end
         end
 
-        # Consecutive comment lines: a block is what documents one thing, so a wrap can only
-        # happen inside one.
+        # Consecutive comment lines: a block is what documents one thing, so a wrap can only happen inside one.
         def blocks
-          found = []
-          current = []
+          [].tap do |found|
+            current = []
 
-          processed_source.comments.each do |comment|
-            if comment.text.match?(HEADER) or comment.text.start_with?("# rubocop:")
-              next
+            processed_source.comments.each do |comment|
+              if comment.text.match?(HEADER) or comment.text.start_with?("# rubocop:")
+                next
+              end
+
+              if current.empty? or comment.loc.line == current.last.loc.line + 1
+                current << comment
+              else
+                found << current
+                current = [comment]
+              end
             end
 
-            if current.empty? or comment.loc.line == current.last.loc.line + 1
-              current << comment
-            else
+            unless current.empty?
               found << current
-              current = [comment]
             end
           end
-
-          unless current.empty?
-            found << current
-          end
-
-          found
         end
 
         def check_wrapping(block)
@@ -234,8 +222,7 @@ module RuboCop
           end
         end
 
-        # decode consumes the lines it parses and does not report where they came from, so they are
-        # handed over through something which records what it gave away.
+        # decode consumes the lines it parses and does not report where they came from, so they are handed over through something which records what it gave away.
         def parse(block)
           source = Consumable.new(block.each_with_index.map{|comment, index| [index, self.text_of(comment)]})
           nodes = []

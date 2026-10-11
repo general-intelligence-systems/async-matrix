@@ -3,14 +3,6 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# The version layers for `session.rb`. Each module mirrors the class of the same name, and holds
-# only what a given specification version changed: the unversioned implementation stays in the
-# class.
-#
-# Every version is declared, highest first, even when it changed nothing, so that a missing module
-# is a mistake rather than a deliberate no-op. The schemas beside this file say what each version
-# requires, and `session-<version>.deltas.yaml` says what it changed.
-
 module Async
   module Matrix
     module Abstract
@@ -81,8 +73,7 @@ module Async
           module V1_4
           end
 
-          # v1.3 added refresh tokens to the login response, so that an access token can be given a
-          # lifetime and renewed rather than living forever.
+          # v1.3 added refresh tokens to the login response.
           module V1_3
             # @returns [String | nil] a token which can be exchanged for a new access token.
             def refresh_token
@@ -99,8 +90,7 @@ module Async
           module V1_2
           end
 
-          # v1.1 deprecated `home_server` in the login response, in favour of the server name carried
-          # by the fully qualified user ID.
+          # v1.1 deprecated `home_server` in the login response.
           module V1_1
             # @returns [String] the name of the homeserver the user belongs to.
             def home_server
@@ -179,8 +169,7 @@ module Async
           module V1_3
           end
 
-          # v1.2 added `is_guest` to the response. Before it a client cannot tell whether the user is a
-          # guest, so the unversioned class answers that it is not.
+          # v1.2 added `is_guest` to the whoami response.
           module V1_2
             # @returns [Boolean] whether the authenticated user is a guest.
             def guest?

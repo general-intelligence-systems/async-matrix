@@ -81,11 +81,7 @@ require_relative "events/typing"
 
 module Async
   module Matrix
-    # The events which flow through the API: the values a representation carries, rather than the
-    # resources it describes.
-    #
-    # The classes here are versioned the same way the API classes are, so the registry a
-    # representation inflates with comes from the version it was built for.
+    # The values a representation carries, not the resources it describes.
     module Events
       class << self
         # The events built for a given specification version.
@@ -98,8 +94,7 @@ module Async
 
         # The registry for a version, which maps an event onto the class describing it.
         #
-        # An unversioned caller gets the unversioned classes, which carry every field the latest
-        # version describes.
+        # An unversioned caller gets the unversioned classes, which carry every field the latest version describes.
         #
         # @parameter version [String | Symbol | nil] e.g. `"v1.19"`.
         # @returns [Registry] the registry.

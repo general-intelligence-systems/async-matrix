@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# Requires `tap` when a method opens by assigning a local variable and closes by
-# returning that same variable:
+# Requires `tap` where a method assigns and returns a local.
 #
+# @example
 #   def require_existing_column!                                    # NO
 #     column = params[:id].to_s
 #     unless connection.columns(@table).any? { |c| c.name == column }
@@ -11,6 +11,7 @@
 #     column
 #   end
 #
+# @example
 #   def require_existing_column!                                    # YES
 #     params[:id].to_s.tap do |column|
 #       unless connection.columns(@table).any? { |c| c.name == column }
@@ -18,16 +19,6 @@
 #       end
 #     end
 #   end
-#
-# The assign-work-return shape states the return value twice — once as the
-# assignment target, once as a bare mention on the last line — and puts the two
-# far enough apart that the trailing `column` reads as a stray expression.
-# `tap` names the value once, scopes it to the block that works on it, and makes
-# "the value flows through unchanged" structural rather than something you check
-# by comparing the first and last lines.
-#
-# A body that REASSIGNS the variable is left alone: `tap` yields the original
-# object and returns it, so that rewrite would change the result.
 module RuboCop
   module Cop
     module Local
@@ -54,8 +45,7 @@ module RuboCop
           end
         end
 
-        # First statement assigns a local; last statement is that same local,
-        # read and nothing else.
+        # First statement assigns a local; last statement is that same local, read and nothing else.
         def tap_shaped?(body)
           body&.begin_type? &&
             body.children.size >= 2 &&
@@ -74,9 +64,7 @@ module RuboCop
           last.lvar_type? && last.children.first == assigned_name(body)
         end
 
-        # `tap` yields the object the receiver evaluated to, so a body that
-        # points the name at something else partway through is a different
-        # program and must not be flagged.
+        # `tap` yields the object the receiver evaluated to, so a body that points the name at something else partway through is a different program and must not be flagged.
         def reassigned?(body)
           name = assigned_name(body)
 

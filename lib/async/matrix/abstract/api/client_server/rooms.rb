@@ -3,13 +3,6 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# The version layers for `rooms.rb`. Each module mirrors the class of the same name, and holds only
-# what a given specification version changed: the unversioned implementation stays in the class.
-#
-# Every version is declared, highest first, even when it changed nothing, so that a missing module
-# is a mistake rather than a deliberate no-op. The schemas beside this file say what each version
-# requires, and `rooms.rb-<version>.deltas.yaml` says what it changed.
-
 module Async
   module Matrix
     module Abstract
@@ -44,9 +37,7 @@ module Async
           module V1_13
           end
 
-          # v1.12 renamed the servers to attempt a join through from `server_name` to `via`. Both
-          # are accepted until v1.14, which removes `server_name`, so there is nothing further to
-          # do at that version.
+          # v1.12 renamed `server_name` to `via`.
           module V1_12
             # @returns [Symbol] the parameter name.
             def join_via_parameter
@@ -86,8 +77,7 @@ module Async
           module V1_4
           end
 
-          # v1.3 made the `from` token optional when paging the timeline, so that a client can page
-          # from either end of the history rather than having to hold a token first.
+          # v1.3 made the `from` token optional.
           module V1_3
             # @returns [Boolean] whether `from` is required.
             def pagination_requires_from?
@@ -99,9 +89,7 @@ module Async
           module V1_2
           end
 
-          # v1.1 is the oldest version this library supports. It carries the behaviour the later
-          # layers change: `reason` on the membership endpoints, a required `from` when paging, and
-          # `server_name` for the servers to attempt a join through.
+          # v1.1 carries what the later layers change.
           module V1_1
             # @returns [Boolean] whether `from` is required.
             def pagination_requires_from?

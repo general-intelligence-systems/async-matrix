@@ -21,20 +21,15 @@ module Async
     module ClientServer
       # A client for the Matrix client-server API.
       #
-      # The client is rooted at the homeserver rather than at a versioned base path, because the API
-      # is versioned per-endpoint. An unauthenticated client can discover the server's capabilities
-      # and log in; {#authenticated} derives a client which carries an access token.
+      # It is rooted at the homeserver rather than a versioned base path.
       class Client < Async::REST::Resource
         include Versioned
 
         class << self
           # The client for a given specification version.
           #
+          # @example
           #   Async::Matrix::Client["v1.19"].open(url)
-          #
-          # The client it returns builds the matching version of every other class, so a `v1.5`
-          # client hands back `v1.5` rooms and syncs. The classes for a version are built once and
-          # cached, so this is cheap to call and the result is always the same class.
           #
           # @parameter version [String | Symbol] e.g. `"v1.19"` or `"1.19"`.
           # @returns [Class(Client)] the client for that version.
@@ -86,8 +81,7 @@ module Async
         def logged_in(user, password, **options)
           login = self.login(user, password, **options)
 
-          # Note: the login representation shares this client's connection, so it must not be
-          # closed here - see {Client#close}.
+          # Note: the login representation shares this client's connection, so it must not be closed here - see {Client#close}.
           self.authenticated(login.access_token)
         end
 

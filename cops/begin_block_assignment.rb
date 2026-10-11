@@ -1,13 +1,11 @@
 # frozen_string_literal: true
 
-# Flags `lvar = begin ... end` (a kwbegin used as rvalue). Rewrite as
+# Flags a `begin ... end` assigned to a variable.
 #
+# @example
 #   begin
 #     lvar = ...
 #   end
-#
-# so the assignment reads left-to-right and the rescue/ensure clauses aren't
-# hiding behind the variable name.
 module RuboCop
   module Cop
     module Local

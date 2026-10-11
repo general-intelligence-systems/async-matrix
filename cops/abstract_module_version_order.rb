@@ -8,17 +8,7 @@ require "rubocop"
 module RuboCop
   module Cop
     module AsyncMatrix
-      # Checks that every layer container in `lib/async/matrix/abstract/` declares a module for
-      # every supported specification version, and declares them from highest to lowest.
-      #
-      # A version layer is a module named after the version which introduced the behaviour, so
-      # `v1.19` becomes `V1_19`. Declaring every version, including the ones which changed
-      # nothing, means the set of layers can be read off the file rather than inferred from the
-      # gaps: a missing module is then unambiguously a mistake rather than a deliberate no-op.
-      #
-      # The declaration order is for readers only. {Async::Matrix::Versions} applies layers in
-      # ascending order regardless of where they appear in the file, because it looks them up by
-      # name. Highest first puts the current behaviour at the top, where it is read first.
+      # Checks that every layer container declares every version, highest first.
       #
       # @example
       #   # bad - V1_2 is missing, and the layers ascend
@@ -27,21 +17,25 @@ module RuboCop
       #       module V1_1
       #       end
       #
+      # @example
       #       module V1_3
       #       end
       #     end
       #   end
       #
+      # @example
       #   # good - every version is present, highest first
       #   module Abstract
       #     module Room
       #       module V1_3
       #       end
       #
+      # @example
       #       # No changes in v1.2.
       #       module V1_2
       #       end
       #
+      # @example
       #       module V1_1
       #       end
       #     end
@@ -53,9 +47,7 @@ module RuboCop
 
         MSG_ORDER = "Declare `%<layer>s` before `%<before>s`: order versions from highest (`%<highest>s`) to lowest (`%<lowest>s`)."
 
-        # The versions which must be declared come from MATRIX_API_VERSIONS.txt, which is
-        # generated from synapse/docker-compose.yml: the versions which can be tested are the
-        # versions which must have a layer. Override the location with `VersionsPath`.
+        # The versions which must be declared come from MATRIX_API_VERSIONS.txt, which is generated from synapse/docker-compose.yml: the versions which can be tested are the versions which must have a layer. Override the location with `VersionsPath`.
         DEFAULT_VERSIONS_PATH = File.expand_path("../MATRIX_API_VERSIONS.txt", __dir__)
 
         # @returns [String] where the list of versions is read from.
@@ -154,8 +146,7 @@ module RuboCop
           end
         end
 
-        # Flag each point where the declarations stop descending, rather than every module
-        # involved: a single swap is a single mistake.
+        # Flag each point where the declarations stop descending, rather than every module involved: a single swap is a single mistake.
         def check_order(layers)
           known = layers.select{|name, _| self.expected_layers.include?(name)}
 

@@ -8,28 +8,26 @@ require "rubocop"
 module RuboCop
   module Cop
     module AsyncMatrix
-      # Checks that an empty version layer says why it is empty.
-      #
-      # Every specification version has a layer, including the ones which changed nothing, so that a
-      # missing module is unambiguously a mistake. An empty module on its own does not say which of
-      # those it is, so it carries a comment naming the version it stands for: a reader can then
-      # tell "nothing changed here" from "somebody left this unfinished".
+      # Checks that an empty version layer says which version it stands for.
       #
       # @example
       #   # bad - empty, and says nothing
       #   module V1_19
       #   end
       #
+      # @example
       #   # bad - the comment names the wrong version
       #   # No changes in v1.18.
       #   module V1_19
       #   end
       #
+      # @example
       #   # good
       #   # No changes in v1.19.
       #   module V1_19
       #   end
       #
+      # @example
       #   # good - it changed something, so it speaks for itself
       #   # v1.19 added the thing.
       #   module V1_19
@@ -88,8 +86,7 @@ module RuboCop
           end
         end
 
-        # Only layers below `Abstract` are version layers, so that a module which merely looks like
-        # one elsewhere is left alone.
+        # Only layers below `Abstract` are version layers, so that a module which merely looks like one elsewhere is left alone.
         def abstract?(node)
           node.each_ancestor(:module).any? do |ancestor|
             ancestor.identifier.short_name == :Abstract

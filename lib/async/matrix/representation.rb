@@ -12,8 +12,7 @@ module Async
   module Matrix
     # The base representation for all Matrix responses.
     class Representation < Async::REST::Representation[Wrapper]
-      # The events built for this representation's version, so that an event is read with the
-      # fields its own version describes rather than the newest ones.
+      # The events built for this representation's version.
       #
       # @returns [Events::Registry] the registry.
       def events

@@ -4,20 +4,16 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Compares the per-version manifests written by bin/update-spec and records what each specification
-# version changed, as lib/async/matrix/abstract/<api>/schemas/<name>-<version>.deltas.yaml.
+# Compares the per-version manifests written by bin/update-spec and records what each specification version changed, as lib/async/matrix/abstract/<api>/schemas/<name>-<version>.deltas.yaml.
 #
+# @example
 #   bin/generate-spec-deltas                     # every manifest of every API
 #   bin/generate-spec-deltas client_server       # one API
 #   bin/generate-spec-deltas client_server/rooms # one manifest
 #
-# A deltas file holds every version in descending order, which is the order the layers appear in the
-# Ruby beside it: open rooms.rb next to schemas/rooms-v1.12.deltas.yaml and `module V1_12` has the
-# which says what it must implement, or an empty entry saying the specification changed nothing.
+# A deltas file holds every version in descending order, which is the order the layers appear in the Ruby beside it: open rooms.rb next to schemas/rooms-v1.12.deltas.yaml and `module V1_12` has the which says what it must implement, or an empty entry saying the specification changed nothing.
 #
-# Changes are reported as leaf paths - `parameters.query.from.required`, `responses.200.chunk[].type`
-# - rather than as nested subtrees, because a subtree diff of something like /sync prints the entire
-# response shape and tells you nothing about what moved.
+# Changes are reported as leaf paths - `parameters.query.from.required`, `responses.200.chunk[].type` - rather than as nested subtrees, because a subtree diff of something like /sync prints the entire response shape and tells you nothing about what moved.
 
 require "yaml"
 
@@ -33,8 +29,7 @@ end
 
 # An operation as a flat map of leaf path to value.
 #
-# The `fields` key is a container rather than a step in the path, so it is skipped: a nested field
-# reads as `responses.200.rooms.join`, and an array's member as `responses.200.chunk[]`.
+# The `fields` key is a container rather than a step, so it is skipped.
 def leaves(node, trail = [], out = {})
   case node
   when Hash
@@ -161,9 +156,7 @@ manifests.each do |manifest|
   interesting = deltas.reject{|version, _| version == all.first}.reject{|_, changes| changes.empty?}
   changed_total += interesting.size
 
-  # One file per version, beside the schema for that version: open `module V1_12` in the Ruby and
-  # `<name>-v1.12.deltas.yaml` says what it has to implement, or says the specification changed
-  # nothing and the empty layer is correct.
+  # One file per version, beside the schema for that version: open `module V1_12` in the Ruby and `<name>-v1.12.deltas.yaml` says what it has to implement, or says the specification changed nothing and the empty layer is correct.
   all.each do |version|
     if catalogue[version].nil?
       next

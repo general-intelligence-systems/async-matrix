@@ -11,22 +11,17 @@ require_relative "client_context"
 
 module Async
   module Matrix
-    # What {EventsContext} needs to know: which events a test owes, and what the schema says each
-    # of them carries.
+    # Which events a test owes, and what each carries.
     module EventSchemas
       SCHEMAS = File.expand_path("../../../lib/async/matrix/abstract/events/schemas", __dir__)
 
-      # A case is named exactly `can <type>`, as the operations are, so that a case which exercises
-      # a type end to end can be told from one which describes a detail of it.
+      # A case is named exactly `can <type>`, as the operations are, so that a case which exercises a type end to end can be told from one which describes a detail of it.
       PATTERN = /\Acan\s+(?<type>\S+)\z/
 
       # A content field whose name cannot be an accessor, and the one which reads it instead.
       #
       # Three kinds appear. A name every object answers to - `methods`, `hash` - would be overridden.
-      # A name this library already uses would read the wrong thing: `type` is the event type and
-      # `version` is the specification version, so `m.room.create` and the call events need their
-      # own. And a name which is not an identifier at all - the dotted fields, and the `(*)` of
-      # content keyed by a pattern, which is read by iterating it.
+      # A name this library already uses would read the wrong thing: `type` is the event type and `version` is the specification version, so `m.room.create` and the call events need their own. And a name which is not an identifier at all - the dotted fields, and the `(*)` of content keyed by a pattern, which is read by iterating it.
       RENAMED = {
         "methods" => :verification_methods,
         "method" => :verification_method,
@@ -37,8 +32,7 @@ module Async
       }.freeze
 
       class << self
-        # Every family the version under test describes. A family is one schema manifest: a type
-        # and its variants, which is what one Ruby file holds.
+        # Every family the version under test describes. A family is one schema manifest: a type and its variants, which is what one Ruby file holds.
         #
         # @returns [Array(String)] the type of each family.
         def families
@@ -49,9 +43,7 @@ module Async
           end.sort.freeze
         end
 
-        # The file a family is described by. The type's own name is not a valid path - and the
-        # leading `m.` says nothing, since every type carries it - so it is stripped and the
-        # remaining separators become underscores. `m.room_key_request` already has one.
+        # The file a family is described by, with the leading `m.` stripped.
         #
         # @parameter family [String] the type of the family.
         # @returns [String] the file name, without a suffix.
@@ -59,9 +51,9 @@ module Async
           family.delete_prefix("m.").tr(".", "_")
         end
 
-        # The family a test describes, taken from its path, since a test mirrors the file it
-        # describes. The mapping is applied forwards rather than guessed backwards, because a type
-        # may carry an underscore of its own.
+        # The family a test describes, taken from its path.
+        #
+        # The mapping is applied forwards rather than guessed backwards, because a type may carry an underscore.
         #
         # @parameter path [String] the path of the test.
         # @returns [String | nil] the type of the family.
@@ -99,8 +91,7 @@ module Async
 
         # Whether a field is read by an accessor this library defines.
         #
-        # `instance_methods` alone is not enough: a field named after something every object
-        # answers to - `methods`, `hash`, `display` - would appear to be read when it is not.
+        # `instance_methods` alone is not enough: a field named after `methods` or `hash` would appear read.
         #
         # @parameter klass [Class] the content class.
         # @parameter field [String] the field the schema declares.
@@ -116,6 +107,9 @@ module Async
         end
 
         # The description of every case a context defines, however deeply nested.
+        #
+        # @parameter context [Sus::Context] the context to walk.
+        # @returns [Array(String)] every description.
         def cases(context)
           context.children.each_value.flat_map do |child|
             if child.respond_to?(:children) and !child.leaf?
@@ -127,6 +121,9 @@ module Async
         end
 
         # The type a case is named after, if it is named after one.
+        #
+        # @parameter description [String] the case description.
+        # @returns [String | nil] the type.
         def type(description)
           match = PATTERN.match(description.to_s)
 
@@ -137,16 +134,11 @@ module Async
       end
     end
 
-    # Included by a test which describes a family of events. It checks the library against the
-    # schema rather than against itself: the accessors are one line each, so what can go wrong is
-    # not an accessor but the correspondence - a field the schema declares and nothing reads, a
-    # variant dispatched on the wrong value, a type framed as the wrong kind of event.
+    # Included by a test which describes a family of events. It checks the library against the schema rather than against itself: the accessors are one line each, so what can go wrong is not an accessor but the correspondence - a field the schema declares and nothing reads, a variant dispatched on the wrong value, a type framed as the wrong kind of event.
     #
-    # A case named `can <type>` is held to reaching the homeserver, as the operations are, so that
-    # a round trip which does not actually round trip fails. Such a case is not required, because
-    # a client cannot send every type: some are sent by the server, and some only through an
-    # endpoint of their own.
+    # A case named `can <type>` is held to reaching the homeserver, as the operations are, so that a round trip which does not actually round trip fails. Such a case is not required, because a client cannot send every type: some are sent by the server, and some only through an endpoint of their own.
     #
+    # @example
     #   describe Async::Matrix::Events::Message do
     #     include Async::Matrix::ClientContext
     #     include Async::Matrix::EventsContext
@@ -181,8 +173,7 @@ module Async
       end
 
       around do |&block|
-        # `receive` with no return value spies rather than replaces, so the request still happens,
-        # and its call count defaults to at least once - which sus checks once the body has run.
+        # `receive` with no return value spies rather than replaces, so the request still happens, and its call count defaults to at least once - which sus checks once the body has run.
         if EventSchemas.type(self.class.description)
           expect(unauthenticated.delegate).to receive(:call)
         end

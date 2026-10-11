@@ -1,15 +1,14 @@
 # frozen_string_literal: true
 
-# Bans the modifier `if` / `unless` (trailing conditional) form:
+# Bans the modifier `if` / `unless` form.
 #
+# @example
 #   return true if task.state_task_completed?     # NO
 #
+# @example
 #   if task.state_task_completed?                 # YES
 #     return true
 #   end
-#
-# Modifier form hides the guard and mixes control flow with the statement it
-# guards; the block form makes both the condition and the branch obvious.
 module RuboCop
   module Cop
     module Local
@@ -30,11 +29,7 @@ module RuboCop
 
         private
 
-        # Two shapes are left for a human. A modifier that is not the whole
-        # statement (`x = (foo if bar)`) would unwrap into a conditional
-        # assignment — trading this offence for a NoConditionalAssignment one.
-        # A heredoc body's content lives on the lines BELOW the node, outside
-        # `source`, so re-indenting the node would strip it.
+        # Two shapes are left for a human.
         def safe_to_unwrap?(node)
           own_line?(node) && !contains_heredoc?(node)
         end
@@ -57,10 +52,7 @@ module RuboCop
             "#{indent}end"
         end
 
-        # Move the body to a new indent. Only line 1 is positioned absolutely —
-        # `source` has already stripped its leading whitespace. Lines 2..n
-        # still carry their ORIGINAL absolute indentation, so they get shifted
-        # by the delta, which keeps a multi-line body's internal shape intact.
+        # Move the body to a new indent.
         def reindent(node, indent)
           target = indent.length + 2
           delta  = target - node.loc.column

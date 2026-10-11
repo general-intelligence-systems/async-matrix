@@ -5,12 +5,7 @@
 
 module Async
   module Matrix
-    # Included into every class which can be built for a specific specification version.
-    #
-    # A versioned class knows which generated API it belongs to, which is how one class finds
-    # another of the same version: a `v1.5` client builds `v1.5` rooms, and nothing can mix
-    # versions by accident. A class which was not built for a version resolves its peers to the
-    # unversioned classes in {Async::Matrix} itself.
+    # Included into every class built for a version.
     module Versioned
       module ClassMethods
         # @returns [Module] the generated API this class belongs to, or {Async::Matrix}.
@@ -22,8 +17,7 @@ module Async
           end
         end
 
-        # The API namespace this class belongs to: the module which holds it, which is one of the
-        # Matrix APIs, e.g. {Async::Matrix::ClientServer}.
+        # The API namespace this class belongs to: the module which holds it, which is one of the Matrix APIs, e.g. {Async::Matrix::ClientServer}.
         #
         # @returns [Module] the namespace.
         def namespace
@@ -43,8 +37,7 @@ module Async
 
         # The specification version this class implements.
         #
-        # Deliberately not `VERSION`: {Async::Matrix::VERSION} is the gem's own version, and an
-        # unversioned class resolves its api to {Async::Matrix}.
+        # Deliberately not `VERSION`: {Async::Matrix::VERSION} is the gem's own version, and an unversioned class resolves its api to {Async::Matrix}.
         #
         # @returns [String | nil] the version, or nil if this class is not versioned.
         def version

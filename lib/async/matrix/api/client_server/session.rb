@@ -68,8 +68,7 @@ module Async
 
         # Whether the authenticated user is a guest.
         #
-        # `is_guest` was only added to the response in v1.2, so before then a client cannot tell,
-        # and the layer for that version is what reads it.
+        # `is_guest` arrived in v1.2, whose layer reads it.
         #
         # @returns [Boolean] whether the authenticated user is a guest.
         def guest?

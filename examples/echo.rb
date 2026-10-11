@@ -22,8 +22,7 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
 
   Console.info(self, "Logged in.", user_id: me)
 
-  # The initial sync reports all current state, which we skip over: we only want what happens from
-  # now on, so the first batch is used for its cursor alone.
+  # The initial sync reports all current state, which we skip over: we only want what happens from now on, so the first batch is used for its cursor alone.
   sync = client.sync(timeout: 0)
 
   while true

@@ -10,23 +10,15 @@ module RuboCop
     module AsyncMatrix
       # Checks that `lib` and `test` mirror each other, file for file.
       #
-      # `lib/async/matrix/api/client_server/rooms.rb` is tested by
-      # `test/async/matrix/api/client_server/rooms.rb`, and nothing else. Keeping the two trees the
-      # same shape means the question "is this tested?" is answered by the path rather than by
-      # reading the suite, and renaming a file without renaming its test is a failure rather than a
-      # test which quietly stops describing anything.
-      #
-      # The check runs in both directions: a file with no test, and a test with no file. Genuine
-      # exceptions - an entry point which only requires other files, a test for something which
-      # does not live in `lib` - belong in `Exclude`, where they are written down.
-      #
       # @example
       #   # bad
       #   lib/async/matrix/api/client_server/rooms.rb   # and no test
       #
+      # @example
       #   # bad
       #   test/async/matrix/rooms.rb                    # and no such file in lib
       #
+      # @example
       #   # good
       #   lib/async/matrix/api/client_server/rooms.rb
       #   test/async/matrix/api/client_server/rooms.rb
@@ -58,9 +50,6 @@ module RuboCop
         private
 
         # The path below the given root, and the root it was found under.
-        #
-        # The last occurrence wins, so a checkout inside a directory which is itself called `lib`
-        # resolves against the project rather than against its parent.
         #
         # @returns [Array(String, String) | nil] the project root and the path below it.
         def relative_to(path, root)

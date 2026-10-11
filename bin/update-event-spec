@@ -4,33 +4,28 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# Generates the event manifests in lib/async/matrix/abstract/events, one per event type per
-# version. What each version changed is written beside them by bin/generate-event-spec-deltas,
-# which reads these files rather than the specification: extracting a surface and comparing two of
-# them are separate jobs, and the comparison can then be re-run without reading the submodules.
+# Generates the event manifests in lib/async/matrix/abstract/events, one per event type per version. What each version changed is written beside them by bin/generate-event-spec-deltas, which reads these files rather than the specification: extracting a surface and comparing two of them are separate jobs, and the comparison can then be re-run without reading the submodules.
 #
+# @example
 #   bin/update-event-spec              # every version in MATRIX_API_VERSIONS.txt
 #   bin/update-event-spec v1.18 v1.19  # only these versions
 #
-# Events are generated separately from operations because they are a different kind of thing. An
-# operation is a call: a method, a path, parameters, a response. An event is a value which travels
-# through those calls, and the operation schemas cannot describe it - `sendMessage` takes the event
-# type in its path, so its request body is opaque. These manifests are the other half: the
-# operations say how to call, the events say what goes in and what comes back.
+# Events are generated separately from operations because they are a different kind of thing. An operation is a call: a method, a path, parameters, a response. An event is a value which travels through those calls, and the operation schemas cannot describe it - `sendMessage` takes the event type in its path, so its request body is opaque. These manifests are the other half: the operations say how to call, the events say what goes in and what comes back.
 #
 # Two things about events shape the output:
 #
+# @example
 #   - The same type arrives in different framings. /sync omits the room ID, /messages carries it, a
 #     state event carries a state key, and an invite carries only a stripped subset. The framing is
 #     recorded per entry, because it decides which envelope fields exist.
 #
+# @example
 #   - A type can have variants which are told apart by a field of the content rather than by the
 #     type: `m.room.message` has eleven, keyed by `msgtype`. The specification spells these
 #     `m.room.message$m.text.yaml`, and they are gathered into one manifest per type, so that
 #     everything which arrives as `m.room.message` is described in one file.
 #
-# The specifications come from the submodules in ./data, one per released version, so this needs no
-# network. Run bin/fetch-spec first.
+# The specifications come from the submodules in ./data, one per released version, so this needs no network. Run bin/fetch-spec first.
 
 require "yaml"
 require "fileutils"
@@ -39,8 +34,7 @@ ROOT = File.expand_path("..", __dir__)
 DATA = File.join(ROOT, "data")
 OUTPUT = File.join(ROOT, "lib", "async", "matrix", "abstract", "events", "schemas")
 
-# The core schemas which say how an event is framed rather than what it means. A type refers to one
-# of these, and that reference is what tells us where the event can appear.
+# The core schemas which say how an event is framed rather than what it means. A type refers to one of these, and that reference is what tells us where the event can appear.
 FRAMINGS = %w[
   stripped_state sync_state_event state_event sync_room_event room_event call_event event
 ].freeze
@@ -74,8 +68,7 @@ def sentence(text)
   end
 end
 
-# Event schemas reference each other by relative path, with no fragments, so a reference resolves
-# to a sibling file rather than to a pointer inside this one.
+# Event schemas reference each other by relative path, with no fragments, so a reference resolves to a sibling file rather than to a pointer inside this one.
 def dereference(node, base, cache, seen = [], depth = 0)
   if depth > 24
     node
@@ -213,8 +206,7 @@ def describe(value, required, depth)
   out
 end
 
-# Where this event can appear, from the core schema it is built on. Read before dereferencing,
-# because dereferencing is what dissolves the reference into the fields it contributes.
+# Where this event can appear, from the core schema it is built on. Read before dereferencing, because dereferencing is what dissolves the reference into the fields it contributes.
 def framing_for(raw)
   references = Array(raw["allOf"]).filter_map{|entry| entry["$ref"]}
 
@@ -280,10 +272,9 @@ def entries_for(version)
   end
 end
 
-# Resolving a reference hands back the document it points at, so one schema object can end up at
-# several points in a manifest. Left alone, YAML.dump writes the second occurrence as an alias to
-# the first, which makes the file both unreadable and unloadable by `safe_load`. Copying the tree
-# gives every occurrence its own object, so each is written out in full.
+# Copy the tree, so that every occurrence of a resolved reference is written out in full.
+#
+# Left alone, YAML.dump writes the second occurrence as an alias, which `safe_load` cannot read.
 def disentangle(node)
   case node
   when Hash
@@ -297,8 +288,7 @@ def disentangle(node)
   end
 end
 
-# A manifest per event type, so that everything arriving as `m.room.message` - the type and its
-# eleven msgtype variants - is described in one file.
+# A manifest per event type, so the variants share one file.
 def family_of(stem)
   stem.split("$").first
 end

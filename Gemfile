@@ -14,15 +14,13 @@ group :test do
   gem "rubocop"
   gem "rubocop-socketry"
 
-  # Local/CommentStructure parses comments with decode, so that an annotation is whatever decode
-  # recognises as one rather than whatever a regular expression here happens to match.
+  # Local/CommentStructure parses comments with decode, so that an annotation is whatever decode recognises as one rather than whatever a regular expression here happens to match.
   gem "decode"
 
   gem "bake-test"
 end
 
-# bin/update-spec reads the matrix-spec submodules, whose schemas are full of $ref - including
-# pointers into other documents. json_schemer resolves them.
+# bin/update-spec reads the matrix-spec submodules, whose schemas are full of $ref - including pointers into other documents. json_schemer resolves them.
 group :maintenance do
-	gem "json_schemer"
+  gem "json_schemer"
 end

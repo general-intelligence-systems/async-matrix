@@ -11,28 +11,16 @@ require_relative "error"
 
 module Async
   module Matrix
-    # Matrix speaks JSON in both directions, so most of the work is done by the standard JSON
-    # wrapper. It deviates from `Async::REST`'s defaults in two ways, which this wrapper corrects:
+    # The JSON wrapper, corrected for two Matrix deviations.
     #
-    # - Errors are reported with a non-2xx status and a `{errcode, error}` body. The generated
-    #   class methods (e.g. `Representation.get`) do not check the response status, so a failed
-    #   request would otherwise produce a representation wrapping an error body. We raise instead.
-    #
-    # - Rate limiting is reported as `M_LIMIT_EXCEEDED` with `retry_after_ms` in the response
-    #   *body*, where `Async::REST::Wrapper::Generic` only understands the `retry-after` *header*.
-    #   Newer homeservers send both, so we prefer the header and fall back to the body.
+    # Errors are a non-2xx status with an `{errcode, error}` body, which this raises rather than returning.
     class Wrapper < Async::REST::Wrapper::JSON
-      # The longest delay we will wait before retrying a rate limited request. A longer delay is
-      # reported to the caller as an error, rather than silently blocking the task.
+      # The longest delay we will wait before retrying a rate limited request. A longer delay is reported to the caller as an error, rather than silently blocking the task.
       MAXIMUM_RETRY_DELAY = 30.0
 
-      # Make the request, retrying if the server reports that we have been rate limited.
+      # Make the request, retrying if the server reports a rate limit.
       #
-      # This replaces {Async::REST::Wrapper::Generic#call} rather than overriding `response_for`,
-      # because a retry needs a *fresh* request: the resource merges its own headers and path into
-      # the request it is given, so re-dispatching the same request object applies them twice, and
-      # a duplicated `authorization` header is rejected by the server. Rebuilding the request also
-      # re-encodes the payload, so the body does not need to be replayable.
+      # A retry needs a fresh request: the resource mutates the one it is given.
       #
       # @parameter resource [Async::REST::Resource] the resource to make the request against.
       # @parameter method [String] the HTTP method to use.
@@ -61,8 +49,7 @@ module Async
           sleep(delay)
         end
 
-        # If we exit this block because of an exception, close the response, so that we don't leave
-        # a dangling connection:
+        # If we exit this block because of an exception, close the response, so that we don't leave a dangling connection:
         begin
           self.process_response(request, response)
 
@@ -104,8 +91,7 @@ module Async
           delay = retry_after_ms / 1000.0
         end
 
-        # Nothing said how long to wait, or it asked for longer than we are willing to: the caller
-        # is told about the rate limit instead.
+        # Nothing said how long to wait, or it asked for longer than we are willing to: the caller is told about the rate limit instead.
         if delay and delay <= MAXIMUM_RETRY_DELAY
           delay
         end

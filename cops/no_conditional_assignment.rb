@@ -1,28 +1,20 @@
 # frozen_string_literal: true
 
-# Bans assigning an `if` / `unless` / `case` expression — including a ternary,
-# which is an `if` node — to a variable or through a setter:
+# Bans assigning an `if` / `unless` / `case` expression.
 #
+# @example
 #   status = case task.state                  # NO
 #            when :done then :ok
 #            else :pending
 #            end
 #   obj.status = cond ? :ok : :pending        # NO
 #
+# @example
 #   status = :pending                         # YES
 #   case task.state
 #   when :done
 #     status = :ok
 #   end
-#
-# The conditional makes the assignment itself, inside each branch, so the
-# target isn't hidden behind a multi-line expression, the branches line up
-# under the assignment instead of hanging off its right edge, and adding a
-# branch doesn't re-indent the whole expression.
-#
-# RuboCop ships `Style/ConditionalAssignment` with `assign_inside_condition`,
-# but it only fires when every branch is present; `x = if cond ... end` with
-# no `else` slips through it.
 module RuboCop
   module Cop
     module Local
@@ -64,15 +56,9 @@ module RuboCop
           end
         end
 
-        # The rewrite repeats the assignment target once per branch, so the
-        # target must be re-evaluable without side effects — a bare variable or
-        # a simple `recv.attr =`. Anything else (an index write, a call with
-        # arguments) is left for a human. A heredoc anywhere in the expression
-        # is skipped too: its body lives on the lines below the node, outside
-        # `source`, so re-indenting the node would strip it.
+        # The target must be re-evaluable without side effects.
         def safe_to_push_inside?(node, rhs)
-          # `case/in` pattern matching is left alone — its branch headers are
-          # patterns, not expressions, and reproducing them is a different job.
+          # `case/in` pattern matching is left alone — its branch headers are patterns, not expressions, and reproducing them is a different job.
           rhs.type != :case_match &&
             own_line?(node) &&
             simple_target?(node) &&
@@ -101,8 +87,7 @@ module RuboCop
           node.each_descendant(:str, :dstr, :xstr).any?{|n| n.respond_to?(:heredoc?) && n.heredoc?}
         end
 
-        # The assignment prefix repeated in every branch — "x = ", "@y = ",
-        # "obj.z = ".
+        # The assignment prefix repeated in every branch — "x = ", "@y = ", "obj.z = ".
         def target_source(node)
           if node.type == :send
             "#{node.receiver.source}.#{node.method_name.to_s.chomp('=')} = "
@@ -111,9 +96,7 @@ module RuboCop
           end
         end
 
-        # [[condition_source_or_nil, body_node_or_nil], ...] in source order.
-        # A nil condition is the `else`; a nil body is an empty branch, which
-        # becomes an explicit `= nil` so the variable is always defined.
+        # Each branch as `[condition_source, body_node]`, in source order.
         def branches(rhs)
           if rhs.type == :if
             if_branches(rhs)
@@ -163,8 +146,7 @@ module RuboCop
             "#{header}\n#{indent}  #{target}#{body ? body.source : 'nil'}"
           }
 
-          # The replacement begins at the node's own column, so the first line
-          # must NOT carry the indent again.
+          # The replacement begins at the node's own column, so the first line must NOT carry the indent again.
           "#{parts.join("\n").sub(/\A#{indent}/, '')}\n#{indent}end"
         end
 

@@ -75,10 +75,9 @@ module Async
         end
       end
 
-      # A page of events from a room's timeline.
+      # A page of a room's timeline.
       #
-      # Matrix paginates the timeline with opaque tokens: `start` is the token for the page itself,
-      # and `finish` is the token to pass as `from` in order to fetch the following page.
+      # Pagination uses opaque tokens: `start` names this page, `finish` is the next `from`.
       class Messages < Representation
         include Versioned
 
@@ -89,8 +88,7 @@ module Async
           self.value[:chunk]
         end
 
-        # Enumerate over the events in this page, each wrapped in the envelope its framing calls
-        # for. {#events} is the raw form, for anything the event classes do not name.
+        # Enumerate over the events in this page, each wrapped in the envelope its framing calls for. {#events} is the raw form, for anything the event classes do not name.
         #
         # @yields {|event| ...}
         #   @parameter event [Events::Envelope] the event.
@@ -203,8 +201,7 @@ module Async
 
       # A single state event.
       #
-      # The endpoint returns the content alone by default, and the whole event when asked for
-      # `format: "event"`, so {#content} answers for both shapes.
+      # The endpoint returns the content alone by default, and the whole event when asked for `format: "event"`, so {#content} answers for both shapes.
       class StateEvent < Representation
         include Versioned
 
@@ -214,10 +211,9 @@ module Async
         end
       end
 
-      # A room is a resource which has no representation of its own: the client-server API has no
-      # `GET /rooms/{roomId}`, only representations of its state, timeline and membership. A room is
-      # therefore a navigator which carries its own identifier, because the identifier cannot be
-      # recovered from a derived resource.
+      # A resource with no representation of its own.
+      #
+      # There is no `GET /rooms/{roomId}`, only its state, timeline and membership, so it carries its own identifier.
       class Room
         include Versioned
 
@@ -233,8 +229,7 @@ module Async
           self.new(parent.with(path: self.path_for(id)), id)
         end
 
-        # The absolute path of a room. The path is absolute so that it replaces, rather than extends,
-        # the path of whichever resource it is derived from.
+        # The absolute path of a room, which replaces the path it derives from.
         #
         # @parameter id [String] the room ID or alias.
         # @returns [String] the path.
@@ -308,9 +303,9 @@ module Async
           api::SentEvent.put(@resource.with(path: path), content)
         end
 
-        # Send an event described by one of the {Async::Matrix::Events} classes, which names both
-        # the type for the path and the content for the body.
+        # Send an event, whose class names both the type and the content.
         #
+        # @example
         # 	room.send(Async::Matrix::Events::TextMessage.build(body: "Hello!"))
         #
         # @parameter content [Events::Content] the content to send.
@@ -343,11 +338,17 @@ module Async
         end
 
         # Leave this room.
+        #
+        # @parameter payload [Hash] the fields to send, such as a reason.
+        # @returns [Representation] the empty response.
         def leave(**payload)
           api::Representation.post(@resource.with(path: "leave"), payload)
         end
 
         # Forget this room, which requires having left it first.
+        #
+        # @parameter payload [Hash] the fields to send.
+        # @returns [Representation] the empty response.
         def forget(**payload)
           api::Representation.post(@resource.with(path: "forget"), payload)
         end
@@ -396,16 +397,14 @@ module Async
           api::SentEvent.put(@resource.with(path: self.state_path(type, state_key)), content)
         end
 
-        # Whether a `from` token must be supplied when paging the timeline. It was required until
-        # v1.3 made it optional, so that a client could page from either end of the history.
+        # Whether paging requires a `from` token, as it did before v1.3.
         #
         # @returns [Boolean] whether `from` is required.
         def pagination_requires_from?
           false
         end
 
-        # The query parameter naming the servers to attempt a join through. It was `server_name`
-        # until v1.12 introduced `via`, and v1.14 removed `server_name` altogether.
+        # The parameter naming the servers to join through.
         #
         # @returns [Symbol] the parameter name.
         def join_via_parameter
@@ -418,8 +417,11 @@ module Async
 
         private
 
-        # The path of one state event. The trailing slash an empty state key leaves behind is what
-        # the specification expects.
+        # The path of one state event, trailing slash and all.
+        #
+        # @parameter type [String] the event type.
+        # @parameter state_key [String] the state key, which is usually empty.
+        # @returns [String] the path.
         def state_path(type, state_key)
           "state/#{::Protocol::URL::Encoding.escape(type)}/#{::Protocol::URL::Encoding.escape(state_key)}"
         end

@@ -3,13 +3,6 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-# The version layers for `sync.rb`. Each module mirrors the class of the same name, and holds only
-# what a given specification version changed: the unversioned implementation stays in the class.
-#
-# Every version is declared, highest first, even when it changed nothing, so that a missing module
-# is a mistake rather than a deliberate no-op. The schemas beside this file say what each version
-# requires, and `sync.rb-<version>.deltas.yaml` says what it changed.
-
 module Async
   module Matrix
     module Abstract
@@ -28,8 +21,7 @@ module Async
           module V1_17
           end
 
-          # v1.16 added the `use_state_after` request parameter, and the `state_after` response field
-          # which replaces `state` when it is used.
+          # v1.16 added `use_state_after`, which returns `state_after`.
           module V1_16
             module ClassMethods
               # @parameter use_state_after [Boolean] request `state_after` instead of `state`.

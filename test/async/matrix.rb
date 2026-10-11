@@ -6,8 +6,7 @@
 require "async/matrix"
 
 # The entry point requires everything the library offers, so loading it is a test in its own right:
-# a require which is missing or out of order fails here rather than in whichever suite happens to
-# load first.
+# a require which is missing or out of order fails here rather than in whichever suite happens to load first.
 describe Async::Matrix do
   it "has a version" do
     expect(Async::Matrix::VERSION).to be =~ /\A\d+\.\d+\.\d+\z/
