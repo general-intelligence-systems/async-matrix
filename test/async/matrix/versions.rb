@@ -102,6 +102,29 @@ describe Async::Matrix::ClientServer::Client do
     end
   end
 
+  with "the shared constants" do
+    let(:api) {Async::Matrix::ClientServer::Client["v1.19"].api}
+
+    # The unversioned classes - the wrapper, the errors, the paths - are the same whichever version asks for them.
+    it "shares what is not versioned" do
+      expect(api::Representation).to be_equal(Async::Matrix::Representation)
+      expect(api::Wrapper).to be_equal(Async::Matrix::Wrapper)
+      expect(api::RequestError).to be_equal(Async::Matrix::RequestError)
+    end
+
+    # Sharing the namespace an API was built from would put the unversioned class inside the versioned API, so `api::ClientServer::Client` would answer `nil` to `version` while `api::Client` answered `v1.19`.
+    it "shares no namespace which is itself an API" do
+      expect(api.const_defined?(:ClientServer, false)).to be == false
+      expect(api.const_defined?(:Events, false)).to be == false
+    end
+
+    it "knows which namespaces are APIs" do
+      expect(Async::Matrix::Versions).to be(:api?, Async::Matrix::ClientServer)
+      expect(Async::Matrix::Versions).to be(:api?, Async::Matrix::Events)
+      expect(Async::Matrix::Versions).not.to be(:api?, Async::Matrix::Abstract)
+    end
+  end
+
   with "#api" do
     # `Async::Matrix::VERSION` is the gem's version, and an unversioned class resolves its api to its own namespace, so this must not report the gem version by accident.
     it "reports no version when the class is not versioned" do

@@ -55,10 +55,6 @@ module Async
 
           api::Representation.put(@resource.with(path: path), {messages: messages})
         end
-
-        def close
-          @resource.close
-        end
       end
     end
   end

@@ -96,6 +96,16 @@ module Async
           (@apis ||= {}).keys
         end
 
+        # Whether a module is itself an API, holding versioned classes.
+        #
+        # An API must not contain another API.
+        #
+        # @parameter value [Module] the module to judge.
+        # @returns [Boolean] whether it is an API.
+        def api?(value)
+          self.classes(value).any?
+        end
+
         # The classes which participate in versioning, which is to say those which include {Versioned}. There is no registry to keep in step: a class opts in by including it.
         #
         # @returns [Hash] the unversioned classes, keyed by constant name.
@@ -127,7 +137,7 @@ module Async
               source.constants(false).each do |name|
                 value = source.const_get(name)
 
-                if value.is_a?(Module) and !api.const_defined?(name, false)
+                if value.is_a?(Module) and !api.const_defined?(name, false) and !self.api?(value)
                   api.const_set(name, value)
                 end
               end

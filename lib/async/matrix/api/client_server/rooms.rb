@@ -387,10 +387,6 @@ module Async
           :via
         end
 
-        def close
-          @resource.close
-        end
-
         private
 
         # The path of one state event, trailing slash and all.
