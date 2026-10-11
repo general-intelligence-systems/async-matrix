@@ -11,6 +11,7 @@ require:
   - ./cops/each_file_has_matching_test.rb
   - ./cops/abstract_module_version_order.rb
   - ./cops/abstract_module_no_changes_comment.rb
+  - ./cops/no_operation_respond_to.rb
   - ./cops/comment_structure.rb
   - ./cops/single_line_methods_for_events.rb
 
@@ -143,6 +144,12 @@ AsyncMatrix/AbstractModuleNoChangesComment:
   Include:
     - "lib/async/matrix/abstract/**/*.rb"
     - "test/async/matrix/abstract/**/*.rb"
+
+# Asking an object whether it has an operation is bypassing the versioning system: the class built
+# for a version is what says which operations that version has. The schemas name every operation of
+# every version, including the ones a later version withdrew, which are the names worth probing for.
+AsyncMatrix/NoOperationRespondTo:
+  Enabled: true
 
 # `lib` and `test` mirror each other file for file, so that whether something is tested is answered
 # by the path. Exceptions are listed rather than assumed.

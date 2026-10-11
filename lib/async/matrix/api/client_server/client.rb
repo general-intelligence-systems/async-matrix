@@ -14,6 +14,8 @@ require_relative "../../paths"
 require_relative "../../representation"
 require_relative "../../credentials"
 require_relative "../../authenticated"
+require_relative "../../oauth"
+require_relative "../../abstract/api/client_server/client"
 require_relative "session"
 require_relative "key_backup"
 require_relative "keys"
@@ -56,6 +58,7 @@ require_relative "read_markers"
 require_relative "receipts"
 require_relative "redaction"
 require_relative "refresh"
+require_relative "oauth_server_metadata"
 require_relative "registration"
 require_relative "registration_tokens"
 require_relative "relations"
@@ -135,19 +138,20 @@ module Async
 
         # Derive a client which authenticates using the given access token.
         #
-        # The token goes below the resource, not into its headers, which `#with` copies into every derived resource.
+        # The token goes below the resource, not into its headers.
         #
         # @parameter access_token [String] the access token obtained from {#login}.
-        # @parameter refresh_token [String | nil] the token which buys a new access token, from v1.3.
-        # @parameter expires_in_ms [Integer | nil] how long the access token lasts.
         # @returns [Client] an authenticated client.
-        def authenticated(access_token, refresh_token: nil, expires_in_ms: nil)
-          credentials = Credentials.new(self.refresh,
-            access_token: access_token,
-            refresh_token: refresh_token,
-            expires_in_ms: expires_in_ms,
-          )
+        def authenticated(access_token)
+          # Nothing to renew with: an access token can only be replaced from v1.3, whose layer passes the endpoint which does it.
+          self.with_credentials(Credentials.new(nil, access_token: access_token))
+        end
 
+        # Derive a client which authenticates with the given credentials.
+        #
+        # @parameter credentials [Credentials] the access token, and whatever may replace it.
+        # @returns [Client] an authenticated client.
+        def with_credentials(credentials)
           self.class.new(Authenticated.new(self.delegate, credentials), self.reference, self.headers)
         end
 
@@ -156,13 +160,10 @@ module Async
         # @parameter user [String] the localpart or fully qualified ID of the user.
         # @parameter password [String] the user's password.
         # @returns [Login] the login response, which carries the access token.
-        def login(user, password, type: "m.login.password", refresh_token: false, **payload)
+        def login(user, password, type: "m.login.password", **payload)
           payload[:type] = type
           payload[:identifier] = {type: "m.id.user", user: user}
           payload[:password] = password
-
-          # Off by default, because asking for one shortens the access token: Synapse issues a refreshable token for `refreshable_access_token_lifetime`, five minutes by default, where one without a refresh token does not expire at all. {#logged_in} asks for one, since it can renew it.
-          payload[:refresh_token] = refresh_token
 
           api::Login.post(self.with(path: "#{V3}/login"), payload)
         end
@@ -172,17 +173,11 @@ module Async
         # @parameter user [String] the localpart or fully qualified ID of the user.
         # @parameter password [String] the user's password.
         # @returns [Client] an authenticated client.
-        def logged_in(user, password, refresh_token: true, **options)
-          login = self.login(user, password, refresh_token: refresh_token, **options)
+        def logged_in(user, password, **options)
+          login = self.login(user, password, **options)
 
           # The login representation shares this client's connection, so it is not closed here: closing it would close the connection the derived client is about to use.
-          #
-          # Refresh tokens arrived in v1.3, so an older version has no such field to read.
-          if login.respond_to?(:refresh_token)
-            self.authenticated(login.access_token, refresh_token: login.refresh_token, expires_in_ms: login.expires_in_ms)
-          else
-            self.authenticated(login.access_token)
-          end
+          self.authenticated(login.access_token)
         end
 
         # The ways this homeserver will let a user log in. No authentication is required.
@@ -246,11 +241,6 @@ module Async
           self.room(joined.room_id)
         end
 
-        # @returns [Refresh] the endpoint which exchanges a refresh token for an access token.
-        def refresh
-          api::Refresh.for(self)
-        end
-
         # @returns [Keys] the end to end encryption keys.
         def keys
           api::Keys.for(self)
@@ -274,6 +264,21 @@ module Async
         # @returns [DeviceManagement] the devices this user has logged in from.
         def devices
           api::DeviceManagement.for(self)
+        end
+
+        # @returns [Typing] the typing state of a user in a room.
+        def typing
+          api::Typing.for(self)
+        end
+
+        # @returns [RoomEventByTimestamp] the lookup of the event nearest a time.
+        def room_event_by_timestamp
+          api::RoomEventByTimestamp.for(self)
+        end
+
+        # @returns [Profile] the display names, avatars and other profile fields.
+        def profile
+          api::Profile.for(self)
         end
 
         # Begin syncing.

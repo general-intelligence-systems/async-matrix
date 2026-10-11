@@ -3,14 +3,26 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "protocol/url/encoding"
+
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/room_event_by_timestamp"
 
 module Async
   module Matrix
     module ClientServer
+      # The event a timestamp lookup found.
+      #
+      # The endpoint arrived in v1.6, so the fields are read by that layer.
+      class EventByTimestamp < Representation
+        include Versioned
+      end
+
       # The event nearest a point in time.
       #
-      # The operations are not written yet: this is the class `room_event_by_timestamp-v1.19.yaml` names.
+      # The endpoint arrived in v1.6, so the lookup is made by that layer.
       class RoomEventByTimestamp
         include Versioned
 

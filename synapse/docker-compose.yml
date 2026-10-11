@@ -10,6 +10,13 @@
 # Synapse rejects settings a newer one accepts, so the configuration is versioned alongside the
 # server. MATRIX_API_VERSIONS.txt is generated from the services below.
 
+# The OAuth 2.0 stack is behind the `oauth` profile, so `docker compose config --services` leaves
+# it out and MATRIX_API_VERSIONS.txt stays a list of specification versions:
+#
+#   docker compose --profile oauth up --detach --wait
+#
+# It binds its own ports, so it can run alongside whichever version is up.
+
 # A fixed project name, so that `docker compose down` finds the rig whatever directory it is run
 # from, rather than deriving a different project per working directory.
 name: async-matrix
@@ -182,3 +189,50 @@ services:
       - ./homeserver.v1_19.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+
+  # The OAuth 2.0 stack. MAS stores its state in PostgreSQL, which it requires, and Synapse
+  # delegates authentication to it.
+
+  oauth-postgres:
+    profiles: [oauth]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mas
+      POSTGRES_PASSWORD: mas
+      POSTGRES_DB: mas
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username mas --dbname mas"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  oauth-mas:
+    profiles: [oauth]
+    image: ghcr.io/element-hq/matrix-authentication-service:latest
+    command: ["server", "--config", "/config/mas.yaml"]
+    depends_on:
+      oauth-postgres:
+        condition: service_healthy
+    volumes:
+      - ./mas.yaml:/config/mas.yaml:ro
+    # 8080 is a common default and often already taken, so this sits clear of it:
+    ports:
+      - "${MAS_PORT:-8091}:8080"
+
+  oauth-synapse:
+    profiles: [oauth]
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.19
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+    depends_on:
+      - oauth-mas
+    ports:
+      - "${OAUTH_SYNAPSE_PORT:-8010}:8008"
+    volumes:
+      - ./homeserver.oauth.yaml:/config/homeserver.yaml:ro
+      - ./signing.key:/config/signing.key:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30

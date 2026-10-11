@@ -42,6 +42,9 @@ module Async
 
         # A replacement rotates the refresh token, so two at once would store one pair and discard the other:
         @semaphore = Async::Semaphore.new(1)
+
+        # The refusal which ended this session, once one has. Remembered so that a burst of requests carrying a dead token asks the homeserver once rather than once each:
+        @rejection = nil
       end
 
       # @attribute [String] the access token requests are authenticated with.
@@ -55,6 +58,15 @@ module Async
 
       # @attribute [Integer] how many times the access token has been replaced.
       attr :generation
+
+      # Whether a refusal is one the homeserver may recover from, leaving the session alone.
+      #
+      # @parameter error [RequestError] the refusal.
+      # @returns [Boolean] whether the session may still be good.
+      def self.transient?(error)
+        # A server error is the homeserver having a bad moment, and a rate limit is it asking us to wait. Anything else is a verdict on the refresh token itself.
+        error.status >= 500 or error.status == 429
+      end
 
       # @returns [Boolean] whether there is anything to replace the access token with.
       def renewable?
@@ -93,6 +105,8 @@ module Async
         @semaphore.acquire do
           if @generation > generation
             @generation
+          elsif @rejection
+            raise @rejection
           else
             self.replace!
           end
@@ -111,8 +125,15 @@ module Async
         begin
           refreshed = @refresh.refresh(@refresh_token)
         rescue RequestError => error
-          # Reported with the refusal's own status and code, so that a caller which already handles a rejected token handles this too. Logging out invalidates the refresh token along with the access token, which is exactly this path.
-          raise AuthenticationError.new(error.status, error.errcode, "The access token could not be replaced.")
+          if self.class.transient?(error)
+            # The session may still be good, so the caller is told what went wrong rather than to log in again:
+            raise
+          else
+            # Reported with the refusal's own status and code, so that a caller which already handles a rejected token handles this too. Logging out invalidates the refresh token along with the access token, which is exactly this path.
+            @rejection = AuthenticationError.new(error.status, error.errcode, "The access token could not be replaced.")
+
+            raise @rejection
+          end
         end
 
         @access_token = refreshed.access_token

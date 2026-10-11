@@ -438,27 +438,6 @@
     };
     version = "3.1.1";
   };
-  rake-compiler-dock = {
-    groups = ["default" "test"];
-    platforms = [];
-    source = {
-      remotes = ["https://rubygems.org"];
-      sha256 = "08w033c3p25wr0zwbgx0b4mb4ha5kqd4j0ydmx9j0gcgfg10acpi";
-      type = "gem";
-    };
-    version = "1.12.0";
-  };
-  rb_sys = {
-    dependencies = ["rake-compiler-dock"];
-    groups = ["default" "test"];
-    platforms = [];
-    source = {
-      remotes = ["https://rubygems.org"];
-      sha256 = "05c6ak9wgzf7xqnrnn5j9axr1sjszih9ibyy2man60nsq6cnsj3x";
-      type = "gem";
-    };
-    version = "0.9.130";
-  };
   rbs = {
     dependencies = ["logger" "prism" "tsort"];
     groups = ["default" "test"];
@@ -620,7 +599,7 @@
     version = "7.1.10";
   };
   tree_sitter_language_pack = {
-    dependencies = ["rb_sys" "sorbet-runtime"];
+    dependencies = ["sorbet-runtime"];
     groups = ["default" "test"];
     platforms = [];
     source = {

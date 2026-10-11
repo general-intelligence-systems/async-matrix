@@ -1,0 +1,128 @@
+########## Local/BeginBlockAssignment
+lib/fixtures/begin_block_assignment.rb:11:1: C: Local/BeginBlockAssignment: Do not assign a `begin...end` expression to a variable; move the assignment inside the begin block.
+lib/fixtures/begin_block_assignment.rb:15:1: C: Local/BeginBlockAssignment: Do not assign a `begin...end` expression to a variable; move the assignment inside the begin block.
+lib/fixtures/begin_block_assignment.rb:3:1: C: Local/BeginBlockAssignment: Do not assign a `begin...end` expression to a variable; move the assignment inside the begin block.
+lib/fixtures/begin_block_assignment.rb:7:1: C: Local/BeginBlockAssignment: Do not assign a `begin...end` expression to a variable; move the assignment inside the begin block.
+########## Local/NoConditionalAssignment
+lib/fixtures/no_conditional_assignment.rb:14:1: C: [Correctable] Local/NoConditionalAssignment: Do not assign a `ternary` expression to a variable; assign inside each branch of the ternary.
+lib/fixtures/no_conditional_assignment.rb:16:1: C: [Correctable] Local/NoConditionalAssignment: Do not assign a `if` expression to a variable; assign inside each branch of the if.
+lib/fixtures/no_conditional_assignment.rb:20:1: C: [Correctable] Local/NoConditionalAssignment: Do not assign a `ternary` expression to a variable; assign inside each branch of the ternary.
+lib/fixtures/no_conditional_assignment.rb:3:1: C: [Correctable] Local/NoConditionalAssignment: Do not assign a `if` expression to a variable; assign inside each branch of the if.
+lib/fixtures/no_conditional_assignment.rb:9:1: C: [Correctable] Local/NoConditionalAssignment: Do not assign a `case` expression to a variable; assign inside each branch of the case.
+########## Local/NoModifierIf
+lib/fixtures/no_modifier_if.rb:4:3: C: [Correctable] Local/NoModifierIf: Do not use modifier `if`; use the full `if ... end` block form.
+lib/fixtures/no_modifier_if.rb:8:3: C: [Correctable] Local/NoModifierIf: Do not use modifier `unless`; use the full `unless ... end` block form.
+lib/fixtures/no_return.rb:28:3: C: [Correctable] Local/NoModifierIf: Do not use modifier `if`; use the full `if ... end` block form.
+########## Local/NoReturn
+lib/fixtures/no_return.rb:13:5: C: [Correctable] Local/NoReturn: Do not use `return`; let the method's last expression be the return value.
+lib/fixtures/no_return.rb:21:5: C: [Correctable] Local/NoReturn: Do not use `return`; let the method's last expression be the return value.
+lib/fixtures/no_return.rb:28:3: C: Local/NoReturn: Do not use `return`; let the method's last expression be the return value.
+lib/fixtures/no_return.rb:5:5: C: [Correctable] Local/NoReturn: Do not use `return`; let the method's last expression be the return value.
+########## Local/UseTap
+lib/fixtures/use_tap.rb:22:3: C: Local/UseTap: Assigning `name` and returning it at the end is `tap`; write `<expression>.tap do |name| ... end`.
+lib/fixtures/use_tap.rb:4:3: C: Local/UseTap: Assigning `column` and returning it at the end is `tap`; write `<expression>.tap do |column| ... end`.
+########## Local/CommentStructure
+lib/fixtures/comment_structure.rb:11:1: C: Local/CommentStructure: This summary is 22 words; 10 is the most a module summary may have.
+lib/fixtures/comment_structure.rb:21:7: C: Local/CommentStructure: This method is described in prose but its parameters and return value are not: document them with annotations, or say nothing.
+lib/fixtures/comment_structure.rb:3:1: C: Local/CommentStructure: This summary is 13 words; 10 is the most a module summary may have.
+lib/fixtures/comment_structure.rb:6:1: C: Local/CommentStructure: Do not wrap a summary paragraph: a paragraph is one line, however long.
+########## Local/SingleLineMethodsForEvents
+lib/async/matrix/events/fixture.rb:15:9: C: [Correctable] Local/SingleLineMethodsForEvents: A method whose body is one expression must use the endless form: `def name = expression`.
+lib/async/matrix/events/fixture.rb:9:9: C: [Correctable] Local/SingleLineMethodsForEvents: A method whose body is one expression must use the endless form: `def name = expression`.
+########## AsyncMatrix/AbstractModuleVersionOrder
+lib/async/matrix/abstract/api/ascending.rb:11:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_2` before `V1_1`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:14:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_3` before `V1_2`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:17:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_4` before `V1_3`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:20:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_5` before `V1_4`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:23:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_6` before `V1_5`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:26:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_7` before `V1_6`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:29:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_8` before `V1_7`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:32:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_9` before `V1_8`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:35:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_10` before `V1_9`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:38:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_11` before `V1_10`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:41:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_12` before `V1_11`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:44:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_13` before `V1_12`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:47:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_14` before `V1_13`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:50:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_15` before `V1_14`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:53:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_16` before `V1_15`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:56:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_17` before `V1_16`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:59:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_18` before `V1_17`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/ascending.rb:62:18: C: AsyncMatrix/AbstractModuleVersionOrder: Declare `V1_19` before `V1_18`: order versions from highest (`V1_19`) to lowest (`V1_1`).
+lib/async/matrix/abstract/api/comments.rb:7:16: C: AsyncMatrix/AbstractModuleVersionOrder: Missing version layers `V1_15`, `V1_14`, `V1_13`, `V1_12`, `V1_11`, `V1_10`, `V1_9`, `V1_8`, `V1_7`, `V1_6`, `V1_5`, `V1_4`, `V1_3`, `V1_2`, `V1_1`. Declare every version, even as a no-op.
+lib/async/matrix/abstract/api/missing.rb:7:16: C: AsyncMatrix/AbstractModuleVersionOrder: Missing version layer `V1_18`. Declare every version, even as a no-op.
+lib/async/matrix/abstract/api/unknown.rb:65:18: C: AsyncMatrix/AbstractModuleVersionOrder: Unknown version layer `V9_9`, which is not one of the supported versions.
+########## AsyncMatrix/AbstractModuleNoChangesComment
+lib/async/matrix/abstract/api/ascending.rb:11:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.2.`.
+lib/async/matrix/abstract/api/ascending.rb:14:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.3.`.
+lib/async/matrix/abstract/api/ascending.rb:17:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.4.`.
+lib/async/matrix/abstract/api/ascending.rb:20:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.5.`.
+lib/async/matrix/abstract/api/ascending.rb:23:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.6.`.
+lib/async/matrix/abstract/api/ascending.rb:26:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.7.`.
+lib/async/matrix/abstract/api/ascending.rb:29:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.8.`.
+lib/async/matrix/abstract/api/ascending.rb:32:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.9.`.
+lib/async/matrix/abstract/api/ascending.rb:35:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.10.`.
+lib/async/matrix/abstract/api/ascending.rb:38:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.11.`.
+lib/async/matrix/abstract/api/ascending.rb:41:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.12.`.
+lib/async/matrix/abstract/api/ascending.rb:44:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.13.`.
+lib/async/matrix/abstract/api/ascending.rb:47:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.14.`.
+lib/async/matrix/abstract/api/ascending.rb:50:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.15.`.
+lib/async/matrix/abstract/api/ascending.rb:53:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.16.`.
+lib/async/matrix/abstract/api/ascending.rb:56:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.17.`.
+lib/async/matrix/abstract/api/ascending.rb:59:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.18.`.
+lib/async/matrix/abstract/api/ascending.rb:62:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.19.`.
+lib/async/matrix/abstract/api/ascending.rb:8:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.1.`.
+lib/async/matrix/abstract/api/comments.rb:13:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.18.`.
+lib/async/matrix/abstract/api/comments.rb:16:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.17.`.
+lib/async/matrix/abstract/api/missing.rb:11:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.17.`.
+lib/async/matrix/abstract/api/missing.rb:14:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.16.`.
+lib/async/matrix/abstract/api/missing.rb:17:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.15.`.
+lib/async/matrix/abstract/api/missing.rb:20:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.14.`.
+lib/async/matrix/abstract/api/missing.rb:23:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.13.`.
+lib/async/matrix/abstract/api/missing.rb:26:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.12.`.
+lib/async/matrix/abstract/api/missing.rb:29:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.11.`.
+lib/async/matrix/abstract/api/missing.rb:32:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.10.`.
+lib/async/matrix/abstract/api/missing.rb:35:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.9.`.
+lib/async/matrix/abstract/api/missing.rb:38:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.8.`.
+lib/async/matrix/abstract/api/missing.rb:41:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.7.`.
+lib/async/matrix/abstract/api/missing.rb:44:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.6.`.
+lib/async/matrix/abstract/api/missing.rb:47:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.5.`.
+lib/async/matrix/abstract/api/missing.rb:50:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.4.`.
+lib/async/matrix/abstract/api/missing.rb:53:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.3.`.
+lib/async/matrix/abstract/api/missing.rb:56:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.2.`.
+lib/async/matrix/abstract/api/missing.rb:59:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.1.`.
+lib/async/matrix/abstract/api/missing.rb:8:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.19.`.
+lib/async/matrix/abstract/api/unknown.rb:11:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.18.`.
+lib/async/matrix/abstract/api/unknown.rb:14:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.17.`.
+lib/async/matrix/abstract/api/unknown.rb:17:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.16.`.
+lib/async/matrix/abstract/api/unknown.rb:20:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.15.`.
+lib/async/matrix/abstract/api/unknown.rb:23:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.14.`.
+lib/async/matrix/abstract/api/unknown.rb:26:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.13.`.
+lib/async/matrix/abstract/api/unknown.rb:29:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.12.`.
+lib/async/matrix/abstract/api/unknown.rb:32:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.11.`.
+lib/async/matrix/abstract/api/unknown.rb:35:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.10.`.
+lib/async/matrix/abstract/api/unknown.rb:38:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.9.`.
+lib/async/matrix/abstract/api/unknown.rb:41:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.8.`.
+lib/async/matrix/abstract/api/unknown.rb:44:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.7.`.
+lib/async/matrix/abstract/api/unknown.rb:47:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.6.`.
+lib/async/matrix/abstract/api/unknown.rb:50:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.5.`.
+lib/async/matrix/abstract/api/unknown.rb:53:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.4.`.
+lib/async/matrix/abstract/api/unknown.rb:56:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.3.`.
+lib/async/matrix/abstract/api/unknown.rb:59:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.2.`.
+lib/async/matrix/abstract/api/unknown.rb:62:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.1.`.
+lib/async/matrix/abstract/api/unknown.rb:65:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v9.9.`.
+lib/async/matrix/abstract/api/unknown.rb:8:18: C: [Correctable] AsyncMatrix/AbstractModuleNoChangesComment: An empty version layer must say so: `# No changes in v1.19.`.
+########## AsyncMatrix/EachFileHasMatchingTest
+lib/async/matrix/abstract/api/ascending.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/async/matrix/abstract/api/ascending.rb`.
+lib/async/matrix/abstract/api/comments.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/async/matrix/abstract/api/comments.rb`.
+lib/async/matrix/abstract/api/good.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/async/matrix/abstract/api/good.rb`.
+lib/async/matrix/abstract/api/missing.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/async/matrix/abstract/api/missing.rb`.
+lib/async/matrix/abstract/api/unknown.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/async/matrix/abstract/api/unknown.rb`.
+lib/async/matrix/events/fixture.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/async/matrix/events/fixture.rb`.
+lib/fixtures/begin_block_assignment.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/fixtures/begin_block_assignment.rb`.
+lib/fixtures/comment_structure.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/fixtures/comment_structure.rb`.
+lib/fixtures/no_conditional_assignment.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/fixtures/no_conditional_assignment.rb`.
+lib/fixtures/no_modifier_if.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/fixtures/no_modifier_if.rb`.
+lib/fixtures/no_return.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/fixtures/no_return.rb`.
+lib/fixtures/untested.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/fixtures/untested.rb`.
+lib/fixtures/use_tap.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is no test for this file: add `test/fixtures/use_tap.rb`.
+test/fixtures/undescribed.rb:1:1: C: AsyncMatrix/EachFileHasMatchingTest: There is nothing for this test to describe: expected `lib/fixtures/undescribed.rb`.

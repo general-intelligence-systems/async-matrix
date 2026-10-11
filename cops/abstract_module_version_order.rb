@@ -3,7 +3,7 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-require "rubocop"
+require_relative "support/prism_source"
 
 module RuboCop
   module Cop
@@ -41,6 +41,8 @@ module RuboCop
       #     end
       #   end
       class AbstractModuleVersionOrder < Base
+        include PrismSource
+
         MSG_MISSING = "Missing version %<layers>s. Declare every version, even as a no-op."
 
         MSG_UNKNOWN = "Unknown version %<layers>s, which is not one of the supported versions."
@@ -79,23 +81,25 @@ module RuboCop
           @expected_layers ||= self.versions.map{|version| layer_name(version)}.reverse
         end
 
-        def on_module(node)
-          if self.abstract?(node)
-            concepts = self.child_modules(node).flat_map{|namespace| self.child_modules(namespace)}
-            concepts.each do |concept|
-              layers = self.child_modules(concept).filter_map do |child|
-                name = self.module_name(child)
+        def on_new_investigation
+          self.prism_each(::Prism::ModuleNode).each do |node|
+            if self.abstract?(node)
+              concepts = self.child_modules(node).flat_map{|namespace| self.child_modules(namespace)}
+              concepts.each do |concept|
+                layers = self.child_modules(concept).filter_map do |child|
+                  name = self.module_name(child)
 
-                if name.to_s.start_with?("V")
-                  [name, child]
+                  if name.to_s.start_with?("V")
+                    [name, child]
+                  end
                 end
-              end
 
-              self.check_completeness(concept, layers)
-              self.check_order(layers)
+                self.check_completeness(concept, layers)
+                self.check_order(layers)
+              end
+            else
+              nil
             end
-          else
-            nil
           end
         end
 
@@ -111,22 +115,12 @@ module RuboCop
         end
 
         def module_name(node)
-          node.identifier.short_name
+          node.name
         end
 
         # The modules declared directly inside the given module.
         def child_modules(node)
-          body = node.body
-          if body
-            if body.begin_type?
-              children = body.children
-            else
-              children = [body]
-            end
-            children.select{|child| child.is_a?(::RuboCop::AST::Node) && child.module_type?}
-          else
-            []
-          end
+          self.prism_statements(node.body).select{|child| child.is_a?(::Prism::ModuleNode)}
         end
 
         def check_completeness(concept, layers)
@@ -136,13 +130,13 @@ module RuboCop
           unknown = declared - self.expected_layers
 
           if missing.any?
-            add_offense(concept.identifier, message: format(MSG_MISSING, layers: self.describe(missing)))
+            add_offense(self.prism_node_range(concept.constant_path), message: format(MSG_MISSING, layers: self.describe(missing)))
           end
 
           unknown.each do |name|
             node = layers.assoc(name).last
 
-            add_offense(node.identifier, message: format(MSG_UNKNOWN, layers: self.describe([name])))
+            add_offense(self.prism_node_range(node.constant_path), message: format(MSG_UNKNOWN, layers: self.describe([name])))
           end
         end
 
@@ -155,7 +149,7 @@ module RuboCop
               next
             end
 
-            add_offense(node.identifier, message: format(MSG_ORDER,
+            add_offense(self.prism_node_range(node.constant_path), message: format(MSG_ORDER,
               layer: name,
               before: previous,
               highest: self.expected_layers.first,

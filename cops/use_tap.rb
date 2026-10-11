@@ -19,67 +19,78 @@
 #       end
 #     end
 #   end
+
+require_relative "support/prism_source"
+
 module RuboCop
   module Cop
     module Local
       class UseTap < Base
+        include PrismSource
+
         MSG = "Assigning `%<name>s` and returning it at the end is `tap`; " \
               "write `<expression>.tap do |%<name>s| ... end`."
 
         # Every way a local can be written to after the opening assignment.
-        REASSIGNMENTS = %i[lvasgn op_asgn or_asgn and_asgn masgn].freeze
+        REASSIGNMENTS = [
+          ::Prism::LocalVariableWriteNode,
+          ::Prism::LocalVariableOperatorWriteNode,
+          ::Prism::LocalVariableOrWriteNode,
+          ::Prism::LocalVariableAndWriteNode,
+          ::Prism::MultiWriteNode,
+        ].freeze
 
-        def on_def(node)
-          check(node.body)
-        end
-
-        def on_defs(node)
-          check(node.body)
+        def on_new_investigation
+          self.prism_each(::Prism::DefNode).each do |node|
+            self.check(node.body)
+          end
         end
 
         private
 
         def check(body)
-          if tap_shaped?(body)
-            add_offense(body, message: format(MSG, name: assigned_name(body)))
+          if self.tap_shaped?(body)
+            add_offense(self.prism_node_range(body), message: format(MSG, name: self.assigned_name(body)))
           end
         end
 
         # First statement assigns a local; last statement is that same local, read and nothing else.
         def tap_shaped?(body)
-          body&.begin_type? &&
-            body.children.size >= 2 &&
-            body.children.first.lvasgn_type? &&
-            returns_assigned?(body) &&
-            !reassigned?(body)
+          body.is_a?(::Prism::StatementsNode) &&
+            body.body.size >= 2 &&
+            body.body.first.is_a?(::Prism::LocalVariableWriteNode) &&
+            self.returns_assigned?(body) &&
+            !self.reassigned?(body)
         end
 
         def assigned_name(body)
-          body.children.first.name
+          body.body.first.name
         end
 
         def returns_assigned?(body)
-          last = body.children.last
+          last = body.body.last
 
-          last.lvar_type? && last.children.first == assigned_name(body)
+          last.is_a?(::Prism::LocalVariableReadNode) && last.name == self.assigned_name(body)
         end
 
         # `tap` yields the object the receiver evaluated to, so a body that points the name at something else partway through is a different program and must not be flagged.
         def reassigned?(body)
-          name = assigned_name(body)
+          name = self.assigned_name(body)
 
-          body.children[1..-2].any? do |statement|
-            statement.each_node(*REASSIGNMENTS).any? do |write|
-              writes_name?(write, name)
+          body.body[1..-2].any? do |statement|
+            [statement].concat(self.prism_descendants(statement)).any? do |write|
+              REASSIGNMENTS.any?{|klass| write.is_a?(klass)} && self.writes_name?(write, name)
             end
           end
         end
 
         def writes_name?(node, name)
-          if node.masgn_type?
-            node.assignments.any?{|target| target == name}
+          if node.is_a?(::Prism::MultiWriteNode)
+            node.lefts.concat(node.rights).any? do |target|
+              target.respond_to?(:name) && target.name == name
+            end
           else
-            node.children.first == name
+            node.name == name
           end
         end
       end

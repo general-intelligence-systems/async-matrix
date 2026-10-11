@@ -61,9 +61,31 @@ describe Async::Matrix do
     end.uniq
   end
 
+  # Every operation the layers applied at this version withdrew.
+  #
+  # A withdrawal keeps the method and says what became of it, so the surface is allowed to carry one.
+  #
+  # @parameter api [Module] the API to search.
+  # @returns [Array(Symbol)] every withdrawn method name.
+  def self.removals_of(api)
+    api.constants.each_with_object([]) do |name, found|
+      value = api.const_get(name)
+
+      if value.is_a?(Class)
+        value.ancestors.each do |ancestor|
+          if ancestor.is_a?(Async::Matrix::Removals)
+            found.concat(ancestor.removals.keys)
+          end
+        end
+      end
+    end.uniq
+  end
+
   API = Async::Matrix::ClientServer::Client[Async::Matrix::TEST_VERSION].api
 
   METHODS = self.methods_of(API).freeze
+
+  REMOVED = self.removals_of(API).freeze
 
   # The specification names every operation, and the library owes each one a method of that name.
   #
@@ -73,6 +95,38 @@ describe Async::Matrix do
       it "has a method named #{Async::Matrix::Operations.method_name(operation)} for #{operation}" do
         expect(METHODS).to be(:include?, Async::Matrix::Operations.method_name(operation))
       end
+    end
+  end
+
+  # The method name every operation asks for, whichever version defines it.
+  #
+  # Keyed by method name rather than by operation, because the surface is a list of method names, and an operation renamed between versions asks for the same method twice.
+  ELSEWHERE = Dir.glob(File.join(ROOT, SCHEMAS, "*-v*.yaml")).each_with_object({}) do |path, found|
+    if path.end_with?(".deltas.yaml")
+      next
+    end
+
+    (YAML.safe_load_file(path)["operations"] || {}).each_key do |operation|
+      found[Async::Matrix::Operations.method_name(operation)] ||= operation
+    end
+  end.freeze
+
+  # The method names the version under test owes.
+  OWED = OPERATIONS.keys.map{|operation| Async::Matrix::Operations.method_name(operation)}.freeze
+
+  # An operation another version defines is a method this one must not answer.
+  #
+  # The check above is one-directional, and so is the context which demands a case per operation: both read the version under test, so a method it has no operation for is invisible to them. A method written into the class rather than into a layer is exactly that - present whatever the version, against a homeserver which does not implement it - and this is where it shows up. The class holds what every version has, everything else belongs to the layer for the version which introduced it, and a layer which takes one back declares it {ruby removed} rather than leaving it to be inherited forward.
+  (ELSEWHERE.keys - OWED).each do |name|
+    it "has no method named #{name}, which #{Async::Matrix::TEST_VERSION} has no operation for" do
+      expect(METHODS - REMOVED).not.to be(:include?, name)
+    end
+  end
+
+  # A withdrawal says the version has lost the operation, so the version must not also define it.
+  REMOVED.each do |name|
+    it "withdraws #{name}, which #{Async::Matrix::TEST_VERSION} has no operation for" do
+      expect(OWED).not.to be(:include?, name)
     end
   end
 

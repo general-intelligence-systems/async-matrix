@@ -3,7 +3,7 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-require "rubocop"
+require_relative "support/prism_source"
 
 module RuboCop
   module Cop
@@ -35,25 +35,41 @@ module RuboCop
       #     end
       #   end
       class AbstractModuleNoChangesComment < Base
+        include PrismSource
+
         extend AutoCorrector
 
         MSG = "An empty version layer must say so: `%<expected>s`."
 
-        def on_module(node)
+        def on_new_investigation
+          self.prism_each(::Prism::ModuleNode).each do |node|
+            self.check(node)
+          end
+        end
+
+        private
+
+        COMMENT = "# No changes in %<version>s."
+
+        def check(node)
           if version = self.version_for(node)
             if node.body.nil?
               expected = format(COMMENT, version: version)
-              comment = processed_source.comment_at_line(node.first_line - 1)
-              if comment and comment.text == expected
+              comment = self.prism_leading_comments(node).last
+
+              if comment and self.prism_source(comment) == expected
                 nil
               else
-                add_offense(node.identifier, message: format(MSG, expected: expected)) do |corrector|
-                  if comment
-                    corrector.replace(comment.source_range, expected)
-                  else
-                    indentation = " " * node.loc.keyword.column
+                range = self.prism_node_range(node.constant_path)
 
-                    corrector.insert_before(node.loc.keyword, "#{expected}\n#{indentation}")
+                add_offense(range, message: format(MSG, expected: expected)) do |corrector|
+                  if comment
+                    corrector.replace(self.prism_range(comment.location), expected)
+                  else
+                    keyword = node.module_keyword_loc
+                    indentation = " " * keyword.start_column
+
+                    corrector.insert_before(self.prism_range(keyword), "#{expected}\n#{indentation}")
                   end
                 end
               end
@@ -65,15 +81,11 @@ module RuboCop
           end
         end
 
-        private
-
-        COMMENT = "# No changes in %<version>s."
-
         # The version a layer stands for, if it is one: `V1_19` is `v1.19`.
         #
         # @returns [String | nil] the version, or nil if this is not a version layer.
         def version_for(node)
-          match = /\AV(\d+)_(\d+)\z/.match(node.identifier.short_name.to_s)
+          match = /\AV(\d+)_(\d+)\z/.match(node.name.to_s)
 
           if match
             if self.abstract?(node)
@@ -88,8 +100,8 @@ module RuboCop
 
         # Only layers below `Abstract` are version layers, so that a module which merely looks like one elsewhere is left alone.
         def abstract?(node)
-          node.each_ancestor(:module).any? do |ancestor|
-            ancestor.identifier.short_name == :Abstract
+          self.prism_ancestors(node).any? do |ancestor|
+            ancestor.is_a?(::Prism::ModuleNode) && ancestor.name == :Abstract
           end
         end
       end

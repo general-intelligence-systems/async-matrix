@@ -14,6 +14,9 @@ module Async
     # The homeserver to test against. The rig in `synapse/` provides one, with rate limiting disabled and a module which registers a user on first login.
     HOMESERVER = ENV.fetch("MATRIX_HOMESERVER", "http://localhost:8008")
 
+    # The homeserver which delegates authentication to matrix-authentication-service. The rig in `synapse/` runs one behind the `oauth` compose profile, which binds its own port so it may run alongside a version.
+    OAUTH_HOMESERVER = ENV.fetch("MATRIX_OAUTH_HOMESERVER", "http://localhost:8010")
+
     # The specification version under test. `bin/test` runs the suite once per version, against a server which implements that version. Deliberately not `VERSION`, which is the gem's own.
     TEST_VERSION = ENV.fetch("MATRIX_VERSION", LATEST)
 

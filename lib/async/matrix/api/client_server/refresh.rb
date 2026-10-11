@@ -6,28 +6,16 @@
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/refresh"
 
 module Async
   module Matrix
     module ClientServer
       # The tokens a refresh issued.
+      #
+      # The endpoint arrived in v1.3, so the fields are read by that layer.
       class Refreshed < Representation
         include Versioned
-
-        # @returns [String] the access token to authenticate with from now on.
-        def access_token
-          self.value[:access_token]
-        end
-
-        # @returns [String | nil] the token for the next refresh, if the homeserver rotated it.
-        def refresh_token
-          self.value[:refresh_token]
-        end
-
-        # @returns [Integer | nil] how long the new access token lasts, in milliseconds.
-        def expires_in_ms
-          self.value[:expires_in_ms]
-        end
       end
 
       # Exchanges a refresh token for a new access token.
@@ -52,14 +40,6 @@ module Async
 
         def inspect
           "\#<#{self.class}>"
-        end
-
-        # Exchange a refresh token for a new access token.
-        #
-        # @parameter refresh_token [String] the refresh token to exchange.
-        # @returns [Refreshed] the tokens the homeserver issued.
-        def refresh(refresh_token)
-          api::Refreshed.post(@resource.with(path: "#{V3}/refresh"), {refresh_token: refresh_token})
         end
       end
     end

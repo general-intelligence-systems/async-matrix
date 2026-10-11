@@ -33,13 +33,19 @@
 #       Enabled: true
 #
 # A check with no `Include` runs everywhere; given one, it runs only where a path matches. `Exclude` then removes paths from whatever is left. `Annotations` defaults to `lib` alone: a script in `bin` and a case in `test` have no interface for anyone else to call, so annotating them documents nothing.
+#
+# What a declaration says is read from the run of comment lines touching it. Where an offence is reported is read from the wider span the library attributes to the declaration, less any magic comment, because decode reports a part's position within that span rather than the line it came from.
 
 require "decode/language/ruby/generic"
+
+require_relative "support/prism_source"
 
 module RuboCop
   module Cop
     module Local
       class CommentStructure < Base
+        include PrismSource
+
         MSG_WRAPPED_SUMMARY = "Do not wrap a summary paragraph: a paragraph is one line, however long."
 
         MSG_WRAPPED_ANNOTATION = "Do not wrap the summary of `@%<directive>s`: an annotation's summary is one line."
@@ -61,6 +67,9 @@ module RuboCop
 
         HEADER = /\A#\s*(frozen_string_literal:|Released under|Copyright,|!)/
 
+        # What a Ruby file says to the interpreter rather than to a reader.
+        MAGIC = /\A#\s*(frozen_string_literal:|encoding:|coding:|warn_indent:|shareable_constant_value:|!|-\*-)/
+
         TERMINAL = [".", ":", "?", "!"].freeze
 
         # Multi-line content is the point of these, so their summaries are left alone.
@@ -72,26 +81,20 @@ module RuboCop
               self.check_wrapping(block)
             end
           end
-        end
 
-        def on_module(node)
           if self.applies?("Length")
-            self.check_summary(node, "a module summary", self.cop_config.fetch("ModuleWords", 10))
+            self.prism_each(::Prism::ModuleNode).each do |node|
+              self.check_summary(node, "a module summary", self.cop_config.fetch("ModuleWords", 10))
+            end
+
+            self.prism_each(::Prism::ClassNode).each do |node|
+              self.check_summary(node, "a class summary", self.cop_config.fetch("MaximumWords", 30))
+            end
           end
-        end
 
-        def on_class(node)
-          if self.applies?("Length")
-            self.check_summary(node, "a class summary", self.cop_config.fetch("MaximumWords", 30))
+          self.prism_each(::Prism::DefNode).each do |node|
+            self.check_method(node)
           end
-        end
-
-        def on_def(node)
-          self.check_method(node)
-        end
-
-        def on_defs(node)
-          self.check_method(node)
         end
 
         private
@@ -122,7 +125,7 @@ module RuboCop
         end
 
         def check_method(node)
-          lines = node.loc.last_line - node.loc.line + 1
+          lines = node.location.end_line - node.location.start_line + 1
           base = self.cop_config.fetch("BaseWords", 10)
           per_line = self.cop_config.fetch("WordsPerLine", 3)
           ceiling = self.cop_config.fetch("MaximumWords", 30)
@@ -140,13 +143,23 @@ module RuboCop
 
         # The comment which documents a declaration, as the parts decode reads it as.
         def parts_of(node)
-          comments = processed_source.ast_with_comments[node]
+          comments = self.documenting(node)
 
-          if comments.nil? or comments.empty?
+          if comments.empty?
             nil
           else
-            self.parse(comments.reject{|comment| comment.text.match?(HEADER)})
+            self.parse(comments)
           end
+        end
+
+        # The comment above a declaration, without the file's own header.
+        def documenting(node)
+          self.prism_leading_comments(node).reject{|comment| self.prism_source(comment).match?(HEADER)}
+        end
+
+        # Every comment the declaration owns, which is what the parts are indexed against.
+        def owned(node)
+          self.prism_owned_comments(node).drop_while{|comment| self.prism_source(comment).match?(MAGIC)}
         end
 
         def check_summary(node, subject, allowed)
@@ -159,7 +172,7 @@ module RuboCop
             if words > allowed
               message = format(MSG_TOO_LONG, words: words, allowed: allowed, subject: subject)
 
-              add_offense(summary.first ? self.comment_for(node, parts, summary.first) : node, message: message)
+              add_offense(self.summary_range(node, parts, summary.first), message: message)
             end
           end
         end
@@ -171,7 +184,7 @@ module RuboCop
             annotations = parts.map(&:first).reject{|part| part.is_a?(Decode::Comment::Text)}
 
             if annotations.empty?
-              add_offense(node.loc.name, message: MSG_NO_ANNOTATIONS)
+              add_offense(self.prism_range(node.name_loc), message: MSG_NO_ANNOTATIONS)
             end
           end
         end
@@ -181,12 +194,14 @@ module RuboCop
           [].tap do |found|
             current = []
 
-            processed_source.comments.each do |comment|
-              if comment.text.match?(HEADER) or comment.text.start_with?("# rubocop:")
+            self.prism_comments.each do |comment|
+              text = self.prism_source(comment)
+
+              if text.match?(HEADER) or text.start_with?("# rubocop:")
                 next
               end
 
-              if current.empty? or comment.loc.line == current.last.loc.line + 1
+              if current.empty? or comment.location.start_line == current.last.location.start_line + 1
                 current << comment
               else
                 found << current
@@ -208,7 +223,7 @@ module RuboCop
               following = nodes[index + 1]&.first
 
               if following.is_a?(Decode::Comment::Text) and !self.terminated?(node.line)
-                add_offense(block[lines.first.first], message: MSG_WRAPPED_SUMMARY)
+                add_offense(self.prism_range(block[lines.first.first].location), message: MSG_WRAPPED_SUMMARY)
               end
             elsif !FREEFORM.include?(node.class)
               summary = lines.drop(1).reject{|line| line.last.strip.start_with?("@")}
@@ -216,7 +231,7 @@ module RuboCop
               if summary.size > 1
                 message = format(MSG_WRAPPED_ANNOTATION, directive: node.directive)
 
-                add_offense(block[summary.first.first], message: message)
+                add_offense(self.prism_range(block[summary.first.first].location), message: message)
               end
             end
           end
@@ -240,17 +255,18 @@ module RuboCop
 
         # The comment without its `#`, keeping the indentation which tells decode what is nested.
         def text_of(comment)
-          comment.text.sub(/\A#\s?/, "")
+          self.prism_source(comment).sub(/\A#\s?/, "")
         end
 
-        def comment_for(node, parts, text)
-          entry = parts.find{|part, _| part.equal?(text)}
-          comments = processed_source.ast_with_comments[node]
+        # Where to report a summary which is too long: the comment line it starts on, or the declaration itself when the summary cannot be traced back to one.
+        def summary_range(node, parts, text)
+          comments = self.owned(node)
+          entry = text && parts.find{|part, _| part.equal?(text)}
 
           if entry and comments[entry.last.first.first]
-            comments[entry.last.first.first]
+            self.prism_range(comments[entry.last.first.first].location)
           else
-            node
+            self.prism_node_range(node)
           end
         end
 

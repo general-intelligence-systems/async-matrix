@@ -100,9 +100,6 @@ GEM
     protocol-url (0.19.0)
     racc (1.8.1)
     rainbow (3.1.1)
-    rake-compiler-dock (1.12.0)
-    rb_sys (0.9.130)
-      rake-compiler-dock (= 1.12.0)
     rbs (4.2.0)
       logger
       prism (>= 1.6.0)
@@ -148,9 +145,6 @@ GEM
       parslet (~> 2.0)
       tree_sitter_language_pack (>= 1.17.0, < 2.0)
       version_gem (~> 1.1, >= 1.1.15)
-    tree_sitter_language_pack (1.21.1)
-      rb_sys (>= 0.9.130, < 0.10)
-      sorbet-runtime (~> 0.5)
     tree_sitter_language_pack (1.21.1-x86_64-linux)
       sorbet-runtime (~> 0.5)
     tsort (0.2.0)
@@ -161,7 +155,6 @@ GEM
     zeitwerk (2.8.3)
 
 PLATFORMS
-  ruby
   x86_64-linux
 
 DEPENDENCIES
@@ -218,8 +211,6 @@ CHECKSUMS
   protocol-url (0.19.0) sha256=3f6b9f6aa742a259a0b3610fbbd9685dcd9506adf6734f428ff96259faabfb21
   racc (1.8.1) sha256=4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f
   rainbow (3.1.1) sha256=039491aa3a89f42efa1d6dec2fc4e62ede96eb6acd95e52f1ad581182b79bc6a
-  rake-compiler-dock (1.12.0) sha256=f13205c2738f3d2053afcd03491a9e4541b22a59a0bfc53fc8bc883bd8188023
-  rb_sys (0.9.130) sha256=7d486d99c1da02635515deaf9860fc5aea90bb4ab2589b2deec7fdc7d3548615
   rbs (4.2.0) sha256=51f7b886dcc05bc09e10b901daa6a81829f6adc03101d6ca9ea4aac6103e0674
   regexp_parser (2.13.1) sha256=5aedb6b7c35688f51e86eef17a15374dfd287c83f4ca644b2c5f3ec50a33b44b
   rubocop (1.92.0) sha256=2af68041fb2e70bd9321d0479b49fad07f8008a3d0758c83347b4917128c56e0
@@ -235,7 +226,6 @@ CHECKSUMS
   sus-fixtures-async (0.2.0) sha256=8c2b20b87f62da8cf0ce3efce3f9435370069371cd75ac23cdc7936f6402f9b7
   token-resolver (2.0.13) sha256=aba890ce6be32ff7226e991f9f54d7bd99df312849c119482de48661280e33a5
   tree_haver (7.1.10) sha256=47f2121d709fce1df3952b4e03a60b43a5812a08d24f0d5a02ea67f95b2e69ed
-  tree_sitter_language_pack (1.21.1) sha256=e51925e4b47ccc5d1fe1071fad040c51e71cc9161efb3ac1c1ea97b71e4a8eae
   tree_sitter_language_pack (1.21.1-x86_64-linux) sha256=98ce3e076e9a0807423b75b9b072fe30c8123368900933aaa74d928747b96c7e
   tsort (0.2.0) sha256=9650a793f6859a43b6641671278f79cfead60ac714148aabe4e3f0060480089f
   unicode-display_width (3.3.0) sha256=4b7aa66a4b11db50f6f7e98411215cd0dd10eaecb665d36eec5bcacb3fa0b613

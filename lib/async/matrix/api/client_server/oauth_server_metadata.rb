@@ -3,14 +3,22 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../paths"
+require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/oauth_server_metadata"
 
 module Async
   module Matrix
     module ClientServer
-      # Where the homeserver's OAuth endpoints are.
+      # Where the authorization server is, and what it supports.
       #
-      # The operations are not written yet: this is the class `oauth_server_metadata-v1.19.yaml` names.
+      # The endpoint arrived in v1.15, so the fields are read by that layer.
+      class AuthMetadata < Representation
+        include Versioned
+      end
+
+      # Where the homeserver's OAuth endpoints are.
       class OAuthServerMetadata
         include Versioned
 

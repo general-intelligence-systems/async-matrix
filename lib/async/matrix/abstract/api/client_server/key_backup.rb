@@ -156,12 +156,48 @@ module Async
           module V1_3
           end
 
-          # No changes in v1.2.
+          # v1.2 renamed the single session operations.
           module V1_2
+            extend Removals
+
+            removed :get_room_keys_by_session_id, use: :get_room_key_by_session_id
+
+            removed :put_room_keys_by_session_id, use: :put_room_key_by_session_id
+
+            removed :delete_room_keys_by_session_id, use: :delete_room_key_by_session_id
+
+            # One session's key, by its ID.
+            def get_room_key_by_session_id(room_id, session_id)
+              api::BackedUpSession.get(self.keys(room_id, session_id))
+            end
+
+            # Back up one session's key.
+            def put_room_key_by_session_id(room_id, session_id, session_data:, first_message_index: 0, forwarded_count: 0, is_verified: false)
+              api::KeyBackupUpdate.put(self.keys(room_id, session_id), self.session_payload(session_data, first_message_index, forwarded_count, is_verified))
+            end
+
+            # Delete one session's key.
+            def delete_room_key_by_session_id(room_id, session_id)
+              api::KeyBackupUpdate.delete(self.keys(room_id, session_id))
+            end
           end
 
-          # No changes in v1.1.
+          # v1.1 named the single session operations in the plural.
           module V1_1
+            # One session's key, by its ID.
+            def get_room_keys_by_session_id(room_id, session_id)
+              api::BackedUpSession.get(self.keys(room_id, session_id))
+            end
+
+            # Back up one session's key.
+            def put_room_keys_by_session_id(room_id, session_id, session_data:, first_message_index: 0, forwarded_count: 0, is_verified: false)
+              api::KeyBackupUpdate.put(self.keys(room_id, session_id), self.session_payload(session_data, first_message_index, forwarded_count, is_verified))
+            end
+
+            # Delete one session's key.
+            def delete_room_keys_by_session_id(room_id, session_id)
+              api::KeyBackupUpdate.delete(self.keys(room_id, session_id))
+            end
           end
         end
 

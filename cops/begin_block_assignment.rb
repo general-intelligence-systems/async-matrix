@@ -6,26 +6,31 @@
 #   begin
 #     lvar = ...
 #   end
+
+require_relative "support/prism_source"
+
 module RuboCop
   module Cop
     module Local
       class BeginBlockAssignment < Base
+        include PrismSource
+
         MSG = "Do not assign a `begin...end` expression to a variable; " \
               "move the assignment inside the begin block."
 
-        def on_lvasgn(node)
-          check(node)
-        end
-        alias on_ivasgn on_lvasgn
-        alias on_cvasgn on_lvasgn
-        alias on_gvasgn on_lvasgn
+        # Every way a variable is written to with a single value on the right.
+        WRITES = [
+          ::Prism::LocalVariableWriteNode,
+          ::Prism::InstanceVariableWriteNode,
+          ::Prism::ClassVariableWriteNode,
+          ::Prism::GlobalVariableWriteNode,
+        ].freeze
 
-        private
-
-        def check(node)
-          rhs = node.children.last
-          if rhs.is_a?(RuboCop::AST::Node) && rhs.type == :kwbegin
-            add_offense(node)
+        def on_new_investigation
+          self.prism_each(*WRITES).each do |node|
+            if node.value.is_a?(::Prism::BeginNode)
+              add_offense(self.prism_node_range(node))
+            end
           end
         end
       end

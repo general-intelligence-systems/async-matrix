@@ -7,6 +7,7 @@ require "protocol/url/encoding"
 
 require_relative "../../paths"
 require_relative "../../representation"
+require_relative "../../removals"
 require_relative "../../versioned"
 require_relative "../../abstract/api/client_server/key_backup"
 
@@ -193,41 +194,23 @@ module Async
           api::KeyBackupUpdate.delete(self.keys(room_id))
         end
 
-        # @parameter room_id [String] the room the session belongs to.
-        # @parameter session_id [String] the session to read.
-        # @returns [BackedUpSession] the session.
-        def get_room_key_by_session_id(room_id, session_id)
-          api::BackedUpSession.get(self.keys(room_id, session_id))
-        end
+        private
 
-        # Write one session.
+        # The body of a request which backs up one session.
         #
-        # @parameter room_id [String] the room the session belongs to.
-        # @parameter session_id [String] the session to write.
         # @parameter session_data [Hash] the encrypted key material.
         # @parameter first_message_index [Integer] the first message it decrypts.
         # @parameter forwarded_count [Integer] how many times it was forwarded.
         # @parameter is_verified [Boolean] whether it came from a verified device.
-        # @returns [KeyBackupUpdate] what the server now holds.
-        def put_room_key_by_session_id(room_id, session_id, session_data:, first_message_index: 0, forwarded_count: 0, is_verified: false)
-          payload = {
+        # @returns [Hash] the body.
+        def session_payload(session_data, first_message_index, forwarded_count, is_verified)
+          {
             session_data: session_data,
             first_message_index: first_message_index,
             forwarded_count: forwarded_count,
             is_verified: is_verified,
           }
-
-          api::KeyBackupUpdate.put(self.keys(room_id, session_id), payload)
         end
-
-        # @parameter room_id [String] the room the session belongs to.
-        # @parameter session_id [String] the session to delete.
-        # @returns [KeyBackupUpdate] what the server now holds.
-        def delete_room_key_by_session_id(room_id, session_id)
-          api::KeyBackupUpdate.delete(self.keys(room_id, session_id))
-        end
-
-        private
 
         # The resource of the keys, narrowed to a room and a session when they are given.
         #

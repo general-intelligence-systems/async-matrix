@@ -33,8 +33,18 @@ end
 
 # Refuses every refresh, the way a homeserver does once the refresh token is spent.
 class Refuser
+  def initialize(status: 401, errcode: "M_UNKNOWN_TOKEN")
+    @status = status
+    @errcode = errcode
+    @attempts = 0
+  end
+
+  attr :attempts
+
   def refresh(refresh_token)
-    raise Async::Matrix::RequestError.new(401, "M_UNKNOWN_TOKEN", "invalid refresh token")
+    @attempts += 1
+
+    raise Async::Matrix::RequestError.new(@status, @errcode, "refused")
   end
 end
 
@@ -153,6 +163,91 @@ describe Async::Matrix::Credentials do
     it "sends it anyway" do
       expect(credentials.authorization).to be == ["Bearer first", 0]
       expect(issuer.attempts).to be == 0
+    end
+  end
+
+  with "a refusal the homeserver may recover from" do
+    # A server error is the homeserver having a bad moment. Reporting it as an authentication error would have a caller discard a session which is still good.
+    it "reports a server error as it stands" do
+      refused = subject.new(Refuser.new(status: 502, errcode: "M_UNKNOWN"), access_token: "first", refresh_token: "refresh-0")
+
+      error = nil
+
+      begin
+        refused.renew!
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(error).to be_a(Async::Matrix::RequestError)
+      expect(error).not.to be_a(Async::Matrix::AuthenticationError)
+      expect(error.status).to be == 502
+    end
+
+    # A rate limit is the homeserver asking us to wait, not a verdict on the refresh token.
+    it "reports a rate limit as it stands" do
+      refused = subject.new(Refuser.new(status: 429, errcode: "M_LIMIT_EXCEEDED"), access_token: "first", refresh_token: "refresh-0")
+
+      error = nil
+
+      begin
+        refused.renew!
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(error).not.to be_a(Async::Matrix::AuthenticationError)
+      expect(error.status).to be == 429
+    end
+
+    # It may work next time, so nothing is remembered.
+    it "will try again" do
+      refuser = Refuser.new(status: 502, errcode: "M_UNKNOWN")
+      refused = subject.new(refuser, access_token: "first", refresh_token: "refresh-0")
+
+      2.times do
+        begin
+          refused.renew!
+        rescue Async::Matrix::RequestError
+          nil
+        end
+      end
+
+      expect(refuser.attempts).to be == 2
+    end
+  end
+
+  with "a refusal which ends the session" do
+    let(:refuser) {Refuser.new}
+
+    let(:credentials) {subject.new(refuser, access_token: "first", refresh_token: "refresh-0")}
+
+    # The refresh token is spent, so asking again cannot help and would only hammer the homeserver.
+    it "asks once however many callers are waiting" do
+      8.times.map do
+        Async do
+          begin
+            credentials.renew!(0)
+          rescue Async::Matrix::AuthenticationError
+            nil
+          end
+        end
+      end.each(&:wait)
+
+      expect(refuser.attempts).to be == 1
+    end
+
+    it "reports the same refusal to every caller" do
+      errors = 8.times.map do
+        Async do
+          begin
+            credentials.renew!(0)
+          rescue Async::Matrix::AuthenticationError => error
+            error
+          end
+        end
+      end.map(&:wait)
+
+      expect(errors.map(&:class).uniq).to be == [Async::Matrix::AuthenticationError]
+      expect(errors.map(&:status).uniq).to be == [401]
     end
   end
 end

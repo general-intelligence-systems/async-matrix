@@ -3,7 +3,7 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
-require "rubocop"
+require_relative "support/prism_source"
 
 module RuboCop
   module Cop
@@ -18,42 +18,87 @@ module RuboCop
       #   # good
       #   def event_type = "m.room.message"
       class SingleLineMethodsForEvents < Base
+        include PrismSource
         extend AutoCorrector
 
         MSG = "A method whose body is one expression must use the endless form: `def name = expression`."
 
         # Expressions which can follow ` = ` unchanged. Anything with its own `end`, or with lower precedence than the assignment, is left as a block: what it would parse as is not what it says as a body.
-        ACCEPTED_BODIES = %i[
-          array const csend cvar dstr dsym erange false float gvar hash int irange ivar lvar nil
-          rational regexp self send str sym true xstr
+        ACCEPTED_BODIES = [
+          ::Prism::ArrayNode,
+          ::Prism::CallNode,
+          ::Prism::ClassVariableReadNode,
+          ::Prism::ConstantPathNode,
+          ::Prism::ConstantReadNode,
+          ::Prism::FalseNode,
+          ::Prism::FloatNode,
+          ::Prism::GlobalVariableReadNode,
+          ::Prism::HashNode,
+          ::Prism::ImaginaryNode,
+          ::Prism::InstanceVariableReadNode,
+          ::Prism::IntegerNode,
+          ::Prism::InterpolatedStringNode,
+          ::Prism::InterpolatedSymbolNode,
+          ::Prism::InterpolatedXStringNode,
+          ::Prism::LocalVariableReadNode,
+          ::Prism::NilNode,
+          ::Prism::RangeNode,
+          ::Prism::RationalNode,
+          ::Prism::RegularExpressionNode,
+          ::Prism::SelfNode,
+          ::Prism::StringNode,
+          ::Prism::SymbolNode,
+          ::Prism::TrueNode,
+          ::Prism::XStringNode,
         ].freeze
 
-        def on_def(node)
-          if rewriteable?(node)
-            report(node)
+        def on_new_investigation
+          self.prism_each(::Prism::DefNode).each do |node|
+            if self.rewriteable?(node)
+              self.report(node)
+            end
           end
         end
-        alias on_defs on_def
 
         private
 
+        # The one expression a method's body is, when that is what it is.
+        def sole_expression(node)
+          statements = self.prism_statements(node.body)
+
+          if statements.size == 1
+            statements.first
+          else
+            nil
+          end
+        end
+
         # A method is rewritten only when it is not endless, not a setter, and has one non-heredoc body expression on one line.
         def rewriteable?(node)
-          !node.endless? &&
-            !setter?(node.method_name) &&
-            !node.body.nil? &&
-            ACCEPTED_BODIES.include?(node.body.type) &&
-            single_line?(node) &&
-            !heredoc?(node.body)
+          body = self.sole_expression(node)
+
+          !self.endless?(node) &&
+            !self.setter?(node.name) &&
+            !body.nil? &&
+            ACCEPTED_BODIES.any?{|klass| body.is_a?(klass)} &&
+            self.single_line?(node, body) &&
+            !self.prism_heredoc?(body)
+        end
+
+        # An endless method is written with `=` rather than a body closed by `end`.
+        def endless?(node)
+          !node.equal_loc.nil?
         end
 
         # The offense is reported either way; the correction is withheld when a comment sits inside the method, since replacing the method would take the comment with it.
         def report(node)
-          if comment?(node)
-            add_offense(node)
+          range = self.prism_node_range(node)
+
+          if self.comment?(node)
+            add_offense(range)
           else
-            add_offense(node) do |corrector|
-              corrector.replace(node, endless_form(node))
+            add_offense(range) do |corrector|
+              corrector.replace(range, self.endless_form(node))
             end
           end
         end
@@ -64,51 +109,45 @@ module RuboCop
         end
 
         # The body on one line, and the signature on one line too, so that the rewritten method is still a single line.
-        def single_line?(node)
-          body = node.body
-
-          body.first_line == body.last_line && !signature_source(node).include?("\n")
+        def single_line?(node, body)
+          body.location.start_line == body.location.end_line &&
+            !self.signature_source(node).include?("\n")
         end
 
         # The source of the signature, e.g. `def build(**fields)`, without the gap before the body.
         def signature_source(node)
           source = processed_source.buffer.source
 
-          source[node.source_range.begin_pos...signature_end(node)]
+          source[node.location.start_offset...self.signature_end(node)]
         end
 
         def signature_end(node)
-          ending = node.loc.name.end_pos
+          ending = node.name_loc.end_offset
 
-          if (arguments = node.arguments) && (range = arguments.source_range)
-            [ending, range.end_pos].max
+          if parameters = node.parameters
+            [ending, parameters.location.end_offset].max
           else
             ending
           end
         end
 
-        # A heredoc's content lives below its opening token, outside `body.source`.
-        def heredoc?(body)
-          body.each_node(:str, :dstr, :xstr).any?(&:heredoc?)
-        end
-
         def comment?(node)
-          processed_source.comments.any? do |comment|
-            (node.first_line..node.last_line).cover?(comment.loc.line)
+          self.prism_comments.any? do |comment|
+            (node.location.start_line..node.location.end_line).cover?(comment.location.start_line)
           end
         end
 
         def endless_form(node)
-          "#{signature(node)} = #{node.body.source}"
+          "#{self.signature(node)} = #{self.prism_source(self.sole_expression(node))}"
         end
 
         def signature(node)
-          "#{receiver_prefix(node)}#{node.method_name}#{arguments_suffix(node)}"
+          "#{self.receiver_prefix(node)}#{node.name}#{self.arguments_suffix(node)}"
         end
 
         def receiver_prefix(node)
           if node.receiver
-            "def #{node.receiver.source}."
+            "def #{self.prism_source(node.receiver)}."
           else
             "def "
           end
@@ -116,14 +155,12 @@ module RuboCop
 
         # Bare arguments are ambiguous before ` = `; parenthesize them.
         def arguments_suffix(node)
-          arguments = node.arguments&.source.to_s
+          parameters = node.parameters
 
-          if arguments.empty?
+          if parameters.nil?
             ""
-          elsif arguments.start_with?("(")
-            arguments
           else
-            "(#{arguments})"
+            "(#{self.prism_source(parameters)})"
           end
         end
       end
