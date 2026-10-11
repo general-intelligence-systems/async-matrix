@@ -45,8 +45,9 @@ describe Async::Matrix::ClientServer::Login do
   end
 
   with "#logout" do
+    # A session which cannot renew, so that the logout is what the next request meets.
     it "invalidates the access token it was called with" do
-      session = self.account("logout-#{SecureRandom.hex(4)}")
+      session = self.account("logout-#{SecureRandom.hex(4)}", refreshable: false)
 
       session.logout
 

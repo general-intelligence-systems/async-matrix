@@ -50,10 +50,15 @@ module Async
 
       # An authenticated client for a user of this name, registering the account where the rig needs asking.
       #
+      # A case which needs the homeserver to reject the token asks for one nothing can replace.
+      #
+      # `logged_in` asks for a refresh token from v1.3, and a homeserver may leave a refreshable access token working after the logout which revoked its refresh token, which leaves such a case with nothing to assert.
+      #
       # @parameter username [String] the localpart to be.
       # @parameter through [Client] the unauthenticated client to log in through.
+      # @parameter refreshable [Boolean] whether the session may renew its own access token.
       # @returns [Client] a client authenticated as that user.
-      def account(username, through: self.unauthenticated)
+      def account(username, through: self.unauthenticated, refreshable: true)
         if Async::Matrix::TEST_ACCOUNTS == "register"
           # One round of user interactive authentication, which is all an open registration asks for. `inhibit_login` leaves the account without a device, so the login below is what makes one, and the login is what every case sees: a case watching its own client watches `through`, not this.
           begin
@@ -66,7 +71,13 @@ module Async
           end
         end
 
-        through.logged_in(username, Async::Matrix::TEST_PASSWORD)
+        if refreshable
+          through.logged_in(username, Async::Matrix::TEST_PASSWORD)
+        else
+          login = through.login(username, Async::Matrix::TEST_PASSWORD)
+
+          through.authenticated(login.access_token)
+        end
       end
 
       # Sync until the cursor is current, so a long poll is woken rather than returning at once.
