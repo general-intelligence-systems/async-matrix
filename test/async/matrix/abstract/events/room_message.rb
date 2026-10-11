@@ -51,7 +51,7 @@ module Async
             module V1_10
               def self.included(base)
                 base.it "reads the caption fields the media messages gained" do
-                  image = client.api::ImageMessage.new({msgtype: "m.image", body: "cat.png", filename: "cat.png", format: "org.matrix.custom.html", formatted_body: "<b>cat</b>"})
+                  image = Async::Matrix::Events[Async::Matrix::TEST_VERSION]::ImageMessage.new({msgtype: "m.image", body: "cat.png", filename: "cat.png", format: "org.matrix.custom.html", formatted_body: "<b>cat</b>"})
 
                   expect(image.filename).to be == "cat.png"
                   expect(image.format).to be == "org.matrix.custom.html"

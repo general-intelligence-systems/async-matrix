@@ -59,7 +59,7 @@ module Async
             module V1_8
               def self.included(base)
                 base.it "reads the redacts field v1.8 moved into the content" do
-                  redaction = client.api::RoomRedaction.new({redacts: "$event:localhost", reason: "spam"})
+                  redaction = Async::Matrix::Events[Async::Matrix::TEST_VERSION]::RoomRedaction.new({redacts: "$event:localhost", reason: "spam"})
 
                   expect(redaction.redacts).to be == "$event:localhost"
                 end

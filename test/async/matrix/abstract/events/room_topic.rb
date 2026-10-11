@@ -32,7 +32,7 @@ module Async
               def self.included(base)
                 # `bare: false` keeps the plain `topic` accessor on the base class untouched, so the reader for the extensible field is named `m_topic` instead.
                 base.it "reads the extensible topic v1.15 added" do
-                  topic = client.api::RoomTopic.new({topic: "Testing", "m.topic": {"m.text": [{body: "Testing", mimetype: "text/plain"}]}})
+                  topic = Async::Matrix::Events[Async::Matrix::TEST_VERSION]::RoomTopic.new({topic: "Testing", "m.topic": {"m.text": [{body: "Testing", mimetype: "text/plain"}]}})
 
                   expect(topic.m_topic).to be == {"m.text": [{body: "Testing", mimetype: "text/plain"}]}
                 end

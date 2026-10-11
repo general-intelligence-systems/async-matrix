@@ -64,7 +64,7 @@ jobs:
         echo "matrix=$(jq -R -s -c 'split("\n") | map(select(length > 0))' < MATRIX_API_VERSIONS.txt)" >> "$GITHUB_OUTPUT"
 
   test:
-    name: tuwunel suite / ${{matrix.version}}
+    name: tuwunel suite, spec ${{matrix.version}}
     needs: versions
     runs-on: ubuntu-latest
 
@@ -93,6 +93,6 @@ jobs:
         IMAGE_OWNER: ${{github.repository_owner}}
       run: bin/test --backend tuwunel ${{matrix.version}}
 
-    - name: Tuwunel logs for ${{matrix.version}}
+    - name: Tuwunel logs for spec ${{matrix.version}}
       if: failure()
       run: docker compose --file tuwunel/docker-compose.yml logs --no-color | tail -100

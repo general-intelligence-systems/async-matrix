@@ -27,7 +27,7 @@ module Async
             module V1_16
               def self.included(base)
                 base.it "reads the additional creators v1.16 added" do
-                  create = client.api::RoomCreate.new({creator: "@alice:localhost", additional_creators: ["@bob:localhost"]})
+                  create = Async::Matrix::Events[Async::Matrix::TEST_VERSION]::RoomCreate.new({creator: "@alice:localhost", additional_creators: ["@bob:localhost"]})
 
                   expect(create.additional_creators).to be == ["@bob:localhost"]
                 end
@@ -90,7 +90,7 @@ module Async
             module V1_2
               def self.included(base)
                 base.it "reads the room type v1.2 added" do
-                  create = client.api::RoomCreate.new({creator: "@alice:localhost", type: "m.space"})
+                  create = Async::Matrix::Events[Async::Matrix::TEST_VERSION]::RoomCreate.new({creator: "@alice:localhost", type: "m.space"})
 
                   expect(create.room_type).to be == "m.space"
                 end

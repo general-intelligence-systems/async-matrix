@@ -83,7 +83,7 @@ module Async
             module V1_2
               def self.included(base)
                 base.it "reads the allow rules v1.2 added" do
-                  join_rules = client.api::RoomJoinRules.new({join_rule: "restricted", allow: [{type: "m.room_membership", room_id: "!room:localhost"}]})
+                  join_rules = Async::Matrix::Events[Async::Matrix::TEST_VERSION]::RoomJoinRules.new({join_rule: "restricted", allow: [{type: "m.room_membership", room_id: "!room:localhost"}]})
 
                   expect(join_rules.allow).to be == [{type: "m.room_membership", room_id: "!room:localhost"}]
                 end

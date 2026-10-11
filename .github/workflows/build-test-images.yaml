@@ -78,7 +78,7 @@ jobs:
         echo "matrix=$(echo "$selected" | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
 
   build:
-    name: Synapse image for ${{matrix.version}}
+    name: Synapse image for spec ${{matrix.version}}
     needs: versions
     runs-on: ubuntu-latest
     
@@ -102,7 +102,7 @@ jobs:
         password: ${{secrets.GITHUB_TOKEN}}
     
     # The develop versions build Synapse from source, which compiles Rust - give them room:
-    - name: Build and push the Synapse image for ${{matrix.version}}
+    - name: Build and push the Synapse image for spec ${{matrix.version}}
       timeout-minutes: 60
       working-directory: synapse
       env:

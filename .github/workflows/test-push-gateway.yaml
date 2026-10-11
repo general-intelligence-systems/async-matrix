@@ -47,7 +47,7 @@ jobs:
         echo "matrix=$(jq -R -s -c 'split("\n") | map(select(length > 0))' < MATRIX_API_VERSIONS.txt)" >> "$GITHUB_OUTPUT"
 
   test:
-    name: push-gateway operations ${{matrix.version}}
+    name: push-gateway operations, spec ${{matrix.version}}
     needs: versions
     runs-on: ubuntu-latest
     
