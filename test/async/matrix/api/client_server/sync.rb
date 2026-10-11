@@ -10,6 +10,26 @@ require "async/matrix/operations_context"
 
 require_relative "../../abstract/api/client_server/sync"
 
+# Counts the sync requests which reached the homeserver, and forwards each one.
+class CountingDelegate < Protocol::HTTP::Middleware
+  def initialize(delegate)
+    super(delegate)
+
+    @syncs = 0
+  end
+
+  # @attribute [Integer] how many sync requests arrived.
+  attr :syncs
+
+  def call(request)
+    if request.path.include?("/sync")
+      @syncs += 1
+    end
+
+    super
+  end
+end
+
 describe Async::Matrix::ClientServer::Sync do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -63,6 +83,51 @@ describe Async::Matrix::ClientServer::Sync do
 
       # The content is typed by the registry for this client's version, not by the unversioned classes:
       expect(messages.first.content.version).to be == Async::Matrix::TEST_VERSION
+    end
+  end
+
+  with "#each" do
+    let(:counter) {CountingDelegate.new(unauthenticated.delegate)}
+
+    let(:counted) {Async::Matrix::ClientServer::Client[Async::Matrix::TEST_VERSION].new(counter, unauthenticated.reference).logged_in(username, Async::Matrix::TEST_PASSWORD)}
+
+    # Logging out invalidates the token, so the homeserver itself fails the next long poll.
+    def interrupted
+      counted.sync(timeout: 0).tap do
+        counted.logout
+      end
+    end
+
+    # The default is what the loop has always done, so nothing changes for a caller which asks for nothing.
+    it "ends the loop on a failure it was not told to retry" do
+      sync = interrupted
+      requests = counter.syncs
+      batches = 0
+      error = nil
+
+      begin
+        sync.each(timeout: 0){batches += 1}
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(batches).to be == 1
+      expect(counter.syncs - requests).to be == 1
+      expect(error.status).to be == 401
+    end
+
+    it "asks again as many times as it was told to, and then gives up" do
+      sync = interrupted
+      requests = counter.syncs
+      error = nil
+
+      begin
+        sync.each(retries: 2, backoff: 0, timeout: 0){nil}
+      rescue Async::Matrix::RequestError => error
+      end
+
+      # The batch which failed is asked for once, and then twice more:
+      expect(counter.syncs - requests).to be == 3
+      expect(error.status).to be == 401
     end
   end
 

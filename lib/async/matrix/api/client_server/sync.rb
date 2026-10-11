@@ -3,6 +3,8 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "console"
+
 require_relative "../../events"
 require_relative "../../paths"
 require_relative "../../representation"
@@ -138,18 +140,37 @@ module Async
 
         # Sync repeatedly, yielding each batch as it arrives. This does not return.
         #
+        # Resuming after a failure costs nothing: the batch which failed to arrive leaves this one holding the cursor.
+        #
+        # @parameter retries [Integer] how many times to ask again before giving up.
+        # @parameter backoff [Numeric] how long to wait before the first retry, doubling after each.
         # @yields {|sync| ...}
         #   @parameter sync [Sync] the batch.
-        def each(**options)
+        def each(retries: 0, backoff: 0.5, **options)
           if block_given?
             sync = self
+            attempts = 0
+
             while true
               yield sync
 
-              sync = sync.following(**options)
+              begin
+                sync = sync.following(**options)
+                attempts = 0
+              rescue => error
+                attempts += 1
+
+                if attempts > retries
+                  raise
+                end
+
+                Console.warn(self, "Sync was interrupted; resuming.", since: sync.next_batch, attempt: attempts, error: error)
+
+                sleep(backoff * (2 ** (attempts - 1)))
+              end
             end
           else
-            to_enum(:each, **options)
+            to_enum(:each, retries: retries, backoff: backoff, **options)
           end
         end
       end
