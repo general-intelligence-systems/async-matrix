@@ -121,6 +121,13 @@ module Async
           end
         end
 
+        # What the homeserver will let this user do.
+        #
+        # @returns [Capabilities] the capabilities.
+        def get_capabilities
+          api::Capabilities.get(self.with(path: "#{V3}/capabilities"))
+        end
+
         # @returns [Representation] the specification versions supported by the homeserver.
         def versions
           api::Representation.get(self.with(path: "/_matrix/client/versions"))
