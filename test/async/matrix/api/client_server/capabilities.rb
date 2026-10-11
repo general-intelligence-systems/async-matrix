@@ -15,6 +15,37 @@ describe Async::Matrix::ClientServer::Capabilities do
   # The cases for the operation itself, layered by the version which introduced each capability:
   include Async::Matrix::Testing::Abstract::ClientServer::Capabilities::CASES
 
+  with "the version it was built for" do
+    def readers(version)
+      Async::Matrix::ClientServer::Client[version].api::Capabilities.instance_methods
+    end
+
+    # The schemas say which version describes which capability, so a client built for an older one has no reader for one that version never named.
+    it "gains the account readers at v1.12" do
+      expect(readers("v1.11")).not.to be(:include?, :set_displayname?)
+      expect(readers("v1.11")).not.to be(:include?, :third_party_identifier_changes?)
+      expect(readers("v1.12")).to be(:include?, :set_displayname?)
+      expect(readers("v1.12")).to be(:include?, :third_party_identifier_changes?)
+    end
+
+    it "gains the profile field readers at v1.16" do
+      expect(readers("v1.15")).not.to be(:include?, :profile_fields?)
+      expect(readers("v1.16")).to be(:include?, :profile_fields?)
+    end
+
+    it "gains the moderation readers at v1.18" do
+      expect(readers("v1.17")).not.to be(:include?, :suspend_accounts?)
+      expect(readers("v1.18")).to be(:include?, :suspend_accounts?)
+      expect(readers("v1.18")).to be(:include?, :forget_forced_upon_leave?)
+    end
+
+    # The capabilities have been an open map since v1.1, so reading one by name needs no version.
+    it "reads a capability by name at every version" do
+      expect(readers("v1.1")).to be(:include?, :enabled?)
+      expect(readers("v1.1")).to be(:include?, :change_password?)
+    end
+  end
+
   with "#[]" do
     it "answers what the homeserver said about a capability" do
       expect(client.get_capabilities["m.change_password"]).to be == {enabled: true}
