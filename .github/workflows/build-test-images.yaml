@@ -51,8 +51,10 @@ jobs:
         
         requested="${{github.event.inputs.versions}}"
         
+        # The flake also exports the sydent and sygnal images, which are not specification
+        # versions - select only the "v1.N" attributes before sorting them numerically.
         defined=$(nix eval --json '.#packages.x86_64-linux' --apply builtins.attrNames \
-          | jq -r 'sort_by(.[3:] | tonumber) | .[]')
+          | jq -r 'map(select(test("^v1\\.[0-9]+$"))) | sort_by(.[3:] | tonumber) | .[]')
         
         if [ -z "$defined" ]; then
           echo "::error::The flake defined no versions."

@@ -14,6 +14,15 @@ on:
 permissions:
   contents: read
 
+# Without the lint group: the suite does not lint, and the cops need Ruby 4, so installing them
+# would fail the older Rubies before a test could run. See the Gemfile.
+#
+# At the workflow level, rather than on the setup-ruby step which installs them: BUNDLE_WITHOUT is
+# read from the environment and is not written to .bundle/config, so a step which does not see it
+# makes `bundle exec` demand the lint gems the install skipped, and Bundler fails with GemNotFound.
+env:
+  BUNDLE_WITHOUT: lint
+
 concurrency:
   group: ${{github.workflow}}-server-server-${{github.ref}}
   cancel-in-progress: true
@@ -50,13 +59,10 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     
-    # Without the lint group: the suite does not lint, and the cops need Ruby 4. See the Gemfile.
     - uses: ruby/setup-ruby@v1
       with:
         ruby-version: "3.4"
         bundler-cache: true
-      env:
-        BUNDLE_WITHOUT: lint
     
     - name: Test
       timeout-minutes: 10
