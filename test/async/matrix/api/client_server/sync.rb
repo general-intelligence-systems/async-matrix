@@ -60,6 +60,9 @@ describe Async::Matrix::ClientServer::Sync do
       messages = sync.each_message.select{|message| message.room_id == room.id}
 
       expect(messages.map{|message| message.content.body}).to be(:include?, body)
+
+      # The content is typed by the registry for this client's version, not by the unversioned classes:
+      expect(messages.first.content.version).to be == Async::Matrix::TEST_VERSION
     end
   end
 

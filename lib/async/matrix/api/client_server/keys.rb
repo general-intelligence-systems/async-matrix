@@ -191,10 +191,6 @@ module Async
         def upload_payload(payload)
           api::UploadedKeys.post(@resource.with(path: "#{V3}/keys/upload"), payload)
         end
-
-        def close
-          @resource.close
-        end
       end
     end
   end

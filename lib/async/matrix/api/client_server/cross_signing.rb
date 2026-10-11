@@ -75,10 +75,6 @@ module Async
         def upload_cross_signing_signatures(signatures)
           api::UploadedSignatures.post(@resource.with(path: "#{V3}/keys/signatures/upload"), signatures)
         end
-
-        def close
-          @resource.close
-        end
       end
     end
   end

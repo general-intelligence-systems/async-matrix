@@ -227,10 +227,6 @@ module Async
           api::KeyBackupUpdate.delete(self.keys(room_id, session_id))
         end
 
-        def close
-          @resource.close
-        end
-
         private
 
         # The resource of the keys, narrowed to a room and a session when they are given.
@@ -323,10 +319,6 @@ module Async
         # @returns [BackupKeys] the keys held in that version.
         def keys(version)
           api::BackupKeys.for(@resource, version)
-        end
-
-        def close
-          @resource.close
         end
 
         private

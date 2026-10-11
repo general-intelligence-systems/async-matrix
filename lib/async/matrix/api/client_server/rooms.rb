@@ -7,6 +7,7 @@ require "securerandom"
 
 require "protocol/url/encoding"
 
+require_relative "../../events"
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "../../versioned"

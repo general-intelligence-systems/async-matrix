@@ -138,10 +138,6 @@ module Async
           api::Representation.post(@resource.with(path: "#{V3}/delete_devices"), payload)
         end
 
-        def close
-          @resource.close
-        end
-
         private
 
         # @parameter device_id [String] the device.

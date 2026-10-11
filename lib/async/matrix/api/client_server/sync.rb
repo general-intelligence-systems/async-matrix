@@ -3,6 +3,7 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require_relative "../../events"
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "rooms"
@@ -91,12 +92,14 @@ module Async
         #   @parameter event [Events::Envelope] the event, which names the room it came from.
         def each_event
           if block_given?
+            registry = Events.registry(self.version)
+
             self.joined.each do |room_id, room|
               events = room.dig(:timeline, :events) or next
 
               events.each do |event|
                 # `/sync` groups events by room rather than naming the room on each one, so the envelope is told which room it came from:
-                yield self.events.wrap(event, room_id: room_id.to_s)
+                yield registry.wrap(event, room_id: room_id.to_s)
               end
             end
           else
