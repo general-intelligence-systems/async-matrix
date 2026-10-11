@@ -115,13 +115,13 @@ module Async
 
                 base.it "can logout" do
                   # A fresh session, so logging out does not invalidate the one the suite shares:
-                  session = unauthenticated.logged_in("logout-#{SecureRandom.hex(4)}", Async::Matrix::TEST_PASSWORD)
+                  session = self.account("logout-#{SecureRandom.hex(4)}")
 
                   expect(session.logout.value).to be_a(Hash)
                 end
 
                 base.it "can logout_all" do
-                  session = unauthenticated.logged_in("logout-all-#{SecureRandom.hex(4)}", Async::Matrix::TEST_PASSWORD)
+                  session = self.account("logout-all-#{SecureRandom.hex(4)}")
 
                   expect(session.logout_all.value).to be_a(Hash)
                 end

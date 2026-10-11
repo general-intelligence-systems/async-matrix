@@ -20,6 +20,14 @@ module Async
     # The specification version under test. `bin/test` runs the suite once per version, against a server which implements that version. Deliberately not `VERSION`, which is the gem's own.
     TEST_VERSION = ENV.fetch("MATRIX_VERSION", LATEST)
 
+    # The homeserver implementation under test, which is the name of the directory its rig lives in.
+    TEST_BACKEND = ENV.fetch("MATRIX_BACKEND", "synapse")
+
+    # How the suite gets an account, which is the one thing the two rigs cannot do the same way.
+    #
+    # `login` is the `synapse/` rig, whose module registers a user on first login, so logging in is enough and registration stays closed. `register` is the `tuwunel/` rig: tuwunel has no way to accept any password, so that rig opens registration instead and the account is registered before it is logged into. `bin/test` sets this from the backend.
+    TEST_ACCOUNTS = ENV.fetch("MATRIX_ACCOUNTS", "login")
+
     TEST_PASSWORD = "password"
 
     TEST_ROOM_NAME = "Test Room"
@@ -36,9 +44,30 @@ module Async
 
       let(:user_id) {"@#{self.username}:localhost"}
 
-      let(:client) {unauthenticated.logged_in(self.username, Async::Matrix::TEST_PASSWORD)}
+      let(:client) {self.account(self.username)}
 
       let(:room) {client.create_room(name: Async::Matrix::TEST_ROOM_NAME, topic: Async::Matrix::TEST_ROOM_TOPIC)}
+
+      # An authenticated client for a user of this name, registering the account where the rig needs asking.
+      #
+      # @parameter username [String] the localpart to be.
+      # @parameter through [Client] the unauthenticated client to log in through.
+      # @returns [Client] a client authenticated as that user.
+      def account(username, through: self.unauthenticated)
+        if Async::Matrix::TEST_ACCOUNTS == "register"
+          # One round of user interactive authentication, which is all an open registration asks for. `inhibit_login` leaves the account without a device, so the login below is what makes one, and the login is what every case sees: a case watching its own client watches `through`, not this.
+          begin
+            unauthenticated.registration.register(username: username, password: Async::Matrix::TEST_PASSWORD, auth: {type: "m.login.dummy"}, inhibit_login: true)
+          rescue Async::Matrix::RequestError => error
+            # A case which asks for the same user twice wants a second device on the one account, not a second account, which is how the rig that registers on first login behaves too.
+            unless error.errcode == "M_USER_IN_USE"
+              raise
+            end
+          end
+        end
+
+        through.logged_in(username, Async::Matrix::TEST_PASSWORD)
+      end
 
       # Sync until the cursor is current, so a long poll is woken rather than returning at once.
       #

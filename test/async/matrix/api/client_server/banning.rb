@@ -15,7 +15,7 @@ describe Async::Matrix::ClientServer::Banning do
 
   let(:other_id) {"@#{self.other_username}:localhost"}
 
-  let(:other) {unauthenticated.logged_in(self.other_username, Async::Matrix::TEST_PASSWORD)}
+  let(:other) {self.account(self.other_username)}
 
   # The operations are in every version, so the methods are on the class rather than in a layer.
   it "can ban" do

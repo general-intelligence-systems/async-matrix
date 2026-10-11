@@ -15,7 +15,7 @@ describe Async::Matrix::ClientServer::Kicking do
 
   let(:other_id) {"@#{self.other_username}:localhost"}
 
-  let(:other) {unauthenticated.logged_in(self.other_username, Async::Matrix::TEST_PASSWORD)}
+  let(:other) {self.account(self.other_username)}
 
   # The operation is in every version, so the method is on the class rather than in a layer.
   it "can kick" do

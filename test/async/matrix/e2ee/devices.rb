@@ -41,7 +41,7 @@ describe Async::Matrix::E2EE::Devices do
 
     it "answers every device the other user has published" do
       other_machine.publish!
-      second = unauthenticated.logged_in(other_username, Async::Matrix::TEST_PASSWORD)
+      second = self.account(other_username)
       Async::Matrix::E2EE::Machine.new(second).publish!
 
       expect(devices.of(other_user_id).map(&:device_id).sort).to be == [other_device_id, second.get_token_owner.device_id].sort
@@ -104,7 +104,7 @@ describe Async::Matrix::E2EE::Devices do
 
       # The cursor has to predate the change, or there is nothing for the server to report it against:
       since = current_sync
-      unauthenticated.logged_in(other_username, Async::Matrix::TEST_PASSWORD)
+      self.account(other_username)
 
       sync = sync_after(since){|batch| batch.changed_devices.include?(other_user_id)}
 

@@ -23,7 +23,7 @@ module Async
 
       let(:other_username) {"other-#{SecureRandom.hex(6)}"}
 
-      let(:other) {unauthenticated.logged_in(other_username, Async::Matrix::TEST_PASSWORD)}
+      let(:other) {self.account(other_username)}
 
       let(:other_user_id) {"@#{other_username}:localhost"}
 

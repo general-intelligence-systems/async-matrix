@@ -1,0 +1,119 @@
+# The test rig: one service per Matrix specification version, each running the tuwunel which
+# implements that version. The images are published by flake.nix in this directory.
+#
+#   docker compose up --detach --wait v1.11
+#
+# Only one runs at a time - they all bind the same port - so bin/test brings each up in turn. The
+# service name is the specification version, so starting the right server is just naming it.
+#
+# Every version mounts the same tuwunel.toml, where synapse/docker-compose.yml needs one
+# homeserver.<version>.yaml per service: an older Synapse rejects settings a newer one accepts,
+# which is not true of the tuwunel releases the rig can run. The services are otherwise identical,
+# and exist one per version so that flake.nix can pin a version to its own release.
+#
+# MATRIX_API_VERSIONS.txt is generated from synapse/docker-compose.yml, and Update Matrix Versions
+# List checks that this file offers the same services, so that `bin/test <version>` means the same
+# thing whichever backend it is pointed at.
+
+# A fixed project name, so that `docker compose down` finds the rig whatever directory it is run
+# from. It is not the project name the Synapse rig uses: with one name between them, `docker
+# compose ps` here would report that rig's containers as this one's, since the service names are
+# the same. They do both bind the same port, so only one rig can be up at a time, and `bin/test`
+# takes its own down on the way out.
+name: async-matrix-tuwunel
+
+x-tuwunel: &tuwunel
+  environment:
+    TUWUNEL_CONFIG: /config/tuwunel.toml
+  ports:
+    - "${TUWUNEL_PORT:-8008}:8008"
+  volumes:
+    - ./tuwunel.toml:/config/tuwunel.toml:ro
+  # The image ships this probe, and the rig only overrides how often it is asked: upstream polls
+  # every 30 seconds inside a 30 minute start period, which is sized for a database migration on a
+  # real deployment, where `docker compose up --wait` here is waiting on an empty database and a
+  # server which answers in a few seconds. The image is distroless - it carries the one binary, and
+  # no shell and no curl - so the probe is the binary's own, in exec form.
+  healthcheck:
+    test: ["CMD", "tuwunel", "--health-check"]
+    interval: 2s
+    timeout: 5s
+    start_period: 10s
+    retries: 30
+
+services:
+  v1.1:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.1
+
+  v1.2:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.2
+
+  v1.3:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.3
+
+  v1.4:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.4
+
+  v1.5:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.5
+
+  v1.6:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.6
+
+  v1.7:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.7
+
+  v1.8:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.8
+
+  v1.9:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.9
+
+  v1.10:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.10
+
+  v1.11:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.11
+
+  v1.12:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.12
+
+  v1.13:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.13
+
+  v1.14:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.14
+
+  v1.15:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.15
+
+  v1.16:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.16
+
+  v1.17:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.17
+
+  v1.18:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.18
+
+  v1.19:
+    <<: *tuwunel
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/tuwunel:spec-v1.19

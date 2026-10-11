@@ -33,6 +33,26 @@ describe Async::Matrix::ClientServer::Client do
   # The cases for the operations themselves, layered by the version which introduced each:
   include Async::Matrix::Testing::Abstract::ClientServer::Client::CASES
 
+  with ".login_token_from" do
+    it "takes the token out of a redirect URL" do
+      expect(subject.login_token_from("http://127.0.0.1:9999/cb?loginToken=abc123")).to be == "abc123"
+    end
+
+    it "ignores a fragment the server appended" do
+      expect(subject.login_token_from("http://127.0.0.1:9999/cb?loginToken=abc123#")).to be == "abc123"
+    end
+
+    it "takes the token out of a bare query string" do
+      expect(subject.login_token_from("?loginToken=abc123")).to be == "abc123"
+    end
+
+    it "refuses a redirect which carried no token" do
+      expect do
+        subject.login_token_from("http://127.0.0.1:9999/cb?error=denied")
+      end.to raise_exception(Async::Matrix::RequestError)
+    end
+  end
+
   with "#versions" do
     it "can be read without authentication" do
       versions = unauthenticated.versions.value[:versions]
@@ -94,7 +114,7 @@ describe Async::Matrix::ClientServer::Client do
     end
 
     it "is sent alongside the authorization once authenticated" do
-      recording.logged_in(username, Async::Matrix::TEST_PASSWORD).get_token_owner.user_id
+      self.account(username, through: recording).get_token_owner.user_id
 
       sent = recorder.sent.last
 
@@ -104,7 +124,7 @@ describe Async::Matrix::ClientServer::Client do
 
     # A resource derived for a room or a representation must not lose it.
     it "is sent on a request made through a derived resource" do
-      client = recording.logged_in(username, Async::Matrix::TEST_PASSWORD)
+      client = self.account(username, through: recording)
       room = client.create_room(name: "User agent")
 
       room.get_room_state.to_a

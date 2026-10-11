@@ -3,6 +3,8 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "securerandom"
+
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
@@ -17,27 +19,39 @@ describe Async::Matrix::ClientServer::Registration do
 
   # These four are in every version, so they are on the class rather than in a layer.
   #
-  # The rig sets `enable_registration: false` and registers a user on first login instead, so the homeserver refuses to register one here. The refusal is what the case has to read: the request is the one the specification describes, and it reached the homeserver.
+  # Whether the homeserver will register an account is the rig's to decide, and the two rigs decide it differently: the `synapse/` one sets `enable_registration: false` and registers a user on first login instead, where the `tuwunel/` one has to leave registration open, because tuwunel cannot be made to accept any password. So the case reads the answer the rig under test gives. Either answer says the same thing about the operation: the request is the one the specification describes, and it reached the homeserver.
+  let(:nobody) {"nobody-#{SecureRandom.hex(6)}"}
+
   it "can register" do
-    error = nil
+    if Async::Matrix::TEST_ACCOUNTS == "register"
+      login = registration.register(username: nobody, password: Async::Matrix::TEST_PASSWORD, auth: {type: "m.login.dummy"})
 
-    begin
-      registration.register(username: "nobody", password: Async::Matrix::TEST_PASSWORD, auth: {type: "m.login.dummy"})
-    rescue Async::Matrix::RequestError => error
+      expect(login.user_id).to be == "@#{nobody}:localhost"
+    else
+      error = nil
+
+      begin
+        registration.register(username: nobody, password: Async::Matrix::TEST_PASSWORD, auth: {type: "m.login.dummy"})
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(error.errcode).to be == "M_FORBIDDEN"
     end
-
-    expect(error.errcode).to be == "M_FORBIDDEN"
   end
 
   it "can checkUsernameAvailability" do
-    error = nil
+    if Async::Matrix::TEST_ACCOUNTS == "register"
+      expect(registration.check_username_availability(nobody)).to be(:available?)
+    else
+      error = nil
 
-    begin
-      registration.check_username_availability("nobody")
-    rescue Async::Matrix::RequestError => error
+      begin
+        registration.check_username_availability(nobody)
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(error.errcode).to be == "M_FORBIDDEN"
     end
-
-    expect(error.errcode).to be == "M_FORBIDDEN"
   end
 
   # Mail is off in the rig, so the homeserver will not start a validation.

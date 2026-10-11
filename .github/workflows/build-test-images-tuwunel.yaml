@@ -1,0 +1,110 @@
+name: Build Test Images (Tuwunel)
+
+# Publishes one tuwunel image per Matrix specification version to GHCR, so that bin/test can run
+# the suite for a version against a tuwunel which implements it.
+#
+# The images are defined by tuwunel/flake.nix, which is the single source of truth for which
+# tuwunel release each specification version maps onto. This workflow only runs it.
+#
+# Where Build Test Images fans out over versions, this does them in one job. Upstream publishes an
+# image for every tuwunel release, so a version here is a pull and a retag rather than a build -
+# and one tuwunel release advertises the whole range the rig covers, so the versions name the same
+# release and the pull happens once. The loop still asks the flake per version, so pinning one of
+# them to a different release needs no change here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: "Space separated versions to build, or 'all'."
+        required: false
+        default: "all"
+  push:
+    paths:
+      - tuwunel/flake.nix
+      - tuwunel/flake.lock
+      - .github/workflows/build-test-images-tuwunel.yaml
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-test-images-tuwunel-${{github.ref}}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and push
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - uses: DeterminateSystems/nix-installer-action@main
+
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{github.actor}}
+        password: ${{secrets.GITHUB_TOKEN}}
+
+    # Asks the flake which versions it defines, rather than repeating them here. This evaluates the
+    # attribute directly rather than using `nix flake show --json`, whose top-level shape is not the
+    # same across Nix builds: on the runner it returned no `packages` key at all, and jq failed with
+    # "null (null) has no keys".
+    - id: resolve
+      name: Resolve versions from the flake
+      working-directory: tuwunel
+      run: |
+        set -o pipefail
+
+        requested="${{github.event.inputs.versions}}"
+
+        defined=$(nix eval --json '.#packages.x86_64-linux' --apply builtins.attrNames \
+          | jq -r 'sort_by(.[3:] | tonumber) | .[]')
+
+        if [ -z "$defined" ]; then
+          echo "::error::The flake defined no versions."
+          exit 1
+        fi
+
+        if [ -z "$requested" ] || [ "$requested" = "all" ]; then
+          selected="$defined"
+        else
+          selected=""
+          for version in $requested; do
+            if echo "$defined" | grep -qx "$version"; then
+              selected="$selected$version"$'\n'
+            else
+              echo "::error::Unknown version $version. The flake defines:"; echo "$defined"
+              exit 1
+            fi
+          done
+        fi
+
+        echo "versions=$(echo "$selected" | paste --serial --delimiters=' ')" >> "$GITHUB_OUTPUT"
+
+    - name: Build and push
+      timeout-minutes: 30
+      working-directory: tuwunel
+      env:
+        IMAGE_REPOSITORY: ghcr.io/${{github.repository_owner}}/tuwunel
+        PUSH: "1"
+        VERSIONS: ${{steps.resolve.outputs.versions}}
+      run: |
+        for version in $VERSIONS; do
+          nix run ".#\"$version\""
+        done
+
+    - name: Report
+      env:
+        VERSIONS: ${{steps.resolve.outputs.versions}}
+      run: |
+        {
+          echo "### Published"
+          echo
+          for version in $VERSIONS; do
+            echo "- \`ghcr.io/${{github.repository_owner}}/tuwunel:spec-$version\`"
+          done
+        } >> "$GITHUB_STEP_SUMMARY"

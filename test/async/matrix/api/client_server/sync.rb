@@ -89,7 +89,7 @@ describe Async::Matrix::ClientServer::Sync do
   with "#each" do
     let(:counter) {CountingDelegate.new(unauthenticated.delegate)}
 
-    let(:counted) {Async::Matrix::ClientServer::Client[Async::Matrix::TEST_VERSION].new(counter, unauthenticated.reference).logged_in(username, Async::Matrix::TEST_PASSWORD)}
+    let(:counted) {self.account(username, through: Async::Matrix::ClientServer::Client[Async::Matrix::TEST_VERSION].new(counter, unauthenticated.reference))}
 
     # Logging out invalidates the token, so the homeserver itself fails the next long poll.
     def interrupted

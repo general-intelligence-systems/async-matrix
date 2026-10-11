@@ -46,7 +46,7 @@ describe Async::Matrix::ClientServer::Login do
 
   with "#logout" do
     it "invalidates the access token it was called with" do
-      session = unauthenticated.logged_in("logout-#{SecureRandom.hex(4)}", Async::Matrix::TEST_PASSWORD)
+      session = self.account("logout-#{SecureRandom.hex(4)}")
 
       session.logout
 

@@ -106,7 +106,7 @@ describe Async::Matrix::ClientServer::Room do
 
   with "a second user" do
     let(:other_username) {"other-#{SecureRandom.hex(6)}"}
-    let(:other) {unauthenticated.logged_in(other_username, Async::Matrix::TEST_PASSWORD)}
+    let(:other) {self.account(other_username)}
 
     it "can join and leave a public room" do
       public_room = client.create_room(preset: "public_chat")

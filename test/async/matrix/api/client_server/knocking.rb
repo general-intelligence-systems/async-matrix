@@ -15,7 +15,7 @@ describe Async::Matrix::ClientServer::Knocking do
     client.create_room(name: Async::Matrix::TEST_ROOM_NAME, initial_state: [{type: "m.room.join_rules", state_key: "", content: {join_rule: "knock"}}])
   end
 
-  let(:knocker) {unauthenticated.logged_in("other-#{SecureRandom.hex(6)}", Async::Matrix::TEST_PASSWORD)}
+  let(:knocker) {self.account("other-#{SecureRandom.hex(6)}")}
 
   # The operation is in every version, so the method is on the class rather than in a layer.
   it "can knockRoom" do

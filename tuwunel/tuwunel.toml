@@ -1,0 +1,56 @@
+# Tuwunel configuration for the test rig.
+#
+# There is one file for every Matrix specification version, where `synapse/` needs one per version.
+# That is not an omission: Synapse rejects settings a newer release accepts, so its configuration
+# has to be versioned alongside the server, whereas every tuwunel release the rig can run accepts
+# the settings below and supports room versions 6 to 12, so one file serves all of them.
+#
+# This is a throwaway local rig with nothing in it worth protecting. Never point it at a reachable
+# interface.
+
+[global]
+
+server_name = "localhost"
+
+# The image is distroless and runs as root, and nothing is mounted over /database, so the database
+# lives in the container's own filesystem and goes away with it. Each `docker compose up` after a
+# `down` therefore starts on an empty database, which is what the suite wants.
+database_path = "/database"
+
+address = "0.0.0.0"
+port = 8008
+
+# Open registration, which is how the suite gets an account.
+#
+# Tuwunel has no equivalent of the Synapse rig's register-on-first-login module - there is no way to
+# make it accept any password - so the account is registered before it is logged into, and
+# registration has to be open for that to work. `bin/test` tells the suite which of the two it is
+# talking to, through MATRIX_ACCOUNTS.
+allow_registration = true
+yes_i_am_very_very_sure_i_want_an_open_registration_server_prone_to_abuse = true
+
+# The first user to register would otherwise be joined to the admin room and given admin
+# privileges. Every test registers its own user, so that would single out whichever test ran first
+# and make it behave unlike the rest.
+grant_admin_to_first_user = false
+create_admin_room = false
+admin_room_notices = false
+
+# Nothing federates, so there is nowhere to reach and no key server to ask.
+allow_federation = false
+trusted_servers = []
+query_trusted_key_servers_first = false
+
+# Tuwunel creates rooms at version 12 by default, where the `synapse/` rig pins 11, so a room made
+# by one rig would not be the same kind of room as one made by the other. Pinned to match, so that
+# a difference between the two backends is a difference in the server and not in the room.
+default_room_version = "11"
+
+# Rate limiting only makes tests slow and flaky. Tuwunel limits password sign-in and nothing else,
+# on the two axes Synapse calls `rc_login.failed_attempts` and `rc_login.account`; a rate of zero
+# turns a limit off rather than making a bucket which never refills.
+[global.rate_limiting.login.failed]
+per_second = 0
+
+[global.rate_limiting.login.account]
+per_second = 0
