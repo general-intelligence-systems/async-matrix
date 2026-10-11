@@ -3,6 +3,7 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "console"
 require "json"
 
 require_relative "../events"
@@ -73,6 +74,8 @@ module Async
           @crypto.published_one_time_keys!
           @counts = uploaded.one_time_key_counts
 
+          Console.debug(self, "Published keys.", device_id: self.device_id, counts: @counts)
+
           uploaded
         end
 
@@ -113,7 +116,11 @@ module Async
           @devices.receive(sync)
           @counts = sync.one_time_keys_count
 
-          self.each_device_event(sync).each do |event|
+          events = self.each_device_event(sync)
+
+          Console.debug(self, "Received a batch.", events: events.size, changed: sync.changed_devices.size, left: sync.left_devices.size, counts: @counts)
+
+          events.each do |event|
             self.receive_device_event(event)
           end
         end
@@ -160,6 +167,8 @@ module Async
           self.session_for(room_id, rotate: rotate).tap do |session|
             recipients = @devices.recipients(user_ids, except: self.device_id)
 
+            Console.debug(self, "Sharing a session.", room_id: room_id, session_id: session[:session_id], recipients: recipients.size, rotate: rotate)
+
             unless recipients.empty?
               @client.to_device.send_event("m.room_key", self.addressed(recipients, {
                 algorithm: MEGOLM,
@@ -180,6 +189,8 @@ module Async
           session = self.session_for(room_id)
 
           plaintext = CanonicalJSON.dump({type: content.type, room_id: room_id, content: content.to_h})
+
+          Console.debug(self, "Encrypting an event.", room_id: room_id, session_id: session[:session_id], type: content.type)
 
           @events.content("m.room.encrypted", {
             algorithm: MEGOLM,
@@ -202,6 +213,8 @@ module Async
           session_id = content[:session_id]
 
           unless @store.session?(room_id, session_id)
+            Console.debug(self, "Deferred an event, whose session has not arrived.", room_id: room_id, session_id: session_id, withheld: @store.refused(room_id, session_id))
+
             @store.defer(room_id, session_id: session_id, event: event)
 
             nil
@@ -216,7 +229,11 @@ module Async
         # @parameter session_id [String] the session which arrived.
         # @returns [Array(Async::Matrix::Events::Envelope)] what can now be read.
         def release(room_id, session_id)
-          @store.deferred(room_id, session_id).filter_map do |event|
+          deferred = @store.deferred(room_id, session_id)
+
+          Console.debug(self, "Releasing the events which were waiting.", room_id: room_id, session_id: session_id, events: deferred.size)
+
+          deferred.filter_map do |event|
             self.decrypted(event, room_id, session_id)
           end
         end
@@ -236,6 +253,8 @@ module Async
           else
             @crypto.create_outbound_session(room_id).tap do |begun|
               @store.remember(room_id, session_id: begun[:session_id], sender: self.user_id)
+
+              Console.debug(self, "Began a session.", room_id: room_id, session_id: begun[:session_id], rotate: rotate)
             end
           end
         end
@@ -250,7 +269,13 @@ module Async
           when Events::RoomKey
             self.receive_room_key(event.content, event[:sender])
           when Events::RoomKeyWithheld
-            @store.refuse(event.content[:room_id], session_id: event.content[:session_id], code: event.content.code)
+            content = event.content
+
+            Console.debug(self, "A session was withheld.", sender: event[:sender], room_id: content[:room_id], session_id: content[:session_id], code: content.code)
+
+            @store.refuse(content[:room_id], session_id: content[:session_id], code: content.code)
+          else
+            Console.debug(self, "Ignoring a device message which is not about keys.", sender: event[:sender], type: event.type)
           end
         end
 
@@ -259,6 +284,8 @@ module Async
         def receive_room_key(content, sender)
           room_id = content.room_id
           session_id = content.session_id
+
+          Console.debug(self, "Accepting a session.", sender: sender, room_id: room_id, session_id: session_id, algorithm: content.algorithm)
 
           @crypto.create_inbound_session(room_id, session_id: session_id, session_key: content.session_key)
           @store.remember(room_id, session_id: session_id, sender: sender)
@@ -273,6 +300,8 @@ module Async
         def decrypted(event, room_id, session_id)
           plaintext = @crypto.decrypt(room_id, session_id: session_id, ciphertext: event.content[:ciphertext])
           payload = ::JSON.parse(plaintext, symbolize_names: true)
+
+          Console.debug(self, "Read an encrypted event.", room_id: room_id, session_id: session_id, event_id: event[:event_id], type: payload[:type])
 
           @events.wrap(event.to_h.merge(type: payload[:type], content: payload[:content]), room_id: room_id)
         end

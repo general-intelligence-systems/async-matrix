@@ -32,7 +32,7 @@
     version = "0.105.0";
   };
   async-matrix = {
-    dependencies = ["async-rest" "base64"];
+    dependencies = ["async-rest" "base64" "console"];
     groups = ["default"];
     platforms = [];
     source = {

@@ -4,6 +4,7 @@ PATH
     async-matrix (0.1.0)
       async-rest (~> 0.20)
       base64 (~> 0.3)
+      console (~> 1.29)
 
 GEM
   remote: https://rubygems.org/

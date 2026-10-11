@@ -22,4 +22,5 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "async-rest", "~> 0.20"
   spec.add_dependency "base64", "~> 0.3"
+  spec.add_dependency "console", "~> 1.29"
 end

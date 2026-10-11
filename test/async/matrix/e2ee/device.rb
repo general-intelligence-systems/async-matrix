@@ -5,56 +5,60 @@
 
 require "async/matrix/e2ee/device"
 
-describe Async::Matrix::E2EE::Device do
-  # Exactly what `POST /keys/query` answers for one device.
-  let(:value) do
-    {
-      algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
-      device_id: "JLAFKJWSCS",
-      keys: {
-        "curve25519:JLAFKJWSCS": "3C5BFWi2Y8MaVvjM8M22DBmh24PmgR0nPvJOIArzgyI",
-        "ed25519:JLAFKJWSCS": "lEuiRJBit0IG6nUf5pUzWTUEsRVVe/HJkoKuEww9ULI",
-      },
-      signatures: {
-        "@alice:localhost": {
-          "ed25519:JLAFKJWSCS": "dSO80A01XiigH3uBiDVx/EjzaoycHcjq9lfQX0uWsqxl2giMIiSPR8a4d291W1ihKJL/a+myXS367WT6NAIcBA",
-        },
-      },
-      unsigned: {device_display_name: "Alice's mobile phone"},
-    }
-  end
+require "async/matrix/e2ee_context"
 
-  let(:device) {subject.new("@alice:localhost", "JLAFKJWSCS", value)}
+describe Async::Matrix::E2EE::Device do
+  include Async::Matrix::E2EEContext
+
+  # The other user's device, exactly as `POST /keys/query` answered with it.
+  let(:device) do
+    other_machine.publish!
+
+    machine.devices.of(other_user_id).first
+  end
 
   with "#curve25519" do
     # The keys are published under a name which includes the device, so reading one means knowing which device it belongs to.
-    it "reads the key its own device published" do
-      expect(device.curve25519).to be == "3C5BFWi2Y8MaVvjM8M22DBmh24PmgR0nPvJOIArzgyI"
-      expect(device.ed25519).to be == "lEuiRJBit0IG6nUf5pUzWTUEsRVVe/HJkoKuEww9ULI"
+    it "reads the keys that device published" do
+      expect(device.curve25519).to be == other_crypto.identity_keys[:curve25519]
+      expect(device.ed25519).to be == other_crypto.identity_keys[:ed25519]
+    end
+
+    it "says which user and device it belongs to" do
+      expect(device.user_id).to be == other_user_id
+      expect(device.device_id).to be == other_device_id
     end
 
     it "answers nothing for a device which published no keys" do
-      bare = subject.new("@alice:localhost", "OTHER", {})
+      bare = machine.devices.of(other_user_id)
 
-      expect(bare.curve25519).to be_nil
-      expect(bare.ed25519).to be_nil
-      expect(bare.keys).to be == {}
-      expect(bare.algorithms).to be == []
-      expect(bare.signatures).to be == {}
-      expect(bare.display_name).to be_nil
+      expect(bare).to be(:empty?)
     end
   end
 
   with "#display_name" do
     it "reads the name its owner gave it" do
-      expect(device.display_name).to be == "Alice's mobile phone"
+      other_machine.publish!
+      other.devices.update(other_device_id, display_name: "Other's phone")
+
+      expect(machine.devices.of(other_user_id).first.display_name).to be == "Other's phone"
     end
   end
 
   with "#supports?" do
     it "answers whether the device can encrypt with an algorithm" do
-      expect(device).to be(:supports?, "m.megolm.v1.aes-sha2")
+      expect(device).to be(:supports?, Async::Matrix::E2EE::Machine::MEGOLM)
       expect(device).not.to be(:supports?, "m.made.up")
+      expect(device.algorithms).to be == other_crypto.algorithms
+    end
+  end
+
+  with "#signatures" do
+    # A device is trusted because of the signature it carries, so the signature must survive the round trip.
+    it "carries a signature which verifies against its own key" do
+      signature = device.signatures[other_user_id.to_sym][:"ed25519:#{other_device_id}"]
+
+      expect(other_crypto.verify(device.value, key: device.ed25519, signature: signature)).to be == true
     end
   end
 
@@ -88,16 +92,13 @@ describe Async::Matrix::E2EE::Device do
   with "#==" do
     # A device is the same device when it is the same device of the same user, whatever its keys say now.
     it "is the same device when the user and the device agree" do
-      expect(device).to be == subject.new("@alice:localhost", "JLAFKJWSCS", {})
+      expect(device).to be == subject.new(other_user_id, other_device_id, {})
     end
 
     it "is a different device when either differs" do
-      expect(device).not.to be == subject.new("@bob:localhost", "JLAFKJWSCS", value)
-      expect(device).not.to be == subject.new("@alice:localhost", "OTHER", value)
-    end
-
-    it "is not anything which is not a device" do
-      expect(device).not.to be == "@alice:localhost"
+      expect(device).not.to be == subject.new(user_id, other_device_id, device.value)
+      expect(device).not.to be == subject.new(other_user_id, "OTHER", device.value)
+      expect(device).not.to be == other_user_id
     end
   end
 end

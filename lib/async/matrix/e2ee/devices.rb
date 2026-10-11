@@ -3,6 +3,8 @@
 # Released under the MIT License.
 # Copyright, 2026, by Nathan K.
 
+require "console"
+
 require_relative "device"
 
 module Async
@@ -28,6 +30,10 @@ module Async
         # @parameter changed [Array(String)] the users to query again.
         # @parameter left [Array(String)] the users to forget.
         def invalidate(changed: [], left: [])
+          unless changed.empty? and left.empty?
+            Console.debug(self, "Invalidating device lists.", changed: changed, left: left)
+          end
+
           changed.each do |user_id|
             @stale[user_id.to_s] = true
           end
@@ -81,12 +87,16 @@ module Async
         def query(user_ids)
           queried = @client.keys.query(user_ids.each_with_object({}){|user_id, asked| asked[user_id] = []})
 
+          Console.debug(self, "Queried device lists.", user_ids: user_ids, failures: queried.failures.keys)
+
           user_ids.each do |user_id|
             @devices[user_id.to_s] = queried.devices_of(user_id).each_with_object({}) do |(device_id, value), devices|
               devices[device_id.to_s] = Device.new(user_id.to_s, device_id.to_s, value)
             end
 
             @stale.delete(user_id.to_s)
+
+            Console.debug(self, "Read the devices of a user.", user_id: user_id, device_ids: @devices[user_id.to_s].keys)
           end
 
           @devices
