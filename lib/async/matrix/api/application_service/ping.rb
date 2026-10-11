@@ -6,11 +6,14 @@
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/application_service/ping"
 
 module Async
   module Matrix
     module ApplicationService
       # Whether an application service is answering.
+      #
+      # The endpoint arrived in v1.7, so the operation is answered by that layer.
       class Ping
         include Versioned
 
@@ -27,16 +30,6 @@ module Async
 
         # @attribute [Async::REST::Resource] the resource requests are made against.
         attr :resource
-
-        # Answer a ping, which is how a homeserver checks the token it was given.
-        #
-        # @parameter transaction_id [String | nil] the transaction to quote back.
-        # @returns [Representation] the empty response.
-        def ping(transaction_id: nil)
-          payload = {transaction_id: transaction_id}.compact
-
-          api::Representation.post(@resource.with(path: "#{APP_V1}/ping"), payload)
-        end
 
         def inspect
           "\#<#{self.class}>"

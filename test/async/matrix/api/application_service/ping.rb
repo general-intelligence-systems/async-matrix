@@ -6,16 +6,12 @@
 require "async/matrix/application_service_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/application_service/ping"
+
 describe Async::Matrix::ApplicationService::Ping do
   include Async::Matrix::ApplicationServiceContext
   include Async::Matrix::OperationsContext
 
-  # The homeserver pings a service to check the token it was given, so the answer is empty.
-  it "can ping" do
-    expect(service.ping.ping(transaction_id: "a-transaction").value).to be == {}
-  end
-
-  it "needs no transaction" do
-    expect(service.ping.ping.value).to be == {}
-  end
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ApplicationService::Ping::CASES
 end

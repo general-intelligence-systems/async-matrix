@@ -5,6 +5,8 @@
 
 require "async/matrix/application_service_context"
 
+require_relative "../../abstract/api/application_service/client"
+
 describe Async::Matrix::ApplicationService::Client do
   include Async::Matrix::ApplicationServiceContext
 
@@ -20,4 +22,7 @@ describe Async::Matrix::ApplicationService::Client do
   it "carries the token it was given" do
     expect(service.headers["authorization"]).to be == "Bearer a-homeserver-token"
   end
+
+  # The cases for the navigators, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ApplicationService::Client::CASES
 end

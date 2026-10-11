@@ -9,6 +9,7 @@ require_relative "../../paths"
 require_relative "../../version"
 require_relative "../../versioned"
 require_relative "../../versions"
+require_relative "../../abstract/api/application_service/client"
 require_relative "ping"
 require_relative "protocols"
 require_relative "query_room"
@@ -72,11 +73,6 @@ module Async
         # @returns [QueryRoom] whether a room alias is the service's own.
         def query_room
           api::QueryRoom.for(self)
-        end
-
-        # @returns [Ping] whether the service is answering.
-        def ping
-          api::Ping.for(self)
         end
 
         # @returns [Protocols] the networks the service bridges to.
