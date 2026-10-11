@@ -191,3 +191,27 @@ Comments: one line per paragraph, never wrapped, and short. See `cops/comment_st
 Every `bin/` script carries a man page at the top, kept current with the script. Read it before using it, rather than guessing options or trusting what is written here.
 
 `bin/test` brings a homeserver up in Docker to test against, so a run costs a container start. Its man page explains how to narrow a run and how to keep the homeserver alive between runs, which is what you want while iterating.
+
+## The native extension
+
+`ext/async_matrix_e2ee` is a Rust crate (magnus over [vodozemac](https://github.com/matrix-org/vodozemac)) which `rake compile` builds into `lib/async/matrix/async_matrix_e2ee.so`. `Cargo.toml` at the repository root is the workspace, because rb_sys runs `cargo metadata` from there.
+
+**Nothing under `lib/` loads it.** `E2EE::Crypto` is the interface encryption is written against, and `E2EE::Plaintext` is the only implementation the library ships. The crate is the binding a real implementation will be built on, and the toolchain is kept wired up so that the release already ships precompiled gems on the day one is.
+
+The `.so` is deliberately not in `spec.files`: see the `reject` in the gemspec. The *source* gem compiles its own at install time, and rake-compiler puts the right object into each precompiled platform gem itself.
+
+## Release
+
+```bash
+gem kit bump [major|minor|patch]  # version.rb via the .erb, then relock
+gem kit changelog --write         # draft this version's entry
+bin/release-gem                   # build + push, source gem AND platform gems
+```
+
+`gem kit bump` renders `lib/async/matrix/version.rb` from `version.rb.erb`, blocks a bump onto a due deprecation deadline, and relocks with `BUNDLE_FROZEN=false` (bare `bundle install` inherits the devshell's frozen store Gemfile and fails).
+
+`bin/release-gem` is **not** superseded by `gem kit release`, which does one `gem build` + one `gem push` and has no notion of per-platform gems. This gem has a native extension, so publishing only the source gem would put a Rust toolchain back in every user's install path. `bin/release-gem` builds the source gem locally and downloads the precompiled platform gems from the latest green `cross-compile.yml` run, so **push to async-rest and let that workflow finish before releasing**.
+
+The tradeoff: `bin/release-gem` skips the `gem kit release` gates (changelog entry, deprecation deadlines, clean working tree). Run `gem kit release --dry-run` first to get them.
+
+A relock cannot go through the devshell's `bundle` wrapper, which pins `BUNDLE_GEMFILE` to the read-only store copy. `gem kit bump` handles it; by hand, run bundler with the store's bundler lib and `BUNDLE_GEMFILE` pointed at the checkout.

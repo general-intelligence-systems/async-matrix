@@ -1,11 +1,12 @@
 PATH
   remote: .
   specs:
-    async-matrix (0.1.0)
+    async-matrix (3.0.1)
       async-rest (~> 0.20)
       base64 (~> 0.3)
       console (~> 1.29)
       gem_kit (~> 0.2)
+      rb_sys (~> 0.9)
 
 GEM
   remote: https://rubygems.org/
@@ -81,6 +82,7 @@ GEM
       regexp_parser (~> 2.0)
       simpleidn (~> 0.2)
     language_server-protocol (3.17.0.6)
+    lefthook (2.2.1)
     lint_roller (1.1.0)
     logger (1.7.0)
     memory_profiler (1.1.0)
@@ -107,6 +109,12 @@ GEM
     protocol-url (0.19.0)
     racc (1.8.1)
     rainbow (3.1.1)
+    rake (13.4.2)
+    rake-compiler (1.3.2)
+      rake
+    rake-compiler-dock (1.12.0)
+    rb_sys (0.9.130)
+      rake-compiler-dock (= 1.12.0)
     rbs (4.2.0)
       logger
       prism (>= 1.6.0)
@@ -174,7 +182,9 @@ DEPENDENCIES
   decode
   gem_kit-release
   json_schemer
+  lefthook (~> 2.2)
   memory_profiler
+  rake-compiler (~> 1.3)
   rubocop
   rubocop-socketry
   stackprof
@@ -188,7 +198,7 @@ CHECKSUMS
   ast-merge (7.1.10) sha256=a60348effc169beddc650c686c1860de001d060528963cdc6ecfc1fc22d74c9a
   async (2.46.0) sha256=34f984733dbf63a997376346451ec995e858cacc3105e86ccfeaf8877b4f490b
   async-http (0.105.0) sha256=55191969d5cf61be5fbc2e0aadd51d77085318ba192a5ff5e12e3aba0826906a
-  async-matrix (0.1.0)
+  async-matrix (3.0.1)
   async-pool (0.12.0) sha256=5580493dc024bd704dab2ed0bf1307100722e49cbb825c7965f8501194f58506
   async-rest (0.20.0) sha256=72b0d467f65269a53a64fc12b828f3d81b4afa201b4eea0b98cddb990e7e95eb
   bake (0.25.0) sha256=a47bdc6a26addc048827debc36fe27bb4d5d71ac2958ad910b5386e9baf49869
@@ -212,6 +222,7 @@ CHECKSUMS
   json (3.0.2) sha256=8e6d7e7b11384c21230430cef90b71f14849a34a1f4452796670f7c981bd19df
   json_schemer (2.5.0) sha256=2f01fb4cce721a4e08dd068fc2030cffd0702a7f333f1ea2be6e8991f00ae396
   language_server-protocol (3.17.0.6) sha256=5ef2c0c138f8267e1bc631d3328347d354f96724b0af22f2c79516120443b7f0
+  lefthook (2.2.1) sha256=ed97ccff9b5f055e10481e736c80fee7195aaf8754db8cff7b4b051379f551fb
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
   memory_profiler (1.1.0) sha256=79a17df7980a140c83c469785905409d3027ca614c42c086089d128b805aa8f8
@@ -228,6 +239,10 @@ CHECKSUMS
   protocol-url (0.19.0) sha256=3f6b9f6aa742a259a0b3610fbbd9685dcd9506adf6734f428ff96259faabfb21
   racc (1.8.1) sha256=4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f
   rainbow (3.1.1) sha256=039491aa3a89f42efa1d6dec2fc4e62ede96eb6acd95e52f1ad581182b79bc6a
+  rake (13.4.2) sha256=cb825b2bd5f1f8e91ca37bddb4b9aaf345551b4731da62949be002fa89283701
+  rake-compiler (1.3.2) sha256=12fed13fa07f9caee829599935e0332ba76e2047a617f8f7918a222d68427760
+  rake-compiler-dock (1.12.0) sha256=f13205c2738f3d2053afcd03491a9e4541b22a59a0bfc53fc8bc883bd8188023
+  rb_sys (0.9.130) sha256=7d486d99c1da02635515deaf9860fc5aea90bb4ab2589b2deec7fdc7d3548615
   rbs (4.2.0) sha256=51f7b886dcc05bc09e10b901daa6a81829f6adc03101d6ca9ea4aac6103e0674
   regexp_parser (2.13.1) sha256=5aedb6b7c35688f51e86eef17a15374dfd287c83f4ca644b2c5f3ec50a33b44b
   rubocop (1.92.0) sha256=2af68041fb2e70bd9321d0479b49fad07f8008a3d0758c83347b4917128c56e0

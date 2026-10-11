@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Released under the MIT License.
-# Copyright, 2026, by Nathan K.
+# Released under the Apache License, Version 2.0.
+# Copyright, 2026, by General Intelligence Systems.
 
 require "async/matrix/client_context"
 require "async/matrix/events_context"

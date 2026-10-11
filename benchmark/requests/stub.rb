@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Released under the MIT License.
-# Copyright, 2026, by Nathan K.
+# Released under the Apache License, Version 2.0.
+# Copyright, 2026, by General Intelligence Systems.
 
 # A homeserver which does nothing, so that what is measured is this library rather than Synapse.
 #

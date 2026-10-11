@@ -1,0 +1,154 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Released under the Apache License, Version 2.0.
+# Copyright, 2026, by General Intelligence Systems.
+
+# RELEASE-GEM(1)                     General Commands Manual                   RELEASE-GEM(1)
+#
+# NAME
+#      bin/release-gem — publish this version, source gem and precompiled platform gems
+#
+# SYNOPSIS
+#      bin/release-gem
+#
+# DESCRIPTION
+#      Releasing means publishing two kinds of gem for one version:
+#
+#      The source gem, async-matrix-X.Y.Z.gem, which compiles the Rust extension at install
+#      time. It is the fallback for the platforms which are not precompiled, and it is the
+#      reason a user would need a Rust toolchain.
+#
+#      The precompiled platform gems, async-matrix-X.Y.Z-<platform>.gem, built in CI by the
+#      Cross Compile workflow with the object already inside, so that `gem install
+#      async-matrix` wants no Rust on those platforms.
+#
+#      This script builds the first locally, downloads the rest from the latest successful run
+#      of that workflow, and pushes all of them. So push to async-rest and let Cross Compile
+#      finish before releasing: the run it downloads from has to be one which built this
+#      version.
+#
+#      A gem which is already on RubyGems is skipped rather than failed, so a release which
+#      died part way through can be run again.
+#
+#      It is not `gem kit release`, which does one `gem build` and one `gem push` and has no
+#      notion of per-platform gems. The cost of that is this script skipping the gates `gem
+#      kit release` applies — a changelog entry for this version, no due deprecation deadline,
+#      a clean working tree — so run `gem kit release --dry-run` first to get them.
+#
+# ENVIRONMENT
+#      Requires gh(1), authenticated, to find and download the workflow's artifacts.
+#
+# FILES
+#      .github/workflows/cross-compile.yml
+#              The workflow which builds the precompiled platform gems.
+#
+#      pkg/    Where the downloaded artifacts are put. Recreated on each run.
+#
+# EXIT STATUS
+#      The bin/release-gem utility exits 0 on success, and >0 if an error occurs.
+#
+# SEE ALSO
+#      gem(1), gh(1), AGENTS.md "Release"
+#
+# async-matrix                          October 11, 2026                       RELEASE-GEM(1)
+
+require_relative "../lib/async/matrix/version"
+require "fileutils"
+require "open3"
+
+local_version = Async::Matrix::VERSION
+gem_name = "async-matrix"
+gemspec = "async-matrix.gemspec"
+workflow = "cross-compile.yml"
+pkg_dir = "pkg"
+
+puts "Local version: #{local_version}"
+
+# The local version has to be ahead of what is published, which is the one mistake that cannot be taken back: a pushed version is pushed.
+remote_output = `gem specification #{gem_name} version --remote 2>&1`
+
+if $?.success?
+  remote_version = remote_output[/version: (.+)/, 1]&.strip
+  puts "Remote version: #{remote_version}"
+
+  if Gem::Version.new(local_version) <= Gem::Version.new(remote_version)
+    abort "ERROR: Local version (#{local_version}) has not been incremented past remote (#{remote_version})"
+  end
+else
+  puts "Gem not yet published remotely, proceeding with first release"
+end
+
+unless system("gh --version > /dev/null 2>&1")
+  abort "ERROR: the GitHub CLI (gh) is required to fetch precompiled gems: https://cli.github.com"
+end
+
+puts "\nBuilding source gem from #{gemspec}..."
+
+system("gem build #{gemspec}") || abort("ERROR: gem build failed")
+
+source_gem = "#{gem_name}-#{local_version}.gem"
+
+FileUtils.rm_rf(pkg_dir)
+FileUtils.mkdir_p(pkg_dir)
+
+puts "\nLocating latest successful #{workflow} run..."
+
+run_id = `gh run list --workflow=#{workflow} --status success --limit 1 --json databaseId --jq '.[0].databaseId'`.strip
+
+if run_id.empty?
+  abort "ERROR: no successful #{workflow} run found. Push to async-rest and let CI build the platform gems first."
+end
+
+puts "Downloading precompiled gems from run #{run_id}..."
+
+system("gh", "run", "download", run_id, "--dir", pkg_dir, "--pattern", "cross-gem-*") ||
+  abort("ERROR: failed to download artifacts from run #{run_id}")
+
+platform_gems = Dir["#{pkg_dir}/**/#{gem_name}-#{local_version}-*.gem"].sort
+
+if platform_gems.empty?
+  built = Dir["#{pkg_dir}/**/*.gem"].map{|path| File.basename(path)}
+
+  if built.empty?
+    abort "ERROR: run #{run_id} produced no gems."
+  else
+    abort "ERROR: the latest CI run built #{built.join(', ')}, not version #{local_version}.\n" \
+          "Push #{local_version} to async-rest, wait for cross-compile to finish, then re-run."
+  end
+end
+
+puts "Precompiled platform gems for #{local_version}:"
+
+platform_gems.each{|path| puts "  #{File.basename(path)}"}
+
+# A gem which is already up is skipped rather than failed, so that a release which died part way through can be run again.
+all_gems = [source_gem] + platform_gems
+
+all_gems.each do |gem_file|
+  puts "\nPushing #{File.basename(gem_file)}..."
+
+  out, status = Open3.capture2e("gem", "push", gem_file)
+
+  print out
+
+  if status.success?
+    next
+  end
+
+  if out.include?("has already been pushed")
+    puts "  (already published — skipping)"
+
+    next
+  end
+
+  abort "ERROR: gem push failed for #{gem_file}"
+end
+
+puts "\nReleased #{gem_name} #{local_version} " \
+     "(1 source + #{platform_gems.size} precompiled platform gems)"
+
+tag = "v#{local_version}"
+
+system("git", "tag", "-a", tag, "-m", "Release #{local_version}")
+system("git", "push", "origin", tag)

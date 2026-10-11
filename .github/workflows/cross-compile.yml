@@ -9,7 +9,7 @@ name: Cross Compile
 
 on:
   push:
-    branches: [main]
+    branches: [async-rest]
     paths:
       - 'ext/**'
       - 'Cargo.toml'

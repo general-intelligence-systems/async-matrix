@@ -1,0 +1,11 @@
+# Git hooks (managed by lefthook). Install with `bundle exec lefthook install`.
+#
+# pre-commit: scan for secrets (trufflehog) and run the suite (bin/test). Both are wrapped in
+# `nix develop --command` because the hook fires outside the flake devshell, so trufflehog /
+# bundler / sus wouldn't otherwise be on PATH.
+pre-commit:
+  commands:
+    secrets:
+      run: nix develop --command trufflehog git file://. --since-commit HEAD --only-verified --fail
+    tests:
+      run: nix develop --command bin/test --core

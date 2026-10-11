@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-# Released under the MIT License.
-# Copyright, 2026, by Nathan K.
+# Released under the Apache License, Version 2.0.
+# Copyright, 2026, by General Intelligence Systems.
 
 module Async
   module Matrix
-    VERSION = "0.1.0"
+    VERSION = "3.0.1"
   end
 end
