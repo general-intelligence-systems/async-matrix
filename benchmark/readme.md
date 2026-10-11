@@ -2,7 +2,7 @@
 
 What the library costs, measured against itself.
 
-async-matrix is a client for a remote server, so a wall-clock figure taken end to end is mostly a figure about the homeserver. These benchmarks therefore measure the part which is ours: what it costs to load the library, to build the classes for a specification version, and to do the work which happens per message rather than per request. The benchmarks which need a homeserver are a separate tier, run against the rig `bin/test` brings up, and are not here yet.
+async-matrix is a client for a remote server, so a wall-clock figure taken end to end is mostly a figure about the homeserver. These benchmarks therefore measure the part which is ours: what it costs to load the library, to build the classes for a specification version, and to do the work which happens per message rather than per request. The ones which do talk to a homeserver say so, and say what they are really measuring.
 
 Run them with `bin/benchmark`, which has a man page in its own header:
 
@@ -13,6 +13,7 @@ bin/benchmark --category headline                  # the numbers worth quoting
 bin/benchmark versions                             # one directory of them
 bin/benchmark --harness harness-bips versions/cached
 bin/benchmark --compare main --category headline     # did the branch make anything worse?
+bin/benchmark --keep-alive homeserver                # against a real homeserver
 ```
 
 ## How a benchmark is put together
@@ -95,6 +96,52 @@ jq .per_namespace benchmark/data/*/versions-namespaces.json
 
 `versions/` is what the versioning costs. A version is built by deriving a class per versioned class and including a layer per version up to it, so building `v1.19` of the client-server API includes nineteen layers across a hundred and forty-five classes. `build` is what the first client of a version pays, `cached` is what every client after it pays, and `sweep` and `namespaces` say how that cost is distributed across the versions and the APIs.
 
+## Requests, and why the stub exists
+
+`requests/concurrency` is the benchmark for the reason this library is async: that one reactor can be waiting for many responses at once. It makes the same number of requests at each of several concurrencies and reports what that bought:
+
+```
+ concurrency       time        req/s   speedup
+           1     399.6ms          160     1.00x
+           2     213.1ms          300     1.87x
+           8      66.5ms          963     6.01x
+          32      30.5ms         2101    13.12x
+          64      23.9ms         2683    16.75x
+```
+
+It runs against an in-process stub, not against a homeserver, and that is not a convenience. The first attempt pointed it at the rig and measured **1.03x** — because Synapse answers one request at a time, so sixty-four requests in flight come back no faster than sixty-four in a row. That figure describes Synapse's concurrency, not ours, and it would have read 1.03x however good the client was. The stub answers after a fixed delay and does no work, which leaves the client's own overlapping as the only thing the curve can be about. The delay is the point: concurrency does not make a response arrive sooner, it makes the waiting overlap, so a server which answered instantly would show a flat curve no matter what.
+
+The stub binds an ephemeral port. An earlier version used a fixed one that turned out to be published by the rig's compose file, so Synapse quietly answered the requests and the numbers looked fine. Hence `Stub.answered_by_stub?`, which every benchmark here checks before believing anything.
+
+## Against a real homeserver
+
+`homeserver/` is the end to end tier, run against the rig `bin/test` brings up — same compose files, same `--backend`, same `--keep-alive`, same version list. It is opt-in: `bin/benchmark` leaves it out unless a name or `--homeserver` asks for it, and says which ones it left out, because starting a container is not what somebody who typed `bin/benchmark` was asking for.
+
+| | median |
+| --- | --- |
+| `homeserver/versions` — cheapest unauthenticated request | 1.36ms |
+| `homeserver/whoami` — the same with a token to look up | 1.51ms |
+| `homeserver/sync` — one sync round trip, `timeout: 0` | 2.69ms |
+
+These measure the whole system: this library, the socket, and a real homeserver doing real work. A figure here moves when Synapse changes, when the image changes, and when the machine is busy, so it should not be read as a regression in this library without checking the rest first. What it is good for is the thing the isolated benchmarks cannot tell you — that it all works at a speed anybody would want. The difference between `versions` and `whoami` is about what being logged in costs; `sync` against `events/sync` is the homeserver and the socket against the decoding.
+
+## Crypto
+
+`crypto/` is the federation signing path: pure CPU, no socket, no homeserver. These are the steadiest numbers here — deviations of one to six percent — because nothing in them waits for anything.
+
+| | median | allocations |
+| --- | --- | --- |
+| `crypto/canonical_json` — render the form that gets signed | 16us | 46 |
+| `crypto/signing` — canonical JSON, then Ed25519 | 58us | 50 |
+| `crypto/verifying` — check a signature | 131us | 47 |
+| `crypto/authorization` — sign a whole federation request | 81us | 117 |
+
+Two things worth knowing fall straight out of these. **Verifying costs 2.3x what signing does** — Ed25519 is not symmetric, and verification is the side paid per *inbound* event, which a homeserver has more of than outbound. And canonical JSON is 16us of the 58us signing figure, so better than a quarter of signing is sorting keys in Ruby rather than doing cryptography; if signing ever looks slow, that is where to look before suspecting OpenSSL.
+
+All four work on one shared event (`crypto/subject.rb`) of about the size a real one is, with a fixed seed rather than a random one — signing is the same work whatever the bytes are, and an input that changed between runs could not be compared across them, which is the point of `--compare`.
+
+The Rust extension under `ext/async_matrix_e2ee` is **not** benchmarked. It needs `rb_sys` and `rake-compiler` to build, neither of which is in the Gemfile, and the gemspec declares no `extensions`, so there is nothing built to measure. Olm and Megolm throughput, and a comparison against a reference implementation, are worth having once the extension is part of the build.
+
 ## A note on the numbers
 
 Read the median and the deviation beside it, not the mean. These timings have a tail: building a version lands between 2.0ms and 2.8ms most times through and takes 14ms when a collection falls inside the iteration, which moves the mean a long way and the median hardly at all. The default harness therefore leads with the median and the median absolute deviation, and prints the mean next to it so the tail is not hidden either. Both are recorded, with the raw timings, so a distribution can be looked at rather than inferred.
@@ -103,4 +150,4 @@ Benchmarks taken on a workstation also move with whatever else it is doing: the 
 
 The two allocation figures are not the same figure, and should not be compared. The default harness reports `GC.stat(:total_allocated_objects)`, which counts every object the VM made including its own internal ones; `harness-memory` reports what memory_profiler can attribute to a line of Ruby, which is fewer. Each is consistent with itself across runs, which is what a regression is read from.
 
-The benchmarks which need a homeserver - throughput, and the concurrency the library exists for - are a tier of their own against the rig `bin/test` brings up, and are not written yet.
+What is left is the Olm and Megolm side of E2EE, which waits on the Rust extension becoming part of the build - see the note under Crypto.

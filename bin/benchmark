@@ -7,8 +7,8 @@
 #
 # SYNOPSIS
 #      bin/benchmark [--harness name] [--category name] [--version version]
-#                    [--compare revision] [--threshold percentage] [--gate name] [--list]
-#                    [benchmark ...]
+#                    [--compare revision] [--threshold percentage] [--gate name]
+#                    [--homeserver] [--backend name] [--keep-alive] [--list] [benchmark ...]
 #
 # DESCRIPTION
 #      bin/benchmark runs the benchmarks in benchmark/, each in a Ruby of its own, and writes
@@ -39,8 +39,16 @@
 #      code allocates the same objects however busy the machine is - which makes them the
 #      signal to trust where the machine is shared. See --gate.
 #
-#      These are the benchmarks which need nothing but a Ruby. The ones which need a
-#      homeserver run against the rig bin/test brings up, and are not here yet.
+#      Most of the benchmarks need nothing but a Ruby. The ones under homeserver/ need the rig
+#      bin/test brings up, and are left out of a run which did not ask for them: naming one is
+#      asking for it, so is --homeserver. When one is selected the backend's compose file is
+#      used to bring the version up and take it down again, exactly as bin/test does.
+#
+#      The benchmark under requests/ needs no homeserver, because it cannot use one. It
+#      measures whether requests under one reactor overlap, and a real homeserver answers one
+#      request at a time, so the figure against Synapse describes Synapse rather than this
+#      library - it reads 1.03x whatever the client does. It therefore runs against an
+#      in-process stub which answers after a fixed delay. See benchmark/requests/stub.rb.
 #
 # OPTIONS
 #      --harness name
@@ -77,6 +85,17 @@
 #              should use: a timing on a CI runner is not reproducible enough to block on, and
 #              gating on one teaches everybody to ignore the job. none reports and exits 0.
 #
+#      --homeserver
+#              Include the benchmarks which need the rig, which are left out otherwise.
+#
+#      --backend name
+#              The homeserver to benchmark against, which is a directory holding a compose
+#              file. Defaults to synapse, as bin/test does.
+#
+#      --keep-alive
+#              Leave the homeserver running afterwards, and reuse it when it is already the
+#              version wanted. What you want while iterating.
+#
 #      --list  Print the registered benchmarks with what each measures, and exit.
 #
 # ENVIRONMENT
@@ -112,12 +131,34 @@
 #              Read by harness-stackprof: what to sample (wall, cpu or object), how often, how
 #              many iterations to profile, and how many frames to print.
 #
+#      MATRIX_BACKEND, MATRIX_ACCOUNTS
+#              Set for a benchmark which needs the rig, to the backend and to how it is to get
+#              an account, which the backend decides. As bin/test sets them for the suite.
+#
+#      MATRIX_HOMESERVER
+#              Read by the rig benchmarks, for where the homeserver is. Defaults to the port
+#              the compose file publishes.
+#
+#      REQUESTS, CONCURRENCIES, STUB_DELAY
+#              Read by requests/concurrency: how many requests each level makes, which levels
+#              to sweep, and how long the stub takes to answer. There has to be a delay:
+#              concurrency overlaps waiting, so a server which answers instantly has nothing
+#              to overlap and would show a flat curve however good the client is.
+#
 # FILES
 #      benchmark/benchmarks.yml
 #              The benchmarks which can be run, with a description and a category for each.
 #
 #      benchmark/harness/
 #              The default harness, and what every harness shares.
+#
+#      <backend>/docker-compose.yml
+#              The homeservers of one backend, one service per version. The same file bin/test
+#              uses.
+#
+#      MATRIX_API_VERSIONS.txt
+#              The versions the rig offers. The latest is brought up unless --version says
+#              otherwise.
 #
 #      benchmark/data/
 #              A directory per run, holding a JSON document per benchmark, and beside it the
@@ -171,6 +212,18 @@
 #
 #            bin/benchmark --compare origin/main --gate allocations
 #
+#      Prove the requests overlap:
+#
+#            bin/benchmark requests/concurrency
+#
+#      Benchmark against a real homeserver, reusing it between runs:
+#
+#            bin/benchmark --keep-alive homeserver
+#
+#      Against a different homeserver implementation:
+#
+#            bin/benchmark --homeserver --backend tuwunel
+#
 # SEE ALSO
 #      bin/test(1), benchmark/readme.md, benchmark/compare.rb,
 #      .github/workflows/benchmark.yaml
@@ -190,6 +243,9 @@ list="no"
 compare=""
 threshold="10"
 gate="all"
+homeserver="no"
+backend="${MATRIX_BACKEND:-synapse}"
+keep_alive="no"
 chosen=()
 
 while [ "$#" -gt 0 ]; do
@@ -272,6 +328,25 @@ while [ "$#" -gt 0 ]; do
     --gate=*)
       gate="${1#--gate=}"
       ;;
+    --homeserver)
+      homeserver="yes"
+      ;;
+    --backend)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--backend needs a name." >&2
+        exit 1
+      fi
+
+      backend="$1"
+      ;;
+    --backend=*)
+      backend="${1#--backend=}"
+      ;;
+    --keep-alive)
+      keep_alive="yes"
+      ;;
     --list)
       list="yes"
       ;;
@@ -309,7 +384,7 @@ fi
 # may be a benchmark or a directory of them, and one which is neither is an error rather than a run
 # of nothing.
 selected=$(ruby -ryaml -e '
-  manifest, category, *chosen = ARGV
+  manifest, category, homeserver, *chosen = ARGV
   benchmarks = YAML.load_file(manifest)
 
   unknown = chosen.reject do |want|
@@ -338,10 +413,105 @@ selected=$(ruby -ryaml -e '
     end
   end
 
+  # A benchmark which needs the rig is left out of a run which did not ask for one. Naming it is
+  # asking for it; so is --homeserver. Said rather than done quietly, because a run which measured
+  # less than it looks like is worse than one which refused.
+  unless homeserver == "yes" or !chosen.empty?
+    needing = selected.select{|name| benchmarks[name]["homeserver"]}
+
+    unless needing.empty?
+      warn "Leaving out #{needing.join(", ")}, which need a homeserver. Ask with --homeserver."
+    end
+
+    selected -= needing
+  end
+
+  if selected.empty?
+    warn "Nothing to run."
+    exit 1
+  end
+
   puts selected
-' "$manifest" "$category" ${chosen[@]+"${chosen[@]}"})
+' "$manifest" "$category" "$homeserver" ${chosen[@]+"${chosen[@]}"})
 
 output="$root/benchmark/data/$(date +%F-%H%M%S)"
+
+# What this run started, and has to take down again. One trap for all of it: a second `trap ... EXIT`
+# replaces the first rather than adding to it, so whichever lost would leak a container or a worktree.
+started_homeserver="no"
+baseline_worktree=""
+
+cleanup() {
+  if [ -n "$baseline_worktree" ]; then
+    git -C "$root" worktree remove --force "$baseline_worktree" > /dev/null 2>&1 || rm -rf "$baseline_worktree"
+  fi
+
+  if [ "$started_homeserver" = "yes" ]; then
+    if [ "$keep_alive" = "yes" ]; then
+      echo "The homeserver is still running. Stop it with:" >&2
+      echo "  docker compose --file $backend/docker-compose.yml down" >&2
+    else
+      docker compose --file "$compose" down
+    fi
+  fi
+}
+
+trap cleanup EXIT
+
+# Whether anything selected needs the rig, which decides whether a container is started at all.
+needs_homeserver="no"
+
+for name in $selected; do
+  case "$name" in
+    homeserver/*)
+      needs_homeserver="yes"
+      ;;
+  esac
+done
+
+compose="$root/$backend/docker-compose.yml"
+
+if [ "$needs_homeserver" = "yes" ]; then
+  if [ ! -f "$compose" ]; then
+    echo "Unknown backend $backend: $compose does not exist." >&2
+    exit 1
+  fi
+
+  # The version to bring up, which is the latest the rig offers unless one was asked for. The same
+  # list bin/test reads, generated from the compose file.
+  mapfile -t rig_versions < "$root/MATRIX_API_VERSIONS.txt"
+  rig_version="${version:-${rig_versions[-1]}}"
+
+  # How the suite gets an account, which the backend decides rather than the benchmark. See
+  # bin/test, which says the same thing at more length.
+  case "$backend" in
+    synapse)
+      accounts="login"
+      ;;
+    *)
+      accounts="register"
+      ;;
+  esac
+
+  started_homeserver="yes"
+
+  running="$(docker compose --file "$compose" ps --services --filter status=running 2>/dev/null | head -1)"
+
+  if [ "$keep_alive" = "yes" ] && [ "$running" = "$rig_version" ]; then
+    echo "Reusing the $backend $rig_version homeserver, which is already running." >&2
+  else
+    docker compose --file "$compose" down
+    docker compose --file "$compose" up --detach --wait "$rig_version"
+  fi
+
+  echo "Benchmarking against $backend $rig_version." >&2
+
+  export MATRIX_BACKEND="$backend"
+  export MATRIX_ACCOUNTS="$accounts"
+  export MATRIX_VERSION="$rig_version"
+
+  version="$rig_version"
+fi
 
 # Run the selection against one library, which is this working copy's unless a baseline is being
 # measured. The benchmarks and the harness always come from this working copy: one which changed
@@ -397,8 +567,7 @@ fi
 # A worktree rather than a checkout, so that the working copy is left exactly as it was: a
 # comparison is run with uncommitted changes in it more often than not, and that is the point.
 worktree="$(mktemp --directory --tmpdir "async-matrix-baseline-XXXXXX")"
-
-trap 'git -C "$root" worktree remove --force "$worktree" > /dev/null 2>&1 || rm -rf "$worktree"' EXIT
+baseline_worktree="$worktree"
 
 git -C "$root" worktree add --detach --quiet "$worktree" "$compare"
 
