@@ -24,6 +24,11 @@
 #      says which it was: the point of having more than one is that the suite tests the
 #      specification rather than whatever Synapse happens to do.
 #
+#      An API whose server is not a homeserver gets that server too: the identity API sydent,
+#      the push gateway API sygnal, and the application service API the stub which answers in
+#      a bridge's place. The client-server API also gets the OAuth 2.0 rig, which is a second
+#      homeserver delegating authentication to an authorization server.
+#
 # OPTIONS
 #      --all   Test every version in MATRIX_API_VERSIONS.txt, in order.
 #
@@ -65,7 +70,11 @@
 #
 #      SYNAPSE_PORT
 #              Read by the compose file, to move the homeserver off port 7300. A second
-#              version can be brought up alongside the first with it.
+#              version can be brought up alongside the first with it. SYDENT_PORT,
+#              SYGNAL_PORT, APPSERVICE_PORT, MAS_PORT and OAUTH_SYNAPSE_PORT do the same for
+#              the other servers, which the fixtures are told about by MATRIX_HOMESERVER,
+#              MATRIX_IDENTITY_SERVER, MATRIX_PUSH_GATEWAY, MATRIX_APPLICATION_SERVICE and
+#              MATRIX_OAUTH_HOMESERVER.
 #
 # FILES
 #      MATRIX_API_VERSIONS.txt
@@ -220,8 +229,15 @@ running() {
 # application service API against the stub which answers in a bridge's place.
 services=()
 
+# Whether the OAuth 2.0 rig is wanted, which the client-server API needs for the authorization
+# metadata operations. It is a homeserver of its own - one which delegates authentication to the
+# authorization server instead of handling passwords - so it is a compose profile rather than
+# another service beside the homeserver under test.
+oauth="no"
+
 add_service() {
   case "$1" in
+    client-server|client_server) oauth="yes" ;;
     identity) services+=(sydent) ;;
     push-gateway|push_gateway) services+=(sygnal) ;;
     application-service|application_service) services+=(appservice) ;;
@@ -231,6 +247,7 @@ add_service() {
 if [ "${#apis[@]}" -eq 0 ] && [ "$core" = "no" ]; then
   # The whole suite, which is every API.
   services=(sydent sygnal appservice)
+  oauth="yes"
 else
   for api in ${apis[@]+"${apis[@]}"}; do
     add_service "$api"
@@ -251,6 +268,18 @@ start() {
     # The identity server joins the homeserver's network namespace, so it is told which homeserver
     # is running: `localhost` has to mean the homeserver for an OpenID token to be verified.
     MATRIX_SERVICE="$version" docker compose --file "$compose" up --detach --wait "${services[@]}"
+  fi
+
+  if [ "$oauth" = "yes" ]; then
+    docker compose --file "$compose" --profile oauth up --detach --wait oauth-synapse
+
+    # The user the suite consents as, seeded once the homeserver is up: registering a user
+    # provisions it into the homeserver as well, and one seeded while the homeserver was down
+    # exists at the authorization server alone, which leaves every exchange refused.
+    #
+    # It refuses to register a user it already has, which is what a rig kept alive looks like, so
+    # that is not a failure here.
+    docker compose --file "$compose" --profile oauth up --force-recreate --no-log-prefix oauth-mas-user || true
   fi
 }
 

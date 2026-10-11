@@ -75,12 +75,15 @@ module Async
                   expect(capabilities.third_party_identifier_changes?).to be == true
                 end
 
-                # Advertised and disabled is not the same as not advertised, and this homeserver advertises it off.
-                base.it "tells a disabled capability from an absent one" do
+                # Advertised is not the same as not advertised, and a capability the homeserver never named says nothing either way. The rig turns token login on - see `login_via_existing_session` in the homeserver configuration - so this one is advertised and on.
+                base.it "tells an advertised capability from an absent one" do
                   capabilities = client.get_capabilities
 
                   expect(capabilities).to be(:advertised?, "m.get_login_token")
-                  expect(capabilities.get_login_token?).to be == false
+                  expect(capabilities.get_login_token?).to be == true
+
+                  expect(capabilities).not.to be(:advertised?, "m.a_capability_no_homeserver_has")
+                  expect(capabilities.enabled?("m.a_capability_no_homeserver_has")).to be_nil
                 end
               end
             end
