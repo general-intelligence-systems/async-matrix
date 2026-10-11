@@ -35,6 +35,13 @@ group :maintenance do
   gem "json_schemer"
 end
 
+# The maintainer's half of gem_kit, which the published gem has no use for: one RubyGems command, `gem kit`, for bumping the version, writing and linting the changelog, listing the outstanding deprecations, releasing and tagging.
+#
+# It keeps the promises `gem_kit` records, so a bump refuses to move onto a deprecation's removal version while the deprecated name is still there.
+group :release do
+  gem "gem_kit-release"
+end
+
 # The benchmarks, which are a group of their own for the reason the cops are: a run of the suite has no use for them, and a job which only wants to run the suite leaves them out with BUNDLE_WITHOUT.
 #
 # Only the harnesses need gems, one each. The default harness times with `Process.clock_gettime` and counts with `GC.stat`, and writes its own results, so a benchmark can be run with nothing installed beyond what the suite already needs.

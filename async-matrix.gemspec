@@ -23,4 +23,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "async-rest", "~> 0.20"
   spec.add_dependency "base64", "~> 0.3"
   spec.add_dependency "console", "~> 1.29"
+
+  # GemKit::Deprecate declares a deprecation as a dated promise: the replacement, and the version the old name stops existing in.
+  spec.add_dependency "gem_kit", "~> 0.2"
 end
