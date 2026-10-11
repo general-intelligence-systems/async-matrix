@@ -126,8 +126,13 @@ module Async
             module V1_13
             end
 
-            # No changes in v1.12.
+            # v1.12 added the `via` parameter to joining.
             module V1_12
+              def self.included(base)
+                base.it "joins through the servers named by via" do
+                  expect(client.join_room(room.id, via: ["localhost"]).id).to be == room.id
+                end
+              end
             end
 
             # No changes in v1.11.

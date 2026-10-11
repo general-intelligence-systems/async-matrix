@@ -17,8 +17,19 @@ module Async
           module V1_18
           end
 
-          # No changes in v1.17.
+          # v1.17 made room_id required to peek.
           module V1_17
+            # Read the events of a world readable room without joining it.
+            #
+            # @parameter from [String] the token to read from, which a previous page ends at.
+            # @parameter room_id [String] the room to read, which the homeserver requires to peek.
+            # @parameter timeout [Integer | nil] how long to wait for an event, in milliseconds.
+            # @returns [PeekedEvents] the page of events.
+            def peek_events(from, room_id:, timeout: nil)
+              parameters = {from: from, room_id: room_id, timeout: timeout}.compact
+
+              api::PeekedEvents.get(@resource.with(path: "#{V3}/events", parameters: parameters))
+            end
           end
 
           # No changes in v1.16.

@@ -19,8 +19,24 @@ module Async
             module V1_19
             end
 
-            # No changes in v1.18.
+            # v1.18 added the action query parameter.
             module V1_18
+              def self.included(base)
+                base.let(:redirect_url){"http://127.0.0.1:9999/callback"}
+
+                base.it "carries the action when the user has chosen one" do
+                  url = client.sso_login_redirect.redirect_to_sso(redirect_url, action: "login")
+
+                  expect(url).to be(:include?, "action=login")
+                end
+
+                # Nothing is sent: the endpoint answers a browser with a redirect, so the URL is built.
+                base.it "omits an action which was not chosen" do
+                  url = client.sso_login_redirect.redirect_to_sso(redirect_url)
+
+                  expect(url).not.to be(:include?, "action")
+                end
+              end
             end
 
             # No changes in v1.17.
@@ -106,19 +122,6 @@ module Async
 
                   expect(url).to be(:include?, "/_matrix/client/v3/login/sso/redirect/a-provider?")
                   expect(url).to be(:include?, ::Protocol::URL::Encoding.escape(redirect_url))
-                end
-
-                base.it "carries the action when the user has chosen one" do
-                  url = client.sso_login_redirect.redirect_to_sso(redirect_url, action: "login")
-
-                  expect(url).to be(:include?, "action=login")
-                end
-
-                # Nothing is sent: the endpoint answers a browser with a redirect, so the URL is built.
-                base.it "omits an action which was not chosen" do
-                  url = client.sso_login_redirect.redirect_to_sso(redirect_url)
-
-                  expect(url).not.to be(:include?, "action")
                 end
 
                 base.it "escapes a provider which is not a bare word" do

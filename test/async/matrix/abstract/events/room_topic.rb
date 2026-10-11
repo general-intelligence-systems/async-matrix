@@ -27,8 +27,16 @@ module Async
             module V1_16
             end
 
-            # No changes in v1.15.
+            # v1.15 added the extensible topic.
             module V1_15
+              def self.included(base)
+                # `bare: false` keeps the plain `topic` accessor on the base class untouched, so the reader for the extensible field is named `m_topic` instead.
+                base.it "reads the extensible topic v1.15 added" do
+                  topic = client.api::RoomTopic.new({topic: "Testing", "m.topic": {"m.text": [{body: "Testing", mimetype: "text/plain"}]}})
+
+                  expect(topic.m_topic).to be == {"m.text": [{body: "Testing", mimetype: "text/plain"}]}
+                end
+              end
             end
 
             # No changes in v1.14.

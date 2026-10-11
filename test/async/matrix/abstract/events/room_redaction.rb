@@ -55,8 +55,15 @@ module Async
             module V1_9
             end
 
-            # No changes in v1.8.
+            # v1.8 moved redacts into the content.
             module V1_8
+              def self.included(base)
+                base.it "reads the redacts field v1.8 moved into the content" do
+                  redaction = client.api::RoomRedaction.new({redacts: "$event:localhost", reason: "spam"})
+
+                  expect(redaction.redacts).to be == "$event:localhost"
+                end
+              end
             end
 
             # No changes in v1.7.

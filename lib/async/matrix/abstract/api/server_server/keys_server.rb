@@ -61,8 +61,14 @@ module Async
           module V1_7
           end
 
-          # No changes in v1.6.
+          # v1.6 dropped the deprecated key ID from the path.
           module V1_6
+            # The keys a server signs with, which it publishes for itself.
+            #
+            # @returns [PublishedKeys] the keys, signed by the server they belong to.
+            def get_server_key
+              api::PublishedKeys.get(@resource.with(path: "#{KEY_V2}/server"))
+            end
           end
 
           # No changes in v1.5.
@@ -87,7 +93,8 @@ module Async
             #
             # @returns [PublishedKeys] the keys, signed by the server they belong to.
             def get_server_key
-              api::PublishedKeys.get(@resource.with(path: "#{KEY_V2}/server"))
+              # The key ID segment is deprecated and not required, so it is left empty rather than asked for.
+              api::PublishedKeys.get(@resource.with(path: "#{KEY_V2}/server/"))
             end
           end
         end

@@ -98,8 +98,22 @@ module Async
           module V1_19
           end
 
-          # No changes in v1.18.
+          # v1.18 added the account management and device authorization fields.
           module V1_18
+            # @returns [String | nil] where the user manages their account.
+            def account_management_uri
+              self.value[:account_management_uri]
+            end
+
+            # @returns [Array(String)] the actions the account management url supports.
+            def account_management_actions_supported
+              self.value[:account_management_actions_supported] || []
+            end
+
+            # @returns [String | nil] where a client asks for a device authorization grant.
+            def device_authorization_endpoint
+              self.value[:device_authorization_endpoint]
+            end
           end
 
           # No changes in v1.17.
@@ -135,11 +149,6 @@ module Async
             # @returns [String | nil] where a token is revoked.
             def revocation_endpoint
               self.value[:revocation_endpoint]
-            end
-
-            # @returns [String | nil] where the user manages their account.
-            def account_management_uri
-              self.value[:account_management_uri]
             end
 
             # @returns [Array(String)] the grant types the server supports.

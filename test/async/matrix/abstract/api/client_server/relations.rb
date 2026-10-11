@@ -50,8 +50,32 @@ module Async
             module V1_11
             end
 
-            # No changes in v1.10.
+            # v1.10 added recursing into a thread's own relations.
             module V1_10
+              def self.included(base)
+                base.let(:root){room.send_message("m.room.message", {msgtype: "m.text", body: "the event related to"})}
+
+                base.let(:reply) do
+                  room.send_message("m.room.message", {msgtype: "m.text", body: "the event relating", "m.relates_to": {rel_type: "m.thread", event_id: root.event_id}})
+                end
+
+                base.it "can getRelatingEvents with recurse" do
+                  related = reply
+
+                  events = client.relations.get_relating_events(room.id, root.event_id, recurse: true)
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                  expect(events.recursion_depth).not.to be_nil
+                end
+
+                base.it "can getRelatingEvents with dir" do
+                  reply
+
+                  events = client.relations.get_relating_events(room.id, root.event_id, dir: "f")
+
+                  expect(events).to be_a(client.api::RelatedEvents)
+                end
+              end
             end
 
             # No changes in v1.9.
@@ -74,8 +98,39 @@ module Async
             module V1_5
             end
 
-            # No changes in v1.4.
+            # v1.4 added paging direction.
             module V1_4
+              def self.included(base)
+                base.let(:root){room.send_message("m.room.message", {msgtype: "m.text", body: "the event related to"})}
+
+                base.let(:reply) do
+                  room.send_message("m.room.message", {msgtype: "m.text", body: "the event relating", "m.relates_to": {rel_type: "m.thread", event_id: root.event_id}})
+                end
+
+                base.it "can getRelatingEvents with dir" do
+                  related = reply
+
+                  events = client.relations.get_relating_events(room.id, root.event_id, dir: "f")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+
+                base.it "can getRelatingEventsWithRelType with dir" do
+                  related = reply
+
+                  events = client.relations.get_relating_events_with_rel_type(room.id, root.event_id, "m.thread", dir: "f")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+
+                base.it "can getRelatingEventsWithRelTypeAndEventType with dir" do
+                  related = reply
+
+                  events = client.relations.get_relating_events_with_rel_type_and_event_type(room.id, root.event_id, "m.thread", "m.room.message", dir: "f")
+
+                  expect(events.chunk.map{|event| event[:event_id]}).to be(:include?, related.event_id)
+                end
+              end
             end
 
             # v1.3 added reading the events which relate to an event.

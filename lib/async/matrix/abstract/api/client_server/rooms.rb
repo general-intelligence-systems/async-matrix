@@ -21,8 +21,17 @@ module Async
           module V1_17
           end
 
-          # No changes in v1.16.
+          # v1.16 added `format`, choosing content alone or the whole event.
           module V1_16
+            # @parameter type [String] the event type, e.g. `m.room.name`.
+            # @parameter state_key [String] the state key, which is usually empty.
+            # @parameter format [String | nil] `content` for the content alone, `event` for the event.
+            # @returns [StateEvent] the state event.
+            def get_room_state_with_key(type, state_key = "", format: nil)
+              parameters = {format: format}.compact
+
+              api::StateEvent.get(@resource.with(path: self.state_path(type, state_key), parameters: parameters))
+            end
           end
 
           # No changes in v1.15.
@@ -37,12 +46,8 @@ module Async
           module V1_13
           end
 
-          # v1.12 renamed `server_name` to `via`.
+          # No changes in v1.12.
           module V1_12
-            # @returns [Symbol] the parameter name.
-            def join_via_parameter
-              :via
-            end
           end
 
           # No changes in v1.11.
@@ -94,11 +99,6 @@ module Async
             # @returns [Boolean] whether `from` is required.
             def pagination_requires_from?
               true
-            end
-
-            # @returns [Symbol] the parameter name.
-            def join_via_parameter
-              :server_name
             end
 
             # Join this room, optionally explaining why.

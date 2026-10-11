@@ -74,8 +74,18 @@ module Async
             module V1_5
             end
 
-            # No changes in v1.4.
+            # v1.4 added the private receipt, and let the marker be left out.
             module V1_4
+              def self.included(base)
+                base.it "sends a private receipt, which the other members do not see" do
+                  expect(client.read_markers.set_read_marker(room.id, fully_read: sent.event_id, read_private: sent.event_id).value).to be == {}
+                end
+
+                # The marker was required until v1.4, so a receipt alone is what this version added.
+                base.it "sets a receipt without the marker" do
+                  expect(client.read_markers.set_read_marker(room.id, read: sent.event_id).value).to be == {}
+                end
+              end
             end
 
             # No changes in v1.3.

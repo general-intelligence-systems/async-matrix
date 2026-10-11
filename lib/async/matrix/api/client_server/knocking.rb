@@ -34,12 +34,12 @@ module Async
         # Knock on a room, which asks its members to invite you.
         #
         # @parameter room_id_or_alias [String] the room to knock on, by ID or by alias.
-        # @parameter via [Array(String) | nil] the servers to knock through.
+        # @parameter server_name [Array(String) | nil] the servers to knock through.
         # @parameter reason [String | nil] what to record as the reason.
         # @returns [RoomReference] the room knocked on.
-        def knock_room(room_id_or_alias, via: nil, reason: nil)
+        def knock_room(room_id_or_alias, server_name: nil, reason: nil)
           payload = {reason: reason}.compact
-          parameters = {via: via}.compact
+          parameters = {server_name: server_name}.compact
 
           api::RoomReference.post(@resource.with(path: "#{V3}/knock/#{::Protocol::URL::Encoding.escape(room_id_or_alias)}", parameters: parameters), payload)
         end

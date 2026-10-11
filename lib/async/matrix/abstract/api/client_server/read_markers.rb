@@ -69,8 +69,20 @@ module Async
           module V1_5
           end
 
-          # No changes in v1.4.
+          # v1.4 added the private receipt, and let the marker be left out.
           module V1_4
+            # Set the read marker, and the receipts which go with it.
+            #
+            # @parameter room_id [String] the room read in.
+            # @parameter fully_read [String | nil] the event the marker goes to.
+            # @parameter read [String | nil] the event a public receipt goes to.
+            # @parameter read_private [String | nil] the event a private receipt goes to.
+            # @returns [Representation] the empty response.
+            def set_read_marker(room_id, fully_read: nil, read: nil, read_private: nil)
+              payload = {"m.fully_read": fully_read, "m.read": read, "m.read.private": read_private}.compact
+
+              api::Representation.post(@resource.with(path: "#{api::Room.path_for(room_id)}/read_markers"), payload)
+            end
           end
 
           # No changes in v1.3.

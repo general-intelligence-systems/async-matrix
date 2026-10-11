@@ -54,8 +54,19 @@ module Async
           module V1_11
           end
 
-          # No changes in v1.10.
+          # v1.10 added erase to deactivateAccount.
           module V1_10
+            # Deactivate this user's account, which cannot be undone.
+            #
+            # @parameter auth [Hash | nil] the user interactive authentication, without which the homeserver asks for it.
+            # @parameter erase [Boolean | nil] whether to forget what the user sent, as far as the homeserver can.
+            # @parameter id_server [String | nil] the identity server to unbind the addresses from.
+            # @returns [UnbindResult] what the identity server did with the addresses.
+            def deactivate_account(auth: nil, erase: nil, id_server: nil)
+              payload = {auth: auth, erase: erase, id_server: id_server}.compact
+
+              api::UnbindResult.post(@resource.with(path: "#{V3}/account/deactivate"), payload)
+            end
           end
 
           # No changes in v1.9.
@@ -134,11 +145,10 @@ module Async
             # Deactivate this user's account, which cannot be undone.
             #
             # @parameter auth [Hash | nil] the user interactive authentication, without which the homeserver asks for it.
-            # @parameter erase [Boolean | nil] whether to forget what the user sent, as far as the homeserver can.
             # @parameter id_server [String | nil] the identity server to unbind the addresses from.
             # @returns [UnbindResult] what the identity server did with the addresses.
-            def deactivate_account(auth: nil, erase: nil, id_server: nil)
-              payload = {auth: auth, erase: erase, id_server: id_server}.compact
+            def deactivate_account(auth: nil, id_server: nil)
+              payload = {auth: auth, id_server: id_server}.compact
 
               api::UnbindResult.post(@resource.with(path: "#{V3}/account/deactivate"), payload)
             end

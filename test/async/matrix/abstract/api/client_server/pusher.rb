@@ -66,8 +66,22 @@ module Async
             module V1_7
             end
 
-            # No changes in v1.6.
+            # v1.6 let kind be nil, which deletes the pusher.
             module V1_6
+              def self.included(base)
+                base.it "can delete a pusher by giving its kind as nil" do
+                  client.pusher.post_pusher(pushkey, "http", "com.example.app",
+                    app_display_name: "An Application",
+                    device_display_name: "A Device",
+                    lang: "en",
+                    data: {url: "https://example.com/_matrix/push/v1/notify"},
+                  )
+
+                  client.pusher.post_pusher(pushkey, nil, "com.example.app")
+
+                  expect(client.pusher.get_pushers.pushkeys).not.to be(:include?, pushkey)
+                end
+              end
             end
 
             # No changes in v1.5.

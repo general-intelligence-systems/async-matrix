@@ -20,8 +20,21 @@ module Async
             module V1_19
             end
 
-            # No changes in v1.18.
+            # v1.18 added the account management and device authorization fields.
             module V1_18
+              def self.included(base)
+                base.it "names where the user manages their account" do
+                  expect(metadata.account_management_uri).to be_a(String)
+                end
+
+                base.it "names the account management actions it supports" do
+                  expect(metadata.account_management_actions_supported).to be_a(Array)
+                end
+
+                base.it "names a device authorization endpoint" do
+                  expect(metadata.device_authorization_endpoint).to be_a(String)
+                end
+              end
             end
 
             # No changes in v1.17.

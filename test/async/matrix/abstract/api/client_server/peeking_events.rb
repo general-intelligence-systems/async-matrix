@@ -22,8 +22,15 @@ module Async
             module V1_18
             end
 
-            # No changes in v1.17.
+            # v1.17 made room_id required.
             module V1_17
+              def self.included(base)
+                base.it "requires a room_id" do
+                  expect do
+                    client.peeking_events.peek_events(token)
+                  end.to raise_exception(ArgumentError)
+                end
+              end
             end
 
             # No changes in v1.16.

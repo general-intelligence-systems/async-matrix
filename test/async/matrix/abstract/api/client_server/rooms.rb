@@ -25,8 +25,18 @@ module Async
             module V1_17
             end
 
-            # No changes in v1.16.
+            # v1.16 added `format`, choosing content alone or the whole event.
             module V1_16
+              def self.included(base)
+                base.it "reads back the whole event with format: event" do
+                  room.set_room_state_with_key("m.room.topic", {topic: "with format"})
+
+                  event = room.get_room_state_with_key("m.room.topic", format: "event")
+
+                  expect(event.value[:type]).to be == "m.room.topic"
+                  expect(event.content[:topic]).to be == "with format"
+                end
+              end
             end
 
             # No changes in v1.15.
@@ -41,13 +51,8 @@ module Async
             module V1_13
             end
 
-            # v1.12 added the `via` parameter to joining.
+            # No changes in v1.12.
             module V1_12
-              def self.included(base)
-                base.it "joins through the servers named by via" do
-                  expect(room.join_room_by_id(via: ["localhost"]).room_id).to be == room.id
-                end
-              end
             end
 
             # No changes in v1.11.

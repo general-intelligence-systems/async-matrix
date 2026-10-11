@@ -319,13 +319,22 @@ module Async
         # Join a room, by ID or alias.
         #
         # @parameter id_or_alias [String] the room ID or alias, e.g. `#general:localhost`.
+        # @parameter via [Array(String) | nil] the servers to attempt the join through.
         # @returns [Room] the joined room.
-        def join_room(id_or_alias, **payload)
+        def join_room(id_or_alias, via: nil, **payload)
           path = "#{V3}/join/#{::Protocol::URL::Encoding.escape(id_or_alias)}"
+          parameters = {self.join_via_parameter => via}.compact
 
-          joined = api::RoomReference.post(self.with(path: path), payload)
+          joined = api::RoomReference.post(self.with(path: path, parameters: parameters), payload)
 
           self.room(joined.room_id)
+        end
+
+        # The parameter naming the servers to join through.
+        #
+        # @returns [Symbol] the parameter name.
+        def join_via_parameter
+          :via
         end
 
         # @returns [Keys] the end to end encryption keys.

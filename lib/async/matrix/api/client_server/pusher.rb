@@ -56,15 +56,20 @@ module Async
           api::Pushers.get(@resource.with(path: "#{V3}/pushers"))
         end
 
-        # Set a pusher, or take one away by giving its kind as nil.
+        # Set a pusher.
         #
         # @parameter pushkey [String] the key the application gave for this device.
-        # @parameter kind [String | nil] `http`, `email`, or nil to remove the pusher.
+        # @parameter kind [String] `http` or `email`.
         # @parameter app_id [String] the application the key belongs to.
-        # @parameter payload [Hash] the rest the specification allows, e.g. `data:`, `lang:`.
+        # @parameter app_display_name [String] a name the user can identify this application by.
+        # @parameter device_display_name [String] a name the user can identify this device by.
+        # @parameter lang [String] the preferred language for notifications, e.g. `en`.
+        # @parameter data [Hash] the pusher implementation's own data, e.g. `url:` for `http`.
+        # @parameter payload [Hash] the rest the specification allows, e.g. `profile_tag:`, `append:`.
         # @returns [Representation] the empty response.
-        def post_pusher(pushkey, kind, app_id, **payload)
-          body = {pushkey: pushkey, kind: kind, app_id: app_id, **payload}
+        def post_pusher(pushkey, kind, app_id, app_display_name:, device_display_name:, lang:, data:, **payload)
+          body = {pushkey: pushkey, kind: kind, app_id: app_id, app_display_name: app_display_name,
+            device_display_name: device_display_name, lang: lang, data: data, **payload}
 
           api::Representation.post(@resource.with(path: "#{V3}/pushers/set"), body)
         end

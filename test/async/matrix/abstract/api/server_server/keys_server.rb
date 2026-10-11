@@ -66,8 +66,16 @@ module Async
             module V1_7
             end
 
-            # No changes in v1.6.
+            # v1.6 dropped the deprecated key ID from the path.
             module V1_6
+              def self.included(base)
+                # The key ID segment is gone at this version, so the bare `/server` route is what has to answer.
+                base.it "can getServerKey without a key ID segment" do
+                  published = unauthenticated.keys_server.get_server_key
+
+                  expect(published.server_name).to be == server_name
+                end
+              end
             end
 
             # No changes in v1.5.

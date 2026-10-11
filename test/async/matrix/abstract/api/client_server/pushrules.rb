@@ -42,9 +42,11 @@ module Async
             module V1_13
             end
 
-            # v1.12 added reading the global scope on its own.
+            # v1.12 hardcoded `global` and dropped `scope` from the other seven.
             module V1_12
               def self.included(base)
+                base.let(:rule_id){"com.example.async_matrix.#{SecureRandom.hex(6)}"}
+
                 base.it "can getPushRulesGlobal" do
                   global = client.pushrules.get_push_rules_global
 
@@ -55,6 +57,55 @@ module Async
                 # The scope on its own is what the whole set carries under `global`.
                 base.it "answers with what the whole set carries" do
                   expect(client.pushrules.get_push_rules_global.underride).to be == client.pushrules.get_push_rules.global[:underride]
+                end
+
+                base.it "can setPushRule without scope" do
+                  expect(client.pushrules.set_push_rule("sender", rule_id, ["notify"]).value).to be == {}
+                end
+
+                base.it "can getPushRule without scope" do
+                  client.pushrules.set_push_rule("sender", rule_id, ["notify"])
+
+                  read = client.pushrules.get_push_rule("sender", rule_id)
+
+                  expect(read.rule_id).to be == rule_id
+                  expect(read.actions).to be == ["notify"]
+                end
+
+                base.it "can deletePushRule without scope" do
+                  client.pushrules.set_push_rule("sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.delete_push_rule("sender", rule_id).value).to be == {}
+
+                  expect do
+                    client.pushrules.get_push_rule("sender", rule_id)
+                  end.to raise_exception(Async::Matrix::RequestError)
+                end
+
+                base.it "can getPushRuleActions without scope" do
+                  client.pushrules.set_push_rule("sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.get_push_rule_actions("sender", rule_id).actions).to be == ["notify"]
+                end
+
+                base.it "can setPushRuleActions without scope" do
+                  client.pushrules.set_push_rule("sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.set_push_rule_actions("sender", rule_id, ["dont_notify"]).value).to be == {}
+                  expect(client.pushrules.get_push_rule_actions("sender", rule_id).actions).to be == ["dont_notify"]
+                end
+
+                base.it "can isPushRuleEnabled without scope" do
+                  client.pushrules.set_push_rule("sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.is_push_rule_enabled("sender", rule_id)).to be(:enabled?)
+                end
+
+                base.it "can setPushRuleEnabled without scope" do
+                  client.pushrules.set_push_rule("sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.set_push_rule_enabled("sender", rule_id, false).value).to be == {}
+                  expect(client.pushrules.is_push_rule_enabled("sender", rule_id)).not.to be(:enabled?)
                 end
               end
             end
@@ -99,14 +150,87 @@ module Async
             module V1_2
             end
 
-            # No changes in v1.1.
+            # v1.1 took `scope` positionally, which v1.12 hardcoded and dropped.
             module V1_1
+              # The operations these cases exercise dropped `scope` in v1.12, and so did the cases.
+              WITHDRAWN_IN = "v1.12"
+
+              def self.included(base)
+                base.let(:rule_id){"com.example.async_matrix.#{SecureRandom.hex(6)}"}
+
+                base.it "can setPushRule" do
+                  expect(client.pushrules.set_push_rule("global", "sender", rule_id, ["notify"]).value).to be == {}
+                end
+
+                base.it "can getPushRule" do
+                  client.pushrules.set_push_rule("global", "sender", rule_id, ["notify"])
+
+                  read = client.pushrules.get_push_rule("global", "sender", rule_id)
+
+                  expect(read.rule_id).to be == rule_id
+                  expect(read.actions).to be == ["notify"]
+                  expect(read).not.to be(:default?)
+                  expect(read).to be(:enabled?)
+                end
+
+                base.it "can deletePushRule" do
+                  client.pushrules.set_push_rule("global", "sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.delete_push_rule("global", "sender", rule_id).value).to be == {}
+
+                  expect do
+                    client.pushrules.get_push_rule("global", "sender", rule_id)
+                  end.to raise_exception(Async::Matrix::RequestError)
+                end
+
+                base.it "can getPushRuleActions" do
+                  client.pushrules.set_push_rule("global", "sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.get_push_rule_actions("global", "sender", rule_id).actions).to be == ["notify"]
+                end
+
+                base.it "can setPushRuleActions" do
+                  client.pushrules.set_push_rule("global", "sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.set_push_rule_actions("global", "sender", rule_id, ["dont_notify"]).value).to be == {}
+                  expect(client.pushrules.get_push_rule_actions("global", "sender", rule_id).actions).to be == ["dont_notify"]
+                end
+
+                base.it "can isPushRuleEnabled" do
+                  client.pushrules.set_push_rule("global", "sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.is_push_rule_enabled("global", "sender", rule_id)).to be(:enabled?)
+                end
+
+                base.it "can setPushRuleEnabled" do
+                  client.pushrules.set_push_rule("global", "sender", rule_id, ["notify"])
+
+                  expect(client.pushrules.set_push_rule_enabled("global", "sender", rule_id, false).value).to be == {}
+                  expect(client.pushrules.is_push_rule_enabled("global", "sender", rule_id)).not.to be(:enabled?)
+                end
+
+                # The rules the homeserver makes are marked as its own, and carry what they match on.
+                base.it "reads the rules the homeserver made" do
+                  read = client.pushrules.get_push_rule("global", "underride", ".m.rule.message")
+
+                  expect(read).to be(:default?)
+                  expect(read.conditions).not.to be(:empty?)
+                end
+              end
             end
             # The cases required at the version under test.
+            #
+            # A layer whose operations a later version withdrew names that version, and is left out once the version under test has reached it: the cases go the way the operations did.
             CASES = Sus::Shared("push rule cases") do
               Async::Matrix::Versions.layers_for(Async::Matrix::TEST_VERSION).each do |name|
                 if PushRules.const_defined?(name, false)
-                  include PushRules.const_get(name, false)
+                  layer = PushRules.const_get(name, false)
+
+                  if layer.const_defined?(:WITHDRAWN_IN, false) and Async::Matrix::Versions.up_to(Async::Matrix::TEST_VERSION).include?(layer::WITHDRAWN_IN)
+                    next
+                  end
+
+                  include layer
                 end
               end
             end

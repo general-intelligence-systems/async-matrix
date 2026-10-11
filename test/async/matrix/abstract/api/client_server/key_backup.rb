@@ -267,8 +267,45 @@ module Async
             module V1_3
             end
 
-            # No changes in v1.2.
+            # v1.2 renamed the single session operations.
             module V1_2
+              def self.included(base)
+                base.it "says putRoomKeysBySessionId was renamed" do
+                  error = nil
+
+                  begin
+                    keys.put_room_keys_by_session_id(room.id, "session", session_data: session_data)
+                  rescue Async::Matrix::RemovedOperationError => error
+                  end
+
+                  expect(error.version).to be == "v1.2"
+                  expect(error.replacement).to be == :put_room_key_by_session_id
+                end
+
+                base.it "says getRoomKeysBySessionId was renamed" do
+                  error = nil
+
+                  begin
+                    keys.get_room_keys_by_session_id(room.id, "session")
+                  rescue Async::Matrix::RemovedOperationError => error
+                  end
+
+                  expect(error.version).to be == "v1.2"
+                  expect(error.replacement).to be == :get_room_key_by_session_id
+                end
+
+                base.it "says deleteRoomKeysBySessionId was renamed" do
+                  error = nil
+
+                  begin
+                    keys.delete_room_keys_by_session_id(room.id, "session")
+                  rescue Async::Matrix::RemovedOperationError => error
+                  end
+
+                  expect(error.version).to be == "v1.2"
+                  expect(error.replacement).to be == :delete_room_key_by_session_id
+                end
+              end
             end
 
             # v1.1 named the single session operations in the plural.

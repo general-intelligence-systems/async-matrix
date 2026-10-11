@@ -66,8 +66,14 @@ module Async
             module V1_7
             end
 
-            # No changes in v1.6.
+            # v1.6 dropped the deprecated key ID from the path.
             module V1_6
+              def self.included(base)
+                # The key ID segment is gone at this version, so the bare `/query/{serverName}` route is what has to answer.
+                base.it "can perspectivesKeyQuery without a key ID segment" do
+                  expect(unauthenticated.keys_query.perspectives_key_query("elsewhere.test").server_keys).to be_a(Array)
+                end
+              end
             end
 
             # No changes in v1.5.

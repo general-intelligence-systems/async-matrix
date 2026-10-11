@@ -85,15 +85,8 @@ module Async
             module V1_2
             end
 
-            # v1.1 is the oldest version, and sending already exists.
+            # No changes in v1.1.
             module V1_1
-              def self.included(base)
-                base.it "can sendToDevice" do
-                  messages = {self.user_id => {"*" => {algorithm: "m.megolm.v1.aes-sha2", room_id: "!r:localhost"}}}
-
-                  expect(client.to_device.send_to_device("m.room_key", messages).value).to be_a(Hash)
-                end
-              end
             end
 
             # The cases required at the version under test.

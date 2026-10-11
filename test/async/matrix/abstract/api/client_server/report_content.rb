@@ -18,8 +18,15 @@ module Async
             module V1_19
             end
 
-            # No changes in v1.18.
+            # v1.18 dropped the score, leaving only the reason.
             module V1_18
+              def self.included(base)
+                base.it "no longer accepts a score when reporting an event" do
+                  expect do
+                    client.report_content.report_event(room.id, sent.event_id, reason: "a report from a test", score: -100)
+                  end.to raise_exception(ArgumentError)
+                end
+              end
             end
 
             # No changes in v1.17.
@@ -34,11 +41,17 @@ module Async
             module V1_15
             end
 
-            # v1.14 added reporting a user.
+            # v1.14 added user reports, and required the room report's reason.
             module V1_14
               def self.included(base)
                 base.it "can reportUser" do
                   expect(client.report_content.report_user(self.user_id, "a report from a test").value).to be == {}
+                end
+
+                base.it "requires a reason to reportRoom" do
+                  expect do
+                    client.report_content.report_room(room.id)
+                  end.to raise_exception(ArgumentError)
                 end
               end
             end
@@ -49,7 +62,7 @@ module Async
                 base.let(:sent){room.send_message("m.room.message", {msgtype: "m.text", body: "something to report"})}
 
                 base.it "can reportEvent" do
-                  expect(client.report_content.report_event(room.id, sent.event_id, reason: "a report from a test", score: -100).value).to be == {}
+                  expect(client.report_content.report_event(room.id, sent.event_id, reason: "a report from a test").value).to be == {}
                 end
 
                 base.it "can reportRoom" do

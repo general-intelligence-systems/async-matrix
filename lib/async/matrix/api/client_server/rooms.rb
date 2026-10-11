@@ -306,12 +306,9 @@ module Async
 
         # Join this room.
         #
-        # @parameter via [Array(String) | nil] the servers to attempt the join through.
         # @returns [RoomReference] the joined room.
-        def join_room_by_id(via: nil, **payload)
-          parameters = {self.join_via_parameter => via}.compact
-
-          api::RoomReference.post(@resource.with(path: "join", parameters: parameters), payload)
+        def join_room_by_id(**payload)
+          api::RoomReference.post(@resource.with(path: "join"), payload)
         end
 
         # Leave this room.
@@ -356,12 +353,9 @@ module Async
         #
         # @parameter type [String] the event type, e.g. `m.room.name`.
         # @parameter state_key [String] the state key, which is usually empty.
-        # @parameter format [String | nil] `content` for the content alone, `event` for the event.
         # @returns [StateEvent] the state event.
-        def get_room_state_with_key(type, state_key = "", format: nil)
-          parameters = {format: format}.compact
-
-          api::StateEvent.get(@resource.with(path: self.state_path(type, state_key), parameters: parameters))
+        def get_room_state_with_key(type, state_key = "")
+          api::StateEvent.get(@resource.with(path: self.state_path(type, state_key)))
         end
 
         # Set a state event in this room.
@@ -379,13 +373,6 @@ module Async
         # @returns [Boolean] whether `from` is required.
         def pagination_requires_from?
           false
-        end
-
-        # The parameter naming the servers to join through.
-        #
-        # @returns [Symbol] the parameter name.
-        def join_via_parameter
-          :via
         end
 
         private

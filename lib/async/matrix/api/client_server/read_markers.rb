@@ -34,12 +34,11 @@ module Async
         # The marker is for the user's own devices; a receipt is for the room.
         #
         # @parameter room_id [String] the room read in.
-        # @parameter fully_read [String | nil] the event the marker goes to.
+        # @parameter fully_read [String] the event the marker goes to.
         # @parameter read [String | nil] the event a public receipt goes to.
-        # @parameter read_private [String | nil] the event a private receipt goes to.
         # @returns [Representation] the empty response.
-        def set_read_marker(room_id, fully_read: nil, read: nil, read_private: nil)
-          payload = {"m.fully_read": fully_read, "m.read": read, "m.read.private": read_private}.compact
+        def set_read_marker(room_id, fully_read:, read: nil)
+          payload = {"m.fully_read": fully_read, "m.read": read}.compact
 
           api::Representation.post(@resource.with(path: "#{api::Room.path_for(room_id)}/read_markers"), payload)
         end

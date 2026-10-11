@@ -61,8 +61,20 @@ module Async
           module V1_7
           end
 
-          # No changes in v1.6.
+          # v1.6 let kind be nil, which deletes the pusher, and made the other fields optional to match.
           module V1_6
+            # Set a pusher, or take one away by giving its kind as nil.
+            #
+            # @parameter pushkey [String] the key the application gave for this device.
+            # @parameter kind [String | nil] `http`, `email`, or nil to remove the pusher.
+            # @parameter app_id [String] the application the key belongs to.
+            # @parameter payload [Hash] the rest the specification allows, e.g. `data:`, `lang:`.
+            # @returns [Representation] the empty response.
+            def post_pusher(pushkey, kind, app_id, **payload)
+              body = {pushkey: pushkey, kind: kind, app_id: app_id, **payload}
+
+              api::Representation.post(@resource.with(path: "#{V3}/pushers/set"), body)
+            end
           end
 
           # No changes in v1.5.

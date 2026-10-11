@@ -45,8 +45,66 @@ module Async
           module V1_11
           end
 
-          # No changes in v1.10.
+          # v1.10 added recursing into a thread's own relations.
           module V1_10
+            # The events which relate to an event.
+            #
+            # @parameter room_id [String] the room the event is in.
+            # @parameter event_id [String] the event they relate to.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @parameter recurse [Boolean | nil] whether to also return events relating to the related events.
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @returns [RelatedEvents] the page of events.
+            def get_relating_events(room_id, event_id, dir: "b", recurse: nil, from: nil, to: nil, limit: nil)
+              api::RelatedEvents.get(@resource.with(path: self.relations_path_for(room_id, event_id), parameters: self.relations_parameters(from, to, limit, dir: dir, recurse: recurse)))
+            end
+
+            # The events of one relation type which relate to an event.
+            #
+            # @parameter room_id [String] the room the event is in.
+            # @parameter event_id [String] the event they relate to.
+            # @parameter rel_type [String] the relation, e.g. `m.thread`.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @parameter recurse [Boolean | nil] whether to also return events relating to the related events.
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @returns [RelatedEvents] the page of events.
+            def get_relating_events_with_rel_type(room_id, event_id, rel_type, dir: "b", recurse: nil, from: nil, to: nil, limit: nil)
+              path = "#{self.relations_path_for(room_id, event_id)}/#{::Protocol::URL::Encoding.escape(rel_type)}"
+
+              api::RelatedEvents.get(@resource.with(path: path, parameters: self.relations_parameters(from, to, limit, dir: dir, recurse: recurse)))
+            end
+
+            # The events of one relation type and one event type which relate to an event.
+            #
+            # @parameter room_id [String] the room the event is in.
+            # @parameter event_id [String] the event they relate to.
+            # @parameter rel_type [String] the relation, e.g. `m.thread`.
+            # @parameter event_type [String] the event type, e.g. `m.room.message`.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @parameter recurse [Boolean | nil] whether to also return events relating to the related events.
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @returns [RelatedEvents] the page of events.
+            def get_relating_events_with_rel_type_and_event_type(room_id, event_id, rel_type, event_type, dir: "b", recurse: nil, from: nil, to: nil, limit: nil)
+              path = "#{self.relations_path_for(room_id, event_id)}/#{::Protocol::URL::Encoding.escape(rel_type)}/#{::Protocol::URL::Encoding.escape(event_type)}"
+
+              api::RelatedEvents.get(@resource.with(path: path, parameters: self.relations_parameters(from, to, limit, dir: dir, recurse: recurse)))
+            end
+
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @parameter recurse [Boolean | nil] whether to also return events relating to the related events.
+            # @returns [Hash] the parameters all three take.
+            def relations_parameters(from, to, limit, dir: "b", recurse: nil)
+              super(from, to, limit, dir: dir).merge(recurse: recurse).compact
+            end
           end
 
           # No changes in v1.9.
@@ -69,8 +127,62 @@ module Async
           module V1_5
           end
 
-          # No changes in v1.4.
+          # v1.4 added paging direction.
           module V1_4
+            # The events which relate to an event.
+            #
+            # @parameter room_id [String] the room the event is in.
+            # @parameter event_id [String] the event they relate to.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @returns [RelatedEvents] the page of events.
+            def get_relating_events(room_id, event_id, dir: "b", from: nil, to: nil, limit: nil)
+              api::RelatedEvents.get(@resource.with(path: self.relations_path_for(room_id, event_id), parameters: self.relations_parameters(from, to, limit, dir: dir)))
+            end
+
+            # The events of one relation type which relate to an event.
+            #
+            # @parameter room_id [String] the room the event is in.
+            # @parameter event_id [String] the event they relate to.
+            # @parameter rel_type [String] the relation, e.g. `m.thread`.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @returns [RelatedEvents] the page of events.
+            def get_relating_events_with_rel_type(room_id, event_id, rel_type, dir: "b", from: nil, to: nil, limit: nil)
+              path = "#{self.relations_path_for(room_id, event_id)}/#{::Protocol::URL::Encoding.escape(rel_type)}"
+
+              api::RelatedEvents.get(@resource.with(path: path, parameters: self.relations_parameters(from, to, limit, dir: dir)))
+            end
+
+            # The events of one relation type and one event type which relate to an event.
+            #
+            # @parameter room_id [String] the room the event is in.
+            # @parameter event_id [String] the event they relate to.
+            # @parameter rel_type [String] the relation, e.g. `m.thread`.
+            # @parameter event_type [String] the event type, e.g. `m.room.message`.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @returns [RelatedEvents] the page of events.
+            def get_relating_events_with_rel_type_and_event_type(room_id, event_id, rel_type, event_type, dir: "b", from: nil, to: nil, limit: nil)
+              path = "#{self.relations_path_for(room_id, event_id)}/#{::Protocol::URL::Encoding.escape(rel_type)}/#{::Protocol::URL::Encoding.escape(event_type)}"
+
+              api::RelatedEvents.get(@resource.with(path: path, parameters: self.relations_parameters(from, to, limit, dir: dir)))
+            end
+
+            # @parameter from [String | nil] the token a previous page ended at.
+            # @parameter to [String | nil] the token to stop at.
+            # @parameter limit [Integer | nil] the most events wanted.
+            # @parameter dir [String] the direction to page in: `b` (backwards) or `f` (forwards).
+            # @returns [Hash] the parameters all three take.
+            def relations_parameters(from, to, limit, dir: "b")
+              super(from, to, limit).merge(dir: dir)
+            end
           end
 
           # v1.3 added reading the events which relate to an event.
@@ -181,8 +293,12 @@ module Async
           module V1_11
           end
 
-          # No changes in v1.10.
+          # v1.10 added how deep a recursive page of relations went.
           module V1_10
+            # @returns [Integer | nil] how deep recursion went, if `recurse` was given.
+            def recursion_depth
+              self.value[:recursion_depth]
+            end
           end
 
           # No changes in v1.9.

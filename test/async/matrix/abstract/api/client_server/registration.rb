@@ -55,6 +55,8 @@ module Async
                   rescue Async::Matrix::RemovedOperationError => error
                   end
 
+                  expect(error.version).to be == "v1.15"
+                  expect(error.replacement).to be == :deactivate_account
                   expect(error.to).to be == "AccountDeactivation"
                 end
               end
@@ -76,8 +78,18 @@ module Async
             module V1_11
             end
 
-            # No changes in v1.10.
+            # v1.10 added erase to deactivateAccount, and the case moved out again in v1.15.
             module V1_10
+              WITHDRAWN_IN = "v1.15"
+
+              def self.included(base)
+                base.let(:auth){{type: "m.login.password", identifier: {type: "m.id.user", user: self.user_id}, password: Async::Matrix::TEST_PASSWORD}}
+
+                # The user is this case's own, so there is nothing to lose by deactivating it.
+                base.it "can deactivateAccount with erase" do
+                  expect(client.registration.deactivate_account(auth: auth, erase: true)).to be(:unbound?)
+                end
+              end
             end
 
             # No changes in v1.9.
@@ -152,7 +164,7 @@ module Async
 
                 # The user is this case's own, so there is nothing to lose by deactivating it.
                 base.it "can deactivateAccount" do
-                  expect(client.registration.deactivate_account(auth: auth, erase: true)).to be(:unbound?)
+                  expect(client.registration.deactivate_account(auth: auth)).to be(:unbound?)
                 end
               end
             end

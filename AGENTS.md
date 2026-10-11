@@ -1,5 +1,7 @@
 # AGENTS.md
 
+DO NOT FUCKING DARE USE GIT STASH!!!!!!!
+
 ## Hard rules
 
 Never sweep the versions: one run, one specification version. Default to the latest, which is what bare `bin/test` does. Naming a single version to chase a version-specific failure is fine; running every version in order is not, unless expressly permitted. This holds however the script's options change: read its man page for how, not whether.

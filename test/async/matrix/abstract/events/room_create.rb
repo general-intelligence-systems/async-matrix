@@ -23,8 +23,15 @@ module Async
             module V1_17
             end
 
-            # No changes in v1.16.
+            # v1.16 added the additional creators.
             module V1_16
+              def self.included(base)
+                base.it "reads the additional creators v1.16 added" do
+                  create = client.api::RoomCreate.new({creator: "@alice:localhost", additional_creators: ["@bob:localhost"]})
+
+                  expect(create.additional_creators).to be == ["@bob:localhost"]
+                end
+              end
             end
 
             # No changes in v1.15.
@@ -79,8 +86,15 @@ module Async
             module V1_3
             end
 
-            # No changes in v1.2.
+            # v1.2 added the room type.
             module V1_2
+              def self.included(base)
+                base.it "reads the room type v1.2 added" do
+                  create = client.api::RoomCreate.new({creator: "@alice:localhost", type: "m.space"})
+
+                  expect(create.room_type).to be == "m.space"
+                end
+              end
             end
 
             # No changes in v1.1.

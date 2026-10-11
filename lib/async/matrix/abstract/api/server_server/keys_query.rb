@@ -63,8 +63,21 @@ module Async
           module V1_7
           end
 
-          # No changes in v1.6.
+          # v1.6 dropped the deprecated key ID from the path.
           module V1_6
+            # The keys a notary server holds for another server.
+            #
+            # Asking a third party rather than the server itself is what makes it a notary.
+            #
+            # @parameter server_name [String] the server whose keys are wanted.
+            # @parameter minimum_valid_until_ts [Integer | nil] the earliest expiry which will do.
+            # @returns [QueriedKeys] the keys the notary vouches for.
+            def perspectives_key_query(server_name, minimum_valid_until_ts: nil)
+              path = "#{KEY_V2}/query/#{::Protocol::URL::Encoding.escape(server_name)}"
+              parameters = {minimum_valid_until_ts: minimum_valid_until_ts}.compact
+
+              api::QueriedKeys.get(@resource.with(path: path, parameters: parameters))
+            end
           end
 
           # No changes in v1.5.
@@ -87,13 +100,12 @@ module Async
           module V1_1
             # The keys a notary server holds for another server.
             #
-            # Asking a third party rather than the server itself is what makes it a notary.
-            #
             # @parameter server_name [String] the server whose keys are wanted.
             # @parameter minimum_valid_until_ts [Integer | nil] the earliest expiry which will do.
             # @returns [QueriedKeys] the keys the notary vouches for.
             def perspectives_key_query(server_name, minimum_valid_until_ts: nil)
-              path = "#{KEY_V2}/query/#{::Protocol::URL::Encoding.escape(server_name)}"
+              # The key ID segment is deprecated and not required, so it is left empty rather than asked for.
+              path = "#{KEY_V2}/query/#{::Protocol::URL::Encoding.escape(server_name)}/"
               parameters = {minimum_valid_until_ts: minimum_valid_until_ts}.compact
 
               api::QueriedKeys.get(@resource.with(path: path, parameters: parameters))

@@ -19,9 +19,9 @@ describe Async::Matrix::ClientServer::ReadMarkers do
     expect(client.read_markers.set_read_marker(room.id, fully_read: sent.event_id).value).to be == {}
   end
 
-  # The marker and the receipts are set together, which is the point of the endpoint.
-  it "sets the receipts along with the marker" do
-    expect(client.read_markers.set_read_marker(room.id, fully_read: sent.event_id, read: sent.event_id, read_private: sent.event_id).value).to be == {}
+  # The marker and the public receipt are set together, which is the point of the endpoint.
+  it "sets the receipt along with the marker" do
+    expect(client.read_markers.set_read_marker(room.id, fully_read: sent.event_id, read: sent.event_id).value).to be == {}
   end
 
   # The cases for the operations themselves, layered by the version which introduced each:

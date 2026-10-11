@@ -61,8 +61,12 @@ module Async
           module V1_13
           end
 
-          # No changes in v1.12.
+          # v1.12 renamed `server_name` to `via`.
           module V1_12
+            # @returns [Symbol] the parameter name.
+            def join_via_parameter
+              :via
+            end
           end
 
           # No changes in v1.11.
@@ -154,8 +158,12 @@ module Async
           module V1_2
           end
 
-          # No changes in v1.1.
+          # v1.1 carries what the later layers change.
           module V1_1
+            # @returns [Symbol] the parameter name.
+            def join_via_parameter
+              :server_name
+            end
           end
         end
       end

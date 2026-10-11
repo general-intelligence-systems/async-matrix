@@ -69,8 +69,17 @@ module Async
               end
             end
 
-            # No changes in v1.11.
+            # v1.11 added `animated` to the thumbnail query.
             module V1_11
+              def self.included(base)
+                base.it "can getContentThumbnail with animated" do
+                  server_name, media_id = located
+
+                  expect do
+                    client.content_repo.get_content_thumbnail(server_name, media_id, 32, 32, method: "scale", animated: true)
+                  end.to raise_exception(Async::Matrix::RequestError)
+                end
+              end
             end
 
             # No changes in v1.10.
@@ -85,7 +94,7 @@ module Async
             module V1_8
             end
 
-            # v1.7 added reserving a URI before the bytes are ready.
+            # v1.7 added reserving a URI, and widened the download queries.
             module V1_7
               def self.included(base)
                 base.it "can createContent" do
@@ -100,6 +109,14 @@ module Async
                   server_name, media_id = created.content_uri.delete_prefix("mxc://").split("/")
 
                   expect(client.content_repo.upload_content_to_mxc(server_name, media_id, "the reserved bytes", "text/plain").value).to be == {}
+                end
+
+                base.it "can getContentThumbnail with allow_redirect and timeout_ms" do
+                  server_name, media_id = located
+
+                  expect do
+                    client.content_repo.get_content_thumbnail(server_name, media_id, 32, 32, method: "scale", allow_redirect: true, timeout_ms: 5000)
+                  end.to raise_exception(Async::Matrix::RequestError)
                 end
               end
             end

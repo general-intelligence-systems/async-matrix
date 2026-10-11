@@ -7,6 +7,8 @@ require "async/matrix/client_context"
 require "async/matrix/events"
 require "async/matrix/events_context"
 
+require_relative "../abstract/events/room_message"
+
 describe Async::Matrix::Events::Message do
   include Async::Matrix::ClientContext
   include Async::Matrix::EventsContext
@@ -87,4 +89,7 @@ describe Async::Matrix::Events::Message do
       expect(request.methods).to be(:include?, :verification_methods)
     end
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::Events::Message::CASES
 end

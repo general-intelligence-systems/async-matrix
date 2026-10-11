@@ -79,8 +79,15 @@ module Async
             module V1_3
             end
 
-            # No changes in v1.2.
+            # v1.2 added the allow rules a restricted join reads.
             module V1_2
+              def self.included(base)
+                base.it "reads the allow rules v1.2 added" do
+                  join_rules = client.api::RoomJoinRules.new({join_rule: "restricted", allow: [{type: "m.room_membership", room_id: "!room:localhost"}]})
+
+                  expect(join_rules.allow).to be == [{type: "m.room_membership", room_id: "!room:localhost"}]
+                end
+              end
             end
 
             # No changes in v1.1.

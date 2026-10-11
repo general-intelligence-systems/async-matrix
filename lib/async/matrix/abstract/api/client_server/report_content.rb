@@ -13,8 +13,19 @@ module Async
           module V1_19
           end
 
-          # No changes in v1.18.
+          # v1.18 dropped the score, leaving only the reason.
           module V1_18
+            # Report an event to the administrators of this homeserver.
+            #
+            # @parameter room_id [String] the room the event is in.
+            # @parameter event_id [String] the event to report.
+            # @parameter reason [String | nil] why it is being reported.
+            # @returns [Representation] the empty response.
+            def report_event(room_id, event_id, reason: nil)
+              payload = {reason: reason}.compact
+
+              api::Representation.post(@resource.with(path: self.report_path_for(room_id, event_id)), payload)
+            end
           end
 
           # No changes in v1.17.
@@ -29,7 +40,7 @@ module Async
           module V1_15
           end
 
-          # v1.14 added reporting a user.
+          # v1.14 added user reports, and required the room report's reason.
           module V1_14
             # Report a user to the administrators of this homeserver.
             #
@@ -40,6 +51,15 @@ module Async
               path = "#{V3}/users/#{::Protocol::URL::Encoding.escape(user_id)}/report"
 
               api::Representation.post(@resource.with(path: path), {reason: reason})
+            end
+
+            # Report a room to the administrators of this homeserver.
+            #
+            # @parameter room_id [String] the room to report.
+            # @parameter reason [String] why it is being reported.
+            # @returns [Representation] the empty response.
+            def report_room(room_id, reason:)
+              api::Representation.post(@resource.with(path: self.report_path_for(room_id)), {reason: reason})
             end
           end
 
