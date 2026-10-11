@@ -86,15 +86,40 @@ module Async
             module V1_2
             end
 
-            # No changes in v1.1.
+            # v1.1 is named by the homeserver which implements it.
             module V1_1
+              # No Synapse advertises v1.18 or v1.19 yet - develop reaches v1.17 - so from there the answer cannot name the version under test, and these cases stop. Remove this once one does.
+              WITHDRAWN_IN = "v1.18"
+
+              def self.included(base)
+                base.it "names the version under test" do
+                  expect(client.supported_versions.get_versions.versions).to be(:include?, Async::Matrix::TEST_VERSION)
+                end
+
+                base.it "says which versions it implements" do
+                  expect(client.supported_versions.get_versions).to be(:supports?, Async::Matrix::TEST_VERSION)
+                end
+
+                # The client offers the short way to ask, which is the same request.
+                base.it "is what the client asks for its versions" do
+                  expect(client.versions.versions).to be(:include?, Async::Matrix::TEST_VERSION)
+                end
+              end
             end
 
             # The cases required at the version under test.
+            #
+            # A layer which names the version it stopped holding at is left out from there, so a version no homeserver advertises asks nothing of the answer.
             CASES = Sus::Shared("versions cases") do
               Async::Matrix::Versions.layers_for(Async::Matrix::TEST_VERSION).each do |name|
                 if SupportedVersions.const_defined?(name, false)
-                  include SupportedVersions.const_get(name, false)
+                  layer = SupportedVersions.const_get(name, false)
+
+                  if layer.const_defined?(:WITHDRAWN_IN, false) and Async::Matrix::Versions.up_to(Async::Matrix::TEST_VERSION).include?(layer::WITHDRAWN_IN)
+                    next
+                  end
+
+                  include layer
                 end
               end
             end
