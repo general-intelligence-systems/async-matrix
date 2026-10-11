@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/versions"
+
 describe Async::Matrix::ClientServer::SupportedVersions do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -26,4 +28,7 @@ describe Async::Matrix::ClientServer::SupportedVersions do
   it "is what the client asks for its versions" do
     expect(client.versions.versions).to be(:include?, Async::Matrix::TEST_VERSION)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::SupportedVersions::CASES
 end

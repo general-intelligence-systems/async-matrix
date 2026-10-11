@@ -5,6 +5,7 @@
 
 require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/versions"
 
 module Async
   module Matrix

@@ -22,6 +22,12 @@
 name: async-matrix
 
 x-synapse: &synapse
+  # Always ask the registry, because the tag is rebuilt rather than retired: synapse:spec-v1.3 is
+  # "the Synapse which implements Matrix v1.3", and it points at a different Synapse whenever
+  # flake.nix changes which one that is. Without this, a run reuses whatever was pulled last and
+  # tests the version mapping of the day it was pulled, which fails in ways that read as library
+  # bugs. A pull of an unchanged tag costs one manifest request, since the layers are cached.
+  pull_policy: always
   environment:
     SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
     PYTHONPATH: /config/modules
@@ -230,6 +236,7 @@ services:
 
   sydent:
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sydent:latest
+    pull_policy: always
     # The same namespace as the homeserver, so that the name the homeserver calls itself resolves
     # to it from here. Its port is published by the homeserver, above.
     network_mode: "service:${MATRIX_SERVICE:-v1.19}"
@@ -252,6 +259,7 @@ services:
   # its own port, so it runs alongside whichever homeserver version is up.
   sygnal:
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sygnal:latest
+    pull_policy: always
     environment:
       SYGNAL_CONF: /config/sygnal.yaml
     volumes:
@@ -340,6 +348,7 @@ services:
   oauth-synapse:
     profiles: [oauth]
     image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/synapse:spec-v1.19
+    pull_policy: always
     environment:
       SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
     depends_on:

@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/directory"
+
 describe Async::Matrix::ClientServer::Directory do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -46,4 +48,7 @@ describe Async::Matrix::ClientServer::Directory do
   it "has no aliases for a room which was never named" do
     expect(client.directory.get_local_aliases(room.id)).to be(:empty?)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Directory::CASES
 end

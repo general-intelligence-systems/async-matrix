@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/event_context"
+
 describe Async::Matrix::ClientServer::EventContext do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -45,4 +47,7 @@ describe Async::Matrix::ClientServer::EventContext do
     expect(context.start).to be_a(String)
     expect(context.finish).to be_a(String)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::EventContext::CASES
 end

@@ -6,6 +6,8 @@
 require "async/matrix/application_service_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/application_service/transactions"
+
 describe Async::Matrix::ApplicationService::Transactions do
   include Async::Matrix::ApplicationServiceContext
   include Async::Matrix::OperationsContext
@@ -20,4 +22,7 @@ describe Async::Matrix::ApplicationService::Transactions do
 
     expect(service.transactions.send_transaction("2", []).value).to be == {}
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ApplicationService::Transactions::CASES
 end

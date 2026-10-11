@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/tags"
+
 describe Async::Matrix::ClientServer::Tags do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -34,4 +36,7 @@ describe Async::Matrix::ClientServer::Tags do
   it "has no tags on a room which was never tagged" do
     expect(client.tags.get_room_tags(self.user_id, room.id)).to be(:empty?)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Tags::CASES
 end

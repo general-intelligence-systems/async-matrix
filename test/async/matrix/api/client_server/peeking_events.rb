@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/peeking_events"
+
 describe Async::Matrix::ClientServer::PeekingEvents do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -28,4 +30,7 @@ describe Async::Matrix::ClientServer::PeekingEvents do
 
     expect(client.peeking_events.peek_events(page.finish, room_id: room.id, timeout: 0)).to be(:empty?)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::PeekingEvents::CASES
 end

@@ -6,6 +6,8 @@
 require "async/matrix/identity_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/identity/v2_pubkey"
+
 describe Async::Matrix::Identity::V2Pubkey do
   include Async::Matrix::IdentityContext
   include Async::Matrix::OperationsContext
@@ -34,4 +36,7 @@ describe Async::Matrix::Identity::V2Pubkey do
       unauthenticated.v2_pubkey.get_pub_key_v2("ed25519:nope")
     end.to raise_exception(Async::Matrix::RequestError)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::Identity::V2Pubkey::CASES
 end

@@ -6,6 +6,8 @@
 require "async/matrix/application_service_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/application_service/query_user"
+
 describe Async::Matrix::ApplicationService::QueryUser do
   include Async::Matrix::ApplicationServiceContext
   include Async::Matrix::OperationsContext
@@ -20,4 +22,7 @@ describe Async::Matrix::ApplicationService::QueryUser do
       service.query_user.query_user_by_id("@nobody:localhost")
     end.to raise_exception(Async::Matrix::RequestError)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ApplicationService::QueryUser::CASES
 end

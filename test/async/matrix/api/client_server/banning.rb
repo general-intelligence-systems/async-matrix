@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/banning"
+
 describe Async::Matrix::ClientServer::Banning do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -35,4 +37,7 @@ describe Async::Matrix::ClientServer::Banning do
       other.room(room.id).join_room_by_id
     end.to raise_exception(Async::Matrix::RequestError)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Banning::CASES
 end

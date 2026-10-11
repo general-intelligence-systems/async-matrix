@@ -6,6 +6,8 @@
 require "async/matrix/identity_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/identity/v2_email_associations"
+
 describe Async::Matrix::Identity::V2EmailAssociations do
   include Async::Matrix::IdentityContext
   include Async::Matrix::OperationsContext
@@ -34,4 +36,7 @@ describe Async::Matrix::Identity::V2EmailAssociations do
   it "can emailSubmitTokenPostV2" do
     expect(identity.v2_email_associations.email_submit_token_post_v2("a-session", "a-secret", "a-token")).not.to be(:success?)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::Identity::V2EmailAssociations::CASES
 end

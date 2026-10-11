@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/search"
+
 describe Async::Matrix::ClientServer::Search do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -25,4 +27,7 @@ describe Async::Matrix::ClientServer::Search do
   it "finds nothing for a term nobody sent" do
     expect(client.search.search({room_events: {search_term: needle}})).to be(:empty?)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Search::CASES
 end

@@ -6,6 +6,8 @@
 require "async/matrix/push_gateway_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/push_gateway/push_notifier"
+
 describe Async::Matrix::PushGateway::PushNotifier do
   include Async::Matrix::PushGatewayContext
   include Async::Matrix::OperationsContext
@@ -36,4 +38,7 @@ describe Async::Matrix::PushGateway::PushNotifier do
 
     expect(error.status).to be == 400
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::PushGateway::PushNotifier::CASES
 end

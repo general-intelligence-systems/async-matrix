@@ -6,6 +6,8 @@
 require "async/matrix/identity_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/identity/v2_associations"
+
 describe Async::Matrix::Identity::V2Associations do
   include Async::Matrix::IdentityContext
   include Async::Matrix::OperationsContext
@@ -44,4 +46,7 @@ describe Async::Matrix::Identity::V2Associations do
 
     expect(error.status).to be == 401
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::Identity::V2Associations::CASES
 end

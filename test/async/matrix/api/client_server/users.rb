@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/users"
+
 describe Async::Matrix::ClientServer::Users do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -23,4 +25,7 @@ describe Async::Matrix::ClientServer::Users do
   it "says whether the homeserver stopped short of every match" do
     expect(client.users.search_user_directory("someone", limit: 1).limited?).to be == false
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Users::CASES
 end

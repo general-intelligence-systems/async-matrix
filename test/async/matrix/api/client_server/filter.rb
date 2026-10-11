@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/filter"
+
 describe Async::Matrix::ClientServer::Filter do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -27,4 +29,7 @@ describe Async::Matrix::ClientServer::Filter do
       client.filter.get_filter(self.user_id, "not-a-filter")
     end.to raise_exception(Async::Matrix::RequestError)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Filter::CASES
 end

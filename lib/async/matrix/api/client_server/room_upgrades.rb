@@ -6,6 +6,7 @@
 require_relative "../../representation"
 require_relative "../../versioned"
 require_relative "rooms"
+require_relative "../../abstract/api/client_server/room_upgrades"
 
 module Async
   module Matrix

@@ -6,6 +6,8 @@
 require "async/matrix/identity_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/identity/versions"
+
 describe Async::Matrix::Identity::SupportedVersions do
   include Async::Matrix::IdentityContext
   include Async::Matrix::OperationsContext
@@ -21,4 +23,7 @@ describe Async::Matrix::Identity::SupportedVersions do
   it "advertises the identity versions rather than the client-server ones" do
     expect(unauthenticated.supported_versions.get_versions.versions).to be(:include?, "r0.1.0")
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::Identity::SupportedVersions::CASES
 end

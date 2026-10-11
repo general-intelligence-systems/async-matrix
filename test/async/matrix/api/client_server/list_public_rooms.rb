@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/list_public_rooms"
+
 describe Async::Matrix::ClientServer::ListPublicRooms do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -38,4 +40,7 @@ describe Async::Matrix::ClientServer::ListPublicRooms do
     expect(visibility.visibility).to be == "public"
     expect(visibility).to be(:public?)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::ListPublicRooms::CASES
 end

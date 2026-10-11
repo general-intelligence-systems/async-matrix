@@ -6,6 +6,7 @@
 require_relative "../../paths"
 require_relative "../../representation"
 require_relative "../../versioned"
+require_relative "../../abstract/api/identity/versions"
 
 module Async
   module Matrix

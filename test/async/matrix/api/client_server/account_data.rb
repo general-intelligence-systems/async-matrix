@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/account_data"
+
 describe Async::Matrix::ClientServer::AccountData do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -41,4 +43,7 @@ describe Async::Matrix::ClientServer::AccountData do
 
     expect(client.account_data.get_account_data(self.user_id, type).value).to be == {colour: "blue"}
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::AccountData::CASES
 end

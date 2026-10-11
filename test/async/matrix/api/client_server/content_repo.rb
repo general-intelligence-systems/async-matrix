@@ -25,28 +25,7 @@ describe Async::Matrix::ClientServer::ContentRepo do
     expect(client.content_repo.get_config.upload_size).to be > 0
   end
 
-  # Synapse serves media through the endpoints which authenticate, and answers the ones which do not with nothing. The three cases below assert that refusal: the request is the one the specification describes, and {Async::Matrix::ClientServer::AuthedContentRepo} is where the bytes come back.
-  it "can getContent" do
-    server_name, media_id = located
-
-    error = nil
-
-    begin
-      client.content_repo.get_content(server_name, media_id)
-    rescue Async::Matrix::RequestError => error
-    end
-
-    expect(error.errcode).to be == "M_NOT_FOUND"
-  end
-
-  it "can getContentOverrideName" do
-    server_name, media_id = located
-
-    expect do
-      client.content_repo.get_content_override_name(server_name, media_id, "renamed.txt")
-    end.to raise_exception(Async::Matrix::RequestError)
-  end
-
+  # Whether the endpoints which do not authenticate serve anything is a question of which homeserver answers, so those two cases are layered. {Async::Matrix::ClientServer::AuthedContentRepo} is where the bytes come back once they stop.
   it "can getContentThumbnail" do
     server_name, media_id = located
 
@@ -64,4 +43,7 @@ describe Async::Matrix::ClientServer::ContentRepo do
 
   # The cases for the operations themselves, layered by the version which introduced each:
   include Async::Matrix::Testing::Abstract::ClientServer::ContentRepo::CASES
+
+  # The endpoints which do not authenticate, for as long as a homeserver serves them:
+  include Async::Matrix::Testing::Abstract::ClientServer::UnauthenticatedContent::CASES
 end

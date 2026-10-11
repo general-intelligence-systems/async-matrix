@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/notifications"
+
 describe Async::Matrix::ClientServer::Notifications do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -21,4 +23,7 @@ describe Async::Matrix::ClientServer::Notifications do
   it "takes only the highlights where it is asked to" do
     expect(client.notifications.get_notifications(only: "highlight").notifications).to be_a(Array)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Notifications::CASES
 end

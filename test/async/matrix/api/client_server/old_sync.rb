@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/old_sync"
+
 describe Async::Matrix::ClientServer::OldSync do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -39,4 +41,7 @@ describe Async::Matrix::ClientServer::OldSync do
   it "takes the rooms this user has left where it is asked to" do
     expect(client.old_sync.initial_sync(limit: 1, archived: true).rooms).to be_a(Array)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::OldSync::CASES
 end

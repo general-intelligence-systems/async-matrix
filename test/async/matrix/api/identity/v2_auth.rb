@@ -6,6 +6,8 @@
 require "async/matrix/identity_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/identity/v2_auth"
+
 describe Async::Matrix::Identity::V2Auth do
   include Async::Matrix::IdentityContext
   include Async::Matrix::OperationsContext
@@ -46,4 +48,7 @@ describe Async::Matrix::Identity::V2Auth do
       unauthenticated.v2_auth.register_account("not-a-token", "Bearer", "localhost", 3600)
     end.to raise_exception(Async::Matrix::RequestError)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::Identity::V2Auth::CASES
 end

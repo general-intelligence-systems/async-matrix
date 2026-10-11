@@ -45,8 +45,14 @@ module Async
             module V1_12
             end
 
-            # No changes in v1.11.
+            # v1.11 runs Synapse 1.111.0, which judges the key first.
             module V1_11
+              def self.included(base)
+                # Setting cross-signing up for the first time stopped asking for authentication, so the malformed key is what the homeserver answers about.
+                base.let(:refused_upload_status){400}
+
+                base.let(:refused_upload_errcode){"M_INVALID_PARAM"}
+              end
             end
 
             # No changes in v1.10.
@@ -92,7 +98,7 @@ module Async
                   expect(client.cross_signing.upload_cross_signing_signatures({})).to be(:accepted?)
                 end
 
-                # The server checks the key before it asks for authentication, and we have nothing to sign it with.
+                # The homeserver asks for authentication before it looks at the key, and there is nothing to authenticate a reset with.
                 base.it "can uploadCrossSigningKeys" do
                   error = nil
 
@@ -102,9 +108,14 @@ module Async
                   end
 
                   expect(error).to be_a(Async::Matrix::RequestError)
-                  expect(error.status).to be == 400
-                  expect(error.errcode).to be == "M_INVALID_PARAM"
+                  expect(error.status).to be == self.refused_upload_status
+                  expect(error.errcode).to be == self.refused_upload_errcode
                 end
+
+                # What the refusal is, which a later layer changes.
+                base.let(:refused_upload_status){401}
+
+                base.let(:refused_upload_errcode){nil}
               end
             end
 

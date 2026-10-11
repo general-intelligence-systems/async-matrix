@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/read_markers"
+
 describe Async::Matrix::ClientServer::ReadMarkers do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -21,4 +23,7 @@ describe Async::Matrix::ClientServer::ReadMarkers do
   it "sets the receipts along with the marker" do
     expect(client.read_markers.set_read_marker(room.id, fully_read: sent.event_id, read: sent.event_id, read_private: sent.event_id).value).to be == {}
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::ReadMarkers::CASES
 end

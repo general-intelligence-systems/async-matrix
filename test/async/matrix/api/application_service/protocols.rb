@@ -6,6 +6,8 @@
 require "async/matrix/application_service_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/application_service/protocols"
+
 describe Async::Matrix::ApplicationService::Protocols do
   include Async::Matrix::ApplicationServiceContext
   include Async::Matrix::OperationsContext
@@ -54,4 +56,7 @@ describe Async::Matrix::ApplicationService::Protocols do
   it "finds nobody for an address it does not know" do
     expect(service.protocols.query_user_by_id("@nobody:localhost")).to be(:empty?)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ApplicationService::Protocols::CASES
 end

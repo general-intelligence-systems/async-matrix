@@ -8,6 +8,7 @@ require "async/rest/representation"
 require_relative "../../paths"
 require_relative "../../versioned"
 require_relative "../../wrapper/lenient"
+require_relative "../../abstract/api/push_gateway/push_notifier"
 
 module Async
   module Matrix

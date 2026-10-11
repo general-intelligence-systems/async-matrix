@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/administrative_contact"
+
 describe Async::Matrix::ClientServer::AdministrativeContact do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -31,29 +33,6 @@ describe Async::Matrix::ClientServer::AdministrativeContact do
 
   it "can unbind3pidFromAccount" do
     expect(contact.unbind_3pid_from_account("email", "nobody@example.com").id_server_unbind_result).to be == "no-support"
-  end
-
-  # Mail is off in the rig, so the homeserver will not start a validation.
-  it "can requestTokenTo3PIDEmail" do
-    error = nil
-
-    begin
-      contact.request_token_to_3pid_email("a-secret", "nobody@example.com")
-    rescue Async::Matrix::RequestError => error
-    end
-
-    expect(error.errcode).to be == "M_THREEPID_MEDIUM_NOT_SUPPORTED"
-  end
-
-  it "can requestTokenTo3PIDMSISDN" do
-    error = nil
-
-    begin
-      contact.request_token_to_3pid_msisdn("a-secret", "GB", "7700900000")
-    rescue Async::Matrix::RequestError => error
-    end
-
-    expect(error.errcode).to be == "M_THREEPID_MEDIUM_NOT_SUPPORTED"
   end
 
   # There is no validated session to quote, since nothing can validate one here.
@@ -85,4 +64,7 @@ describe Async::Matrix::ClientServer::AdministrativeContact do
       contact.bind_3pid("a-secret", "localhost", "not-a-token", "not-a-session")
     end.to raise_exception(Async::Matrix::RequestError)
   end
+
+  # The cases whose refusal the homeserver names differently from one version to the next:
+  include Async::Matrix::Testing::Abstract::ClientServer::AdministrativeContact::CASES
 end

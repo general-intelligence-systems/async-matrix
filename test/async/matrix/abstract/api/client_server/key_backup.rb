@@ -196,6 +196,122 @@ module Async
               end
             end
           end
+
+          # Cases for {ruby Async::Matrix::ClientServer::BackupKeys}, whose session operations v1.2 renamed.
+          module BackupKeys
+            # No changes in v1.19.
+            module V1_19
+            end
+
+            # No changes in v1.18.
+            module V1_18
+            end
+
+            # No changes in v1.17.
+            module V1_17
+            end
+
+            # No changes in v1.16.
+            module V1_16
+            end
+
+            # No changes in v1.15.
+            module V1_15
+            end
+
+            # No changes in v1.14.
+            module V1_14
+            end
+
+            # No changes in v1.13.
+            module V1_13
+            end
+
+            # No changes in v1.12.
+            module V1_12
+            end
+
+            # No changes in v1.11.
+            module V1_11
+            end
+
+            # No changes in v1.10.
+            module V1_10
+            end
+
+            # No changes in v1.9.
+            module V1_9
+            end
+
+            # No changes in v1.8.
+            module V1_8
+            end
+
+            # No changes in v1.7.
+            module V1_7
+            end
+
+            # No changes in v1.6.
+            module V1_6
+            end
+
+            # No changes in v1.5.
+            module V1_5
+            end
+
+            # No changes in v1.4.
+            module V1_4
+            end
+
+            # No changes in v1.3.
+            module V1_3
+            end
+
+            # No changes in v1.2.
+            module V1_2
+            end
+
+            # v1.1 named the single session operations in the plural.
+            module V1_1
+              # The operations these cases exercise are gone from v1.2, and so are the cases.
+              WITHDRAWN_IN = "v1.2"
+
+              def self.included(base)
+                base.it "can putRoomKeysBySessionId" do
+                  expect(keys.put_room_keys_by_session_id(room.id, "session", session_data: session_data).count).to be == 1
+                end
+
+                base.it "can getRoomKeysBySessionId" do
+                  keys.put_room_keys_by_session_id(room.id, "session", session_data: session_data)
+
+                  expect(keys.get_room_keys_by_session_id(room.id, "session").session_data[:ciphertext]).to be == "cipher"
+                end
+
+                base.it "can deleteRoomKeysBySessionId" do
+                  keys.put_room_keys_by_session_id(room.id, "session", session_data: session_data)
+
+                  expect(keys.delete_room_keys_by_session_id(room.id, "session").count).to be == 0
+                end
+              end
+            end
+
+            # The cases required at the version under test.
+            #
+            # A layer whose operations a later version withdrew names that version, and is left out once the version under test has reached it: the cases go the way the operations did.
+            CASES = Sus::Shared("backup keys cases") do
+              Async::Matrix::Versions.layers_for(Async::Matrix::TEST_VERSION).each do |name|
+                if BackupKeys.const_defined?(name, false)
+                  layer = BackupKeys.const_get(name, false)
+
+                  if layer.const_defined?(:WITHDRAWN_IN, false) and Async::Matrix::Versions.up_to(Async::Matrix::TEST_VERSION).include?(layer::WITHDRAWN_IN)
+                    next
+                  end
+
+                  include layer
+                end
+              end
+            end
+          end
         end
       end
     end

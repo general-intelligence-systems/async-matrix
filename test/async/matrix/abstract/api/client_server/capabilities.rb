@@ -60,8 +60,14 @@ module Async
             module V1_14
             end
 
-            # No changes in v1.13.
+            # v1.13 runs a develop Synapse, which advertises an unstable capability.
             module V1_13
+              def self.included(base)
+                # The response is an open map, so a capability this library has never heard of is still readable. The homeserver has to advertise one for the case to have something to read, and `org.matrix.msc4140.delayed_events` is the first which is not behind a setting the rig leaves off.
+                base.it "reads a capability outside the specification's own namespace" do
+                  expect(client.get_capabilities["org.matrix.msc4140.delayed_events"]).to be_a(Hash)
+                end
+              end
             end
 
             # v1.12 added four capabilities about this user's own account.
@@ -153,13 +159,6 @@ module Async
                   expect(available.values.uniq - ["stable", "unstable"]).to be(:empty?)
                 end
 
-                # The response is an open map, so a capability this library has never heard of is still readable.
-                base.it "reads a capability outside the specification's own namespace" do
-                  unstable = client.get_capabilities.capabilities.keys.find{|name| name.to_s.start_with?("org.matrix.")}
-
-                  expect(unstable).not.to be_nil
-                  expect(client.get_capabilities[unstable]).to be_a(Hash)
-                end
               end
             end
 

@@ -6,6 +6,8 @@
 require "async/matrix/client_context"
 require "async/matrix/operations_context"
 
+require_relative "../../abstract/api/client_server/presence"
+
 describe Async::Matrix::ClientServer::Presence do
   include Async::Matrix::ClientContext
   include Async::Matrix::OperationsContext
@@ -30,4 +32,7 @@ describe Async::Matrix::ClientServer::Presence do
 
     expect(client.presence.get_presence(self.user_id).last_active_ago).to be_a(Integer)
   end
+
+  # The cases for the operations themselves, layered by the version which introduced each:
+  include Async::Matrix::Testing::Abstract::ClientServer::Presence::CASES
 end

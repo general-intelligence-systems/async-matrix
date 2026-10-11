@@ -6,6 +6,7 @@
 require "protocol/url/encoding"
 
 require_relative "../../versioned"
+require_relative "../../abstract/api/client_server/redaction"
 require_relative "rooms"
 
 module Async

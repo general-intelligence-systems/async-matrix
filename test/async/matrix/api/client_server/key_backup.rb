@@ -14,4 +14,7 @@ describe Async::Matrix::ClientServer::KeyBackup do
 
   # The cases for the operations themselves, layered by the version which introduced each:
   include Async::Matrix::Testing::Abstract::ClientServer::KeyBackup::CASES
+
+  # The session operations, which v1.2 renamed:
+  include Async::Matrix::Testing::Abstract::ClientServer::BackupKeys::CASES
 end
