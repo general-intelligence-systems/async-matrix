@@ -32,6 +32,15 @@ x-synapse: &synapse
     # one of its own. The published ports all sit in an unused range, clear of the defaults
     # services pick for themselves.
     - "${SYDENT_PORT:-7302}:8090"
+  # The database and the media store, which homeserver.yaml puts under /tmp.
+  #
+  # In memory, because the rig's database is thrown away with the container either way, and on disk
+  # it is what the suite spends its time on: SQLite fsyncs per transaction, and a createRoom is
+  # fifty persisted events, which costs about 2.7 seconds against the container's overlay
+  # filesystem. Every case which touches a room pays that, and the ones which give up waiting are
+  # the `Connection from client lost before response was sent` in the homeserver's log.
+  tmpfs:
+    - /tmp
   healthcheck:
     test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
     interval: 3s

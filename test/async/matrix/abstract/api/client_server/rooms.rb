@@ -118,10 +118,13 @@ module Async
                   expect(room.get_joined_members_by_room.user_ids).to be(:include?, self.user_id)
                 end
 
+                # From a token, which v1.1 requires: v1.3 made it optional, and the case for leaving it out belongs to that layer. The token is taken after the message is sent, because the page is read backwards from it.
                 base.it "can getRoomEvents" do
                   room.send_message("m.room.message", {msgtype: "m.text", body: "paged"})
 
-                  expect(room.get_room_events(limit: 10).events).not.to be(:empty?)
+                  from = client.sync(timeout: 0).next_batch
+
+                  expect(room.get_room_events(limit: 10, from: from).events).not.to be(:empty?)
                 end
 
                 base.it "can sendMessage" do

@@ -78,10 +78,15 @@ describe Async::Matrix::ClientServer::Room do
   end
 
   with "#messages" do
+    # A token to page back from, which the specification requires before v1.3 and accepts at every version. It is taken after the messages are sent, so that the page read backwards from it carries them.
+    def paging_from
+      client.sync(timeout: 0).next_batch
+    end
+
     it "can page backwards through the timeline" do
       3.times{|index| room.send_message("m.room.message", {msgtype: "m.text", body: "page #{index}"})}
 
-      first = room.get_room_events(limit: 2)
+      first = room.get_room_events(limit: 2, from: paging_from)
 
       expect(first.events.size).to be == 2
       expect(first.finish).not.to be_nil
@@ -98,7 +103,7 @@ describe Async::Matrix::ClientServer::Room do
     it "includes the messages which were sent" do
       room.send_message("m.room.message", {msgtype: "m.text", body: "findable"})
 
-      bodies = room.get_room_events(limit: 20).filter_map{|event| event.dig(:content, :body)}
+      bodies = room.get_room_events(limit: 20, from: paging_from).filter_map{|event| event.dig(:content, :body)}
 
       expect(bodies).to be(:include?, "findable")
     end
