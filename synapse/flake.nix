@@ -47,8 +47,19 @@
         versions = {
           "v1.1" = { published = "v1.54.0"; };
           "v1.2" = { published = "v1.54.0"; };
-          "v1.3" = { published = "v1.55.0"; };
-          "v1.4" = { published = "v1.70.0"; };
+          # Synapse never advertised v1.3 on its own: every release up to 1.69.0 advertised as far as
+          # v1.2, and 1.70.0 jumped straight to v1.1 through v1.4. 1.70.0 and 1.71.0 are still too
+          # early, because the refresh endpoint v1.3 defines is served at
+          # /_matrix/client/v1/refresh there, where the specification puts it under v3: 1.72.0 is
+          # the first release whose RefreshTokenServlet takes client_patterns("/refresh$"). So both
+          # versions take it, being the earliest release which advertises them and serves what they
+          # define.
+          #
+          # The servlet is registered only where `refreshable_access_token_lifetime` is set, which
+          # reads as something the rig would have to turn on - but it defaults to "5m" rather than
+          # to nothing, so homeserver.yaml needs no setting for it.
+          "v1.3" = { published = "v1.72.0"; };
+          "v1.4" = { published = "v1.72.0"; };
           "v1.5" = { published = "v1.74.0"; };
           "v1.6" = { published = "v1.84.0"; };
           "v1.7" = { published = "v1.84.0"; };
