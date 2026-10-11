@@ -303,6 +303,11 @@ services:
 
   # Registers the user the OAuth suite logs in as. MAS has no equivalent of the version rig's
   # register-on-first-login module, so the user is seeded once, here.
+  #
+  # It waits for the homeserver, not just the database: registering a user provisions it into
+  # Synapse as well, and a user seeded while the homeserver was down exists in MAS alone. The
+  # authorization server then refuses every exchange, because the device it must create belongs
+  # to a user the homeserver has never heard of.
   oauth-mas-user:
     profiles: [oauth]
     image: ghcr.io/element-hq/matrix-authentication-service:latest
@@ -318,7 +323,7 @@ services:
       - "${MATRIX_OAUTH_PASSWORD:-password}"
       - "${MATRIX_OAUTH_USERNAME:-oauthtester}"
     depends_on:
-      oauth-postgres:
+      oauth-synapse:
         condition: service_healthy
     volumes:
       - ./mas.yaml:/config/mas.yaml:ro

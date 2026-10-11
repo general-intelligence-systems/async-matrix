@@ -15,10 +15,8 @@ require "rbconfig"
 # The program the child runs, which measures itself and prints what it found.
 SUBJECT = File.expand_path("subject.rb", __dir__)
 
-# The library under test, which is this working copy rather than an installed gem.
-LIBRARY = File.expand_path("../../lib", __dir__)
-
 run_benchmark do
+  # LIBRARY rather than this file's own directory, so that a comparison loads the revision under test rather than always this one:
   output = IO.popen([RbConfig.ruby, "-I", LIBRARY, SUBJECT], &:read)
 
   JSON.parse(output, symbolize_names: true)

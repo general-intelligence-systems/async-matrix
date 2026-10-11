@@ -14,6 +14,11 @@ require "fileutils"
 # Where a run's results are written: a file per benchmark, so that two runs can be compared rather than one overwriting the other.
 DATA = File.expand_path("../data", __dir__)
 
+# The library under test, which is this working copy unless bin/benchmark is comparing it against another revision.
+#
+# A comparison measures the baseline's `lib` with this revision's benchmarks and harness, because a benchmark which changed between the two sides is measuring itself. That is also what lets a revision from before the benchmarks existed be a baseline at all.
+LIBRARY = File.expand_path(ENV.fetch("BENCHMARK_LIBRARY"){File.expand_path("../../lib", __dir__)})
+
 # The file this run writes, which bin/benchmark overrides when it is collecting a set of runs together.
 RESULTS = File.expand_path(ENV.fetch("BENCHMARK_RESULTS"){File.join(DATA, "#{Time.now.strftime("%F-%H%M%S")}.json")})
 

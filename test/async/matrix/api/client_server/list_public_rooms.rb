@@ -29,10 +29,13 @@ describe Async::Matrix::ClientServer::ListPublicRooms do
     expect(visibility).not.to be(:public?)
   end
 
-  # Synapse keeps publication to itself by default, so the homeserver refuses. The case asserts the refusal: what it has to prove is that the request is the one the specification asked for.
+  # The rig lets any room publish - see `room_list_publication_rules` in the homeserver configuration - so the room goes onto the directory and the entry which said it was private now says it is public.
   it "can setRoomVisibilityOnDirectory" do
-    expect do
-      client.list_public_rooms.set_room_visibility_on_directory(room.id, "public")
-    end.to raise_exception(Async::Matrix::RequestError)
+    client.list_public_rooms.set_room_visibility_on_directory(room.id, "public")
+
+    visibility = client.list_public_rooms.get_room_visibility_on_directory(room.id)
+
+    expect(visibility.visibility).to be == "public"
+    expect(visibility).to be(:public?)
   end
 end

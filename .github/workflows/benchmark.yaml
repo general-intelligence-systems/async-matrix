@@ -1,0 +1,75 @@
+name: Benchmark
+
+# What a branch did to the numbers, compared against the branch it is going into.
+#
+# bin/benchmark --compare runs each benchmark twice - against the base revision's library and
+# against this one's - with the benchmarks and the harness coming from this revision both times, so
+# a benchmark which changed on the branch is not measuring itself.
+#
+# It gates on allocations and not on timings. A runner is a shared machine: the neighbours are
+# invisible, the clock is not the one that measured the baseline last week, and a wall-clock figure
+# taken on one is not reproducible to the few percent that a regression would show up as. Gating on
+# it would fail honest branches often enough that everybody learns to ignore the job, which is worse
+# than not having one. Allocation counts do not care what else the machine is doing: the same code
+# allocates the same objects, so a change in one is a change in the code. The timings are still
+# reported, and the results are uploaded, so a suspicious figure can be chased by hand on a quiet
+# machine - which is where a timing is worth believing anyway.
+#
+# Ruby comes from ruby/setup-ruby rather than the flake, as it does for the suite: the devShell pins
+# one Ruby through bundlerEnv.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - async-rest
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: The revision to compare this one against.
+        required: true
+        default: origin/async-rest
+
+permissions:
+  contents: read
+
+# Without the lint and maintenance groups, which the benchmarks have no use for. The benchmark group
+# itself is kept: the harnesses are what need it.
+#
+# At the workflow level rather than on the setup-ruby step, for the reason the suite's workflow gives:
+# BUNDLE_WITHOUT is read from the environment and is not written to .bundle/config, so a step which
+# does not see it makes `bundle exec` demand the gems the install skipped.
+env:
+  BUNDLE_WITHOUT: lint maintenance
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    name: compare against ${{inputs.revision || github.base_ref}}
+    runs-on: ubuntu-latest
+
+    steps:
+    # The whole history, because --compare checks the base revision out into a worktree and the
+    # shallow clone a checkout gives by default has one commit in it.
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "4.0"
+        bundler-cache: true
+
+    - name: Compare
+      timeout-minutes: 20
+      run: bin/benchmark --compare "${{inputs.revision || format('origin/{0}', github.base_ref)}}" --gate allocations
+
+    # Uploaded whatever happened, because the run which failed is the one worth reading.
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: benchmark-results
+        path: benchmark/data

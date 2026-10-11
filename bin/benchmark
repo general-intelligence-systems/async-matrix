@@ -6,7 +6,8 @@
 #      bin/benchmark — measure the library against itself
 #
 # SYNOPSIS
-#      bin/benchmark [--harness name] [--category name] [--version version] [--list]
+#      bin/benchmark [--harness name] [--category name] [--version version]
+#                    [--compare revision] [--threshold percentage] [--gate name] [--list]
 #                    [benchmark ...]
 #
 # DESCRIPTION
@@ -20,6 +21,23 @@
 #      With no benchmark, every registered one is run. A benchmark is registered by being
 #      listed in benchmark/benchmarks.yml, so a file which merely supports one is not
 #      mistaken for one.
+#
+#      With --compare, each benchmark is run twice - against another revision's library and
+#      against this working copy's - and what changed is reported. The benchmarks and the
+#      harness come from this working copy both times, so that a benchmark which changed
+#      between the two revisions is not measuring itself; only lib/ differs. That is also what
+#      lets a revision from before the benchmarks existed be a baseline.
+#
+#      The two sides of a benchmark are run back to back rather than every baseline and then
+#      every current, because a machine drifts over the minutes a full run takes and running
+#      the sides apart turns that drift into the difference being reported.
+#
+#      A change is reported as a change only when it is larger than the runs it was measured
+#      from: each result carries how much that run varied, and the two deviations added
+#      together, or --threshold, whichever is larger, is what a difference has to beat.
+#      Allocation counts are judged against a tighter floor of their own, because the same
+#      code allocates the same objects however busy the machine is - which makes them the
+#      signal to trust where the machine is shared. See --gate.
 #
 #      These are the benchmarks which need nothing but a Ruby. The ones which need a
 #      homeserver run against the rig bin/test brings up, and are not here yet.
@@ -43,6 +61,22 @@
 #              The specification version to build for, where a benchmark builds one. Defaults
 #              to the latest the library knows about.
 #
+#      --compare revision
+#              Measure that revision's library as well as this working copy's, and report what
+#              changed. The revision is checked out into a temporary worktree, which is
+#              removed afterwards; the working copy is not touched, so a comparison can be run
+#              with uncommitted changes in it, which is the usual case.
+#
+#      --threshold percentage
+#              The floor a timing has to move to count as a change, where the runs varied by
+#              less than that. Defaults to 10.
+#
+#      --gate name
+#              What is allowed to fail the comparison. all, the default, is what somebody
+#              watching a run on their own machine wants. allocations is what a shared machine
+#              should use: a timing on a CI runner is not reproducible enough to block on, and
+#              gating on one teaches everybody to ignore the job. none reports and exits 0.
+#
 #      --list  Print the registered benchmarks with what each measures, and exit.
 #
 # ENVIRONMENT
@@ -53,6 +87,11 @@
 #      BENCHMARK_RESULTS
 #              Set for each benchmark, to the file it is to write. A benchmark run by hand and
 #              not given one writes a file named for the time instead.
+#
+#      BENCHMARK_LIBRARY
+#              Set for each benchmark, to the lib/ it is to measure. This working copy's unless
+#              a baseline is being run. A benchmark run by hand and not given one measures this
+#              working copy.
 #
 #      WARMUP_ITERATIONS, MINIMUM_ITERATIONS, MINIMUM_TIME, MAXIMUM_ITERATIONS
 #              Read by the default harness: how many iterations are discarded, and the fewest
@@ -85,7 +124,9 @@
 #              profile dump or allocation report where a harness wrote one. Not checked in.
 #
 # EXIT STATUS
-#      The bin/benchmark utility exits 0 on success, and >0 if an error occurs.
+#      The bin/benchmark utility exits 0 on success, and >0 if an error occurs. With --compare
+#      it also exits >0 when something the gate counts got worse, which is what a workflow
+#      reads.
 #
 # EXAMPLES
 #      Run everything:
@@ -118,8 +159,21 @@
 #
 #            bin/benchmark --version v1.1 versions/build
 #
+#      Find out whether the branch made anything worse:
+#
+#            bin/benchmark --compare main --category headline
+#
+#      Compare one benchmark, and insist on a percent:
+#
+#            bin/benchmark --compare HEAD~1 --threshold 1 events/wrap
+#
+#      What a workflow on a shared runner should ask:
+#
+#            bin/benchmark --compare origin/main --gate allocations
+#
 # SEE ALSO
-#      bin/test(1), benchmark/readme.md
+#      bin/test(1), benchmark/readme.md, benchmark/compare.rb,
+#      .github/workflows/benchmark.yaml
 #
 # async-matrix                          October 11, 2026                        BENCHMARK(1)
 
@@ -133,6 +187,9 @@ harness="harness"
 category=""
 version="${MATRIX_VERSION:-}"
 list="no"
+compare=""
+threshold="10"
+gate="all"
 chosen=()
 
 while [ "$#" -gt 0 ]; do
@@ -175,6 +232,45 @@ while [ "$#" -gt 0 ]; do
       ;;
     --version=*)
       version="${1#--version=}"
+      ;;
+    --compare)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--compare needs a revision." >&2
+        exit 1
+      fi
+
+      compare="$1"
+      ;;
+    --compare=*)
+      compare="${1#--compare=}"
+      ;;
+    --threshold)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--threshold needs a percentage." >&2
+        exit 1
+      fi
+
+      threshold="$1"
+      ;;
+    --threshold=*)
+      threshold="${1#--threshold=}"
+      ;;
+    --gate)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--gate needs all, allocations or none." >&2
+        exit 1
+      fi
+
+      gate="$1"
+      ;;
+    --gate=*)
+      gate="${1#--gate=}"
       ;;
     --list)
       list="yes"
@@ -246,21 +342,76 @@ selected=$(ruby -ryaml -e '
 ' "$manifest" "$category" ${chosen[@]+"${chosen[@]}"})
 
 output="$root/benchmark/data/$(date +%F-%H%M%S)"
-mkdir -p "$output"
 
-for name in $selected; do
-  echo "Benchmarking $name on $harness." >&2
+# Run the selection against one library, which is this working copy's unless a baseline is being
+# measured. The benchmarks and the harness always come from this working copy: one which changed
+# between the two sides of a comparison would be measuring itself.
+run_benchmark() {
+  local name="$1" library="$2" results="$3" label="$4" tolerate="$5"
 
-  environment=("BENCHMARK_RESULTS=$output/${name//\//-}.json")
+  mkdir -p "$results"
+
+  echo "Benchmarking $name on $harness${label:+ ($label)}." >&2
+
+  environment=(
+    "BENCHMARK_RESULTS=$results/${name//\//-}.json"
+    "BENCHMARK_LIBRARY=$library"
+  )
 
   if [ -n "$version" ]; then
     environment+=("MATRIX_VERSION=$version")
   fi
 
-  env "${environment[@]}" bundle exec ruby \
+  if env "${environment[@]}" bundle exec ruby \
     -I "$root/benchmark/$harness" \
-    -I "$root/lib" \
+    -I "$library" \
     "$root/benchmark/$name.rb"
+  then
+    return 0
+  fi
+
+  # A benchmark which cannot run against the baseline is reported and skipped: it may measure
+  # something that revision does not have, which is a benchmark with no baseline rather than a
+  # failure. Against this working copy it is a failure.
+  if [ "$tolerate" = "yes" ]; then
+    echo "  $name did not run against $label; it may measure something that revision does not have." >&2
+  else
+    exit 1
+  fi
+}
+
+if [ -z "$compare" ]; then
+  for name in $selected; do
+    run_benchmark "$name" "$root/lib" "$output" "" "no"
+  done
+
+  echo "Results in $output." >&2
+  exit 0
+fi
+
+if ! git -C "$root" rev-parse --verify --quiet "$compare^{commit}" > /dev/null; then
+  echo "Unknown revision $compare." >&2
+  exit 1
+fi
+
+# A worktree rather than a checkout, so that the working copy is left exactly as it was: a
+# comparison is run with uncommitted changes in it more often than not, and that is the point.
+worktree="$(mktemp --directory --tmpdir "async-matrix-baseline-XXXXXX")"
+
+trap 'git -C "$root" worktree remove --force "$worktree" > /dev/null 2>&1 || rm -rf "$worktree"' EXIT
+
+git -C "$root" worktree add --detach --quiet "$worktree" "$compare"
+
+echo "Comparing this working copy against $compare ($(git -C "$root" rev-parse --short "$compare"))." >&2
+
+# The two sides of one benchmark are run back to back, rather than every baseline and then every
+# current. A machine drifts over the minutes a full run takes - a core clocks down, something else
+# wakes up - and running the sides apart turns that drift into the difference being reported.
+for name in $selected; do
+  run_benchmark "$name" "$worktree/lib" "$output/baseline" "$compare" "yes"
+  run_benchmark "$name" "$root/lib" "$output/current" "working copy" "no"
 done
 
 echo "Results in $output." >&2
+
+ruby "$root/benchmark/compare.rb" "$output/baseline" "$output/current" "$threshold" "$gate"

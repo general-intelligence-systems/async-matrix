@@ -15,7 +15,10 @@ require "yaml"
 
 # The payload the event benchmarks measure against.
 module Payload
-  SCHEMAS = File.expand_path("../../lib/async/matrix/abstract/events/schemas", __dir__)
+  # The schemas the payload is built from, which belong to the library under test rather than to this working copy.
+  #
+  # A comparison therefore builds each side's payload from that side's own schemas, because the schemas are what its event classes were generated from: measuring a revision against types it has never heard of would measure the fallback and call it decoding. Where the two differ the event count differs with them, which is what the recorded `events` figure is for.
+  SCHEMAS = File.join(LIBRARY, "async", "matrix", "abstract", "events", "schemas")
 
   # A plausible value for each type a schema declares.
   VALUES = {
@@ -38,7 +41,14 @@ module Payload
   class << self
     # Every event the version describes: one per family, and one per variant of one.
     def events(version)
-      manifests(version).flat_map do |path|
+      paths = self.manifests(version)
+
+      # Loudly, rather than measuring an empty batch: a revision whose schemas are elsewhere is a comparison which cannot be made, not one which found no work to do.
+      if paths.empty?
+        raise "No event schemas for #{version} under #{SCHEMAS}."
+      end
+
+      paths.flat_map do |path|
         entries = YAML.safe_load_file(path)["events"] || {}
 
         entries.each_value.map{|entry| self.event(entry)}

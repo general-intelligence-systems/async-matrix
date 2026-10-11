@@ -5,6 +5,7 @@
 
 require "async/http/internet"
 
+require "async/matrix/oauth_context"
 require "async/matrix/operations_context"
 
 # Cases for the OAuth server metadata operations, layered by version.
@@ -34,7 +35,7 @@ module Async
             # v1.15 added the auth metadata endpoint.
             module V1_15
               # Where the rig sends an authorization code back to.
-              REDIRECT_URI = Async::Matrix::OAUTH_REDIRECT_URI
+              REDIRECT_URI = ::Async::Matrix::OAUTH_REDIRECT_URI
 
               # Register this application, which a public client must do before it can authorize.
               #

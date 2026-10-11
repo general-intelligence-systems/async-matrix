@@ -34,8 +34,8 @@ http:
   - 127.0.0.1/8
   - fd00::/8
   - ::1/128
-  public_base: http://localhost:8091/
-  issuer: http://localhost:8091/
+  public_base: http://localhost:7301/
+  issuer: http://localhost:7301/
 database:
   uri: postgresql://mas:mas@oauth-postgres:5432/mas
   max_connections: 10
