@@ -298,10 +298,10 @@ module Async
         # @parameter session_id [String] the session it belongs to.
         # @returns [Async::Matrix::Events::Envelope] the event it carried.
         def decrypted(event, room_id, session_id)
-          plaintext = @crypto.decrypt(room_id, session_id: session_id, ciphertext: event.content[:ciphertext])
+          plaintext, message_index = @crypto.decrypt(room_id, session_id: session_id, ciphertext: event.content[:ciphertext])
           payload = ::JSON.parse(plaintext, symbolize_names: true)
 
-          Console.debug(self, "Read an encrypted event.", room_id: room_id, session_id: session_id, event_id: event[:event_id], type: payload[:type])
+          Console.debug(self, "Read an encrypted event.", room_id: room_id, session_id: session_id, event_id: event[:event_id], type: payload[:type], message_index: message_index)
 
           @events.wrap(event.to_h.merge(type: payload[:type], content: payload[:content]), room_id: room_id)
         end

@@ -112,13 +112,19 @@ describe Async::Matrix::E2EE::Plaintext do
 
       crypto.create_inbound_session(room.id, session_id: session[:session_id], session_key: session[:session_key])
 
-      expect(crypto.decrypt(room.id, session_id: session[:session_id], ciphertext: ciphertext)).to be == %({"a":1})
+      expect(crypto.decrypt(room.id, session_id: session[:session_id], ciphertext: ciphertext)).to be == [%({"a":1}), 0]
     end
 
     it "refuses a session it was never given" do
+      crypto.create_outbound_session(room.id)
       ciphertext = crypto.encrypt(room.id, %({"a":1}))
 
       expect{crypto.decrypt(room.id, session_id: "never", ciphertext: ciphertext)}.to raise_exception(KeyError)
+    end
+
+    # Encrypting into a room with no session would write a message nobody holds the key for, including us.
+    it "refuses to encrypt for a room it has begun no session for" do
+      expect{crypto.encrypt(room.id, %({"a":1}))}.to raise_exception(KeyError)
     end
 
     # A client shows the messages it sent, which come back in a sync batch like anybody else's.
@@ -126,7 +132,7 @@ describe Async::Matrix::E2EE::Plaintext do
       session = crypto.create_outbound_session(room.id)
       ciphertext = crypto.encrypt(room.id, %({"a":1}))
 
-      expect(crypto.decrypt(room.id, session_id: session[:session_id], ciphertext: ciphertext)).to be == %({"a":1})
+      expect(crypto.decrypt(room.id, session_id: session[:session_id], ciphertext: ciphertext)).to be == [%({"a":1}), 0]
     end
 
     it "refuses something another implementation wrote" do
@@ -141,15 +147,97 @@ describe Async::Matrix::E2EE::Plaintext do
       sent = room.send_message(content.type, content.to_h)
       stored = room.get_one_room_event(sent.event_id)
 
-      plaintext = crypto.decrypt(room.id, session_id: content.session_id, ciphertext: stored.content[:ciphertext])
+      plaintext, _ = crypto.decrypt(room.id, session_id: content.session_id, ciphertext: stored.content[:ciphertext])
 
       expect(JSON.parse(plaintext, symbolize_names: true)[:content][:body]).to be == "stored"
     end
   end
 
   with "#algorithms" do
-    it "encrypts with megolm, as a room is encrypted" do
-      expect(crypto.algorithms).to be == [subject::ALGORITHM]
+    # A device which did not offer Olm could never be sent a room key, because that is what carries one.
+    it "offers both ratchets, because the room keys travel over Olm" do
+      expect(crypto.algorithms).to be == [subject::OLM, subject::MEGOLM]
+    end
+  end
+
+  with "#generate_fallback_key" do
+    it "generates a key the server may hand out more than once" do
+      expect(crypto.fallback_key).to be(:empty?)
+
+      crypto.generate_fallback_key
+
+      expect(crypto.fallback_key.size).to be == 1
+      expect(crypto.fallback_key.keys.first.to_s).to be(:start_with?, "signed_curve25519:")
+    end
+  end
+
+  with "#encrypt_to_device" do
+    let(:their_key) {other_crypto.identity_keys[:curve25519]}
+
+    it "has no session with a device it has not claimed a key for" do
+      expect(crypto.session?(their_key)).to be == false
+      expect{crypto.encrypt_to_device(their_key, %({"a":1}))}.to raise_exception(KeyError)
+    end
+
+    # This is what carries every key: a room key is an Olm message before it is anything else.
+    it "writes a pre-key message, which the other device adopts as a session" do
+      other_crypto.generate_one_time_keys(1)
+      crypto.open_session(identity_key: their_key, one_time_key: other_crypto.one_time_keys.values.first)
+
+      type, body = crypto.encrypt_to_device(their_key, %({"type":"m.room_key"}))
+      read = other_crypto.accept_session(identity_key: crypto.identity_keys[:curve25519], body: body)
+
+      expect(type).to be == 0
+      expect(read).to be == %({"type":"m.room_key"})
+    end
+
+    # Olm sends pre-key messages until one arrives over the session, which is how the other side knows to keep it.
+    it "writes a normal message once one has arrived over the session" do
+      other_crypto.generate_one_time_keys(1)
+      crypto.open_session(identity_key: their_key, one_time_key: other_crypto.one_time_keys.values.first)
+
+      _, body = crypto.encrypt_to_device(their_key, %({"a":1}))
+      crypto.decrypt_from_device(their_key, type: 0, body: body)
+
+      type, _ = crypto.encrypt_to_device(their_key, %({"b":2}))
+
+      expect(type).to be == 1
+    end
+  end
+
+  with "#export_session" do
+    it "exports a session another device can import" do
+      session = crypto.create_outbound_session(room.id)
+      ciphertext = crypto.encrypt(room.id, %({"a":1}))
+      exported = crypto.export_session(session[:session_id], index: 0)
+
+      other_crypto.import_inbound_session(room.id, session_id: session[:session_id], exported_key: exported)
+
+      expect(other_crypto.decrypt(room.id, session_id: session[:session_id], ciphertext: ciphertext)).to be == [%({"a":1}), 0]
+    end
+
+    # Megolm ratchets forward only, so a key for an earlier message cannot be produced from a later one.
+    it "cannot export a session from before where it begins" do
+      session = crypto.create_outbound_session(room.id)
+      exported = crypto.export_session(session[:session_id], index: 0)
+
+      other_crypto.import_inbound_session(room.id, session_id: session[:session_id], exported_key: exported, index: 4)
+
+      expect(other_crypto.export_session(session[:session_id], index: 0)).to be_nil
+    end
+  end
+
+  with "#dump" do
+    # A device which forgot its sessions on restart would lose every message it had already been sent the key for.
+    it "restores everything it was dumped with" do
+      session = crypto.create_outbound_session(room.id)
+      ciphertext = crypto.encrypt(room.id, %({"a":1}))
+
+      restored = subject.load(crypto.dump("ignored"), "ignored")
+
+      expect(restored.identity_keys).to be == crypto.identity_keys
+      expect(restored.session_for(room.id)[:session_id]).to be == session[:session_id]
+      expect(restored.decrypt(room.id, session_id: session[:session_id], ciphertext: ciphertext)).to be == [%({"a":1}), 0]
     end
   end
 end

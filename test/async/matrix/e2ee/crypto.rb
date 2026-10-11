@@ -22,11 +22,26 @@ describe Async::Matrix::E2EE::Crypto do
     expect{bare.one_time_keys}.to raise_exception(NotImplementedError)
     expect{bare.published_one_time_keys!}.to raise_exception(NotImplementedError)
     expect{bare.one_time_key_target}.to raise_exception(NotImplementedError)
+    expect{bare.generate_fallback_key}.to raise_exception(NotImplementedError)
+    expect{bare.fallback_key}.to raise_exception(NotImplementedError)
     expect{bare.create_outbound_session("!r:localhost")}.to raise_exception(NotImplementedError)
     expect{bare.session_for("!r:localhost")}.to raise_exception(NotImplementedError)
     expect{bare.create_inbound_session("!r:localhost", session_id: "s", session_key: "k")}.to raise_exception(NotImplementedError)
+    expect{bare.import_inbound_session("!r:localhost", session_id: "s", exported_key: "k")}.to raise_exception(NotImplementedError)
+    expect{bare.export_session("s", index: 0)}.to raise_exception(NotImplementedError)
     expect{bare.encrypt("!r:localhost", "{}")}.to raise_exception(NotImplementedError)
     expect{bare.decrypt("!r:localhost", session_id: "s", ciphertext: "c")}.to raise_exception(NotImplementedError)
+    expect{bare.dump("k")}.to raise_exception(NotImplementedError)
+    expect{subject.load("{}", "k")}.to raise_exception(NotImplementedError)
+  end
+
+  # The keys are what Olm carries, so an implementation without this half can deliver nothing at all.
+  it "refuses to answer the Olm half, which every key travels over" do
+    expect{bare.session?("k")}.to raise_exception(NotImplementedError)
+    expect{bare.open_session(identity_key: "k", one_time_key: "o")}.to raise_exception(NotImplementedError)
+    expect{bare.accept_session(identity_key: "k", body: "b")}.to raise_exception(NotImplementedError)
+    expect{bare.encrypt_to_device("k", "{}")}.to raise_exception(NotImplementedError)
+    expect{bare.decrypt_from_device("k", type: 0, body: "b")}.to raise_exception(NotImplementedError)
   end
 
   # Nothing reaches the homeserver, because the keys to publish cannot be produced in the first place.

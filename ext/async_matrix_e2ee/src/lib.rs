@@ -106,6 +106,17 @@ impl Account {
         self.0.borrow_mut().mark_keys_as_published();
     }
 
+    /// Drops the private half of the previous fallback key.
+    ///
+    /// The spec says to keep at most two fallback private keys — the current one
+    /// and the one before it — and to drop the older once it is reasonably
+    /// certain no more messages will arrive using it, because a fallback key is
+    /// not consumed by use and so keeps decrypting replays indefinitely.
+    /// Returns whether there was one to forget.
+    fn forget_fallback_key(&self) -> bool {
+        self.0.borrow_mut().forget_fallback_key()
+    }
+
     /// Returns a Session for sending to a peer identified by their identity and
     /// one-time keys (both base64).
     fn create_outbound_session(
@@ -299,6 +310,87 @@ impl InboundGroupSession {
     }
 }
 
+// --- Sas (short authentication string) -------------------------------------
+
+/// One half of an SAS verification, before the Diffie-Hellman.
+///
+/// A `Sas` establishes exactly one shared secret and is consumed doing so,
+/// which is why `diffie_hellman` takes it out of the cell: vodozemac models that
+/// with an owned `self`, and a second attempt is a programming error rather than
+/// something to be silently allowed.
+#[magnus::wrap(class = "Async::Matrix::E2EE::Sas", free_immediately, size)]
+struct Sas {
+    sas: RefCell<Option<vodozemac::sas::Sas>>,
+    // Kept separately so that it survives the Diffie-Hellman: the SAS and MAC
+    // info strings are built from BOTH public keys, so a caller still needs its
+    // own after the exchange has consumed the Sas itself.
+    public_key: String,
+}
+
+impl Sas {
+    fn new() -> Self {
+        let sas = vodozemac::sas::Sas::new();
+        let public_key = sas.public_key().to_base64();
+
+        Sas {
+            sas: RefCell::new(Some(sas)),
+            public_key,
+        }
+    }
+
+    /// The ephemeral public key to send in `m.key.verification.key`.
+    fn public_key(&self) -> String {
+        self.public_key.clone()
+    }
+
+    fn diffie_hellman(&self, their_public_key: String) -> Result<EstablishedSas, Error> {
+        let key = Curve25519PublicKey::from_base64(&their_public_key).map_err(rt_err)?;
+        let sas = self
+            .sas
+            .borrow_mut()
+            .take()
+            .ok_or_else(|| rt_err("this Sas has already been established"))?;
+        Ok(EstablishedSas(sas.diffie_hellman(key).map_err(rt_err)?))
+    }
+}
+
+#[magnus::wrap(class = "Async::Matrix::E2EE::EstablishedSas", free_immediately, size)]
+struct EstablishedSas(vodozemac::sas::EstablishedSas);
+
+impl EstablishedSas {
+    /// The seven emoji indices of the `emoji` SAS method, as table offsets.
+    fn emoji_indices(&self, info: String) -> Vec<u8> {
+        self.0.bytes(&info).emoji_indices().to_vec()
+    }
+
+    /// The three numbers of the `decimal` SAS method, already offset by 1000.
+    fn decimals(&self, info: String) -> (u16, u16, u16) {
+        self.0.bytes(&info).decimals()
+    }
+
+    /// The raw bytes, for a SAS method this crate does not implement.
+    fn bytes(&self, info: String) -> Vec<u8> {
+        self.0.bytes(&info).as_bytes().to_vec()
+    }
+
+    fn calculate_mac(&self, input: String, info: String) -> String {
+        self.0.calculate_mac(&input, &info).to_base64()
+    }
+
+    /// The `hkdf-hmac-sha256` MAC, which libolm encoded incorrectly.
+    ///
+    /// Deprecated by the spec in favour of `hkdf-hmac-sha256.v2`, and kept only
+    /// so that a verification with an older client can still be read.
+    fn calculate_mac_invalid_base64(&self, input: String, info: String) -> String {
+        self.0.calculate_mac_invalid_base64(&input, &info)
+    }
+
+    fn verify_mac(&self, input: String, info: String, tag: String) -> Result<bool, Error> {
+        let mac = vodozemac::sas::Mac::from_base64(&tag).map_err(rt_err)?;
+        Ok(self.0.verify_mac(&input, &info, &mac).is_ok())
+    }
+}
+
 // --- module-level functions ------------------------------------------------
 
 /// Verify an ed25519 signature. `key` and `signature` are base64; returns bool.
@@ -330,6 +422,7 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     account.define_method("fallback_key", method!(Account::fallback_key, 0))?;
     account.define_method("generate_fallback_key", method!(Account::generate_fallback_key, 0))?;
     account.define_method("mark_keys_as_published", method!(Account::mark_keys_as_published, 0))?;
+    account.define_method("forget_fallback_key", method!(Account::forget_fallback_key, 0))?;
     account.define_method("create_outbound_session", method!(Account::create_outbound_session, 2))?;
     account.define_method("create_inbound_session", method!(Account::create_inbound_session, 2))?;
 
@@ -362,6 +455,22 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "export_at_first_known_index",
         method!(InboundGroupSession::export_at_first_known_index, 0),
     )?;
+
+    let sas = namespace.define_class("Sas", ruby.class_object())?;
+    sas.define_singleton_method("new", function!(Sas::new, 0))?;
+    sas.define_method("public_key", method!(Sas::public_key, 0))?;
+    sas.define_method("diffie_hellman", method!(Sas::diffie_hellman, 1))?;
+
+    let established = namespace.define_class("EstablishedSas", ruby.class_object())?;
+    established.define_method("emoji_indices", method!(EstablishedSas::emoji_indices, 1))?;
+    established.define_method("decimals", method!(EstablishedSas::decimals, 1))?;
+    established.define_method("bytes", method!(EstablishedSas::bytes, 1))?;
+    established.define_method("calculate_mac", method!(EstablishedSas::calculate_mac, 2))?;
+    established.define_method(
+        "calculate_mac_invalid_base64",
+        method!(EstablishedSas::calculate_mac_invalid_base64, 2),
+    )?;
+    established.define_method("verify_mac", method!(EstablishedSas::verify_mac, 3))?;
 
     namespace.define_module_function("verify_signature", function!(verify_signature, 3))?;
 

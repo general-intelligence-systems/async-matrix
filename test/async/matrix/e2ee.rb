@@ -10,8 +10,11 @@ require "async/matrix/e2ee_context"
 describe Async::Matrix::E2EE do
   include Async::Matrix::E2EEContext
 
+  # Not an exact list: E2EE::Vodozemac and the classes the binding defines appear once anything requires it, which this file deliberately does not.
   it "requires everything encryption needs" do
-    expect(Async::Matrix::E2EE.constants.sort).to be == [:CanonicalJSON, :Crypto, :Device, :Devices, :Machine, :Plaintext, :Store]
+    required = [:CanonicalJSON, :Crypto, :Device, :Devices, :Machine, :Plaintext, :Store]
+
+    expect(required - Async::Matrix::E2EE.constants).to be(:empty?)
   end
 
   # Requiring this one file is all a client needs to encrypt, which is what it is for.
