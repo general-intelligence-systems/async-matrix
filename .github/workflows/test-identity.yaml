@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   versions:
-    name: Resolve versions
+    name: Resolve the identity versions
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{steps.resolve.outputs.matrix}}
@@ -37,7 +37,7 @@ jobs:
     - uses: actions/checkout@v5
     
     - id: resolve
-      name: Resolve versions from MATRIX_API_VERSIONS.txt
+      name: List the versions the identity operations run against
       run: |
         if [ ! -s MATRIX_API_VERSIONS.txt ]; then
           echo "::error::MATRIX_API_VERSIONS.txt is missing or empty."
@@ -47,7 +47,7 @@ jobs:
         echo "matrix=$(jq -R -s -c 'split("\n") | map(select(length > 0))' < MATRIX_API_VERSIONS.txt)" >> "$GITHUB_OUTPUT"
 
   test:
-    name: matrix ${{matrix.version}}
+    name: identity operations ${{matrix.version}}
     needs: versions
     runs-on: ubuntu-latest
     
@@ -64,7 +64,7 @@ jobs:
         ruby-version: "3.4"
         bundler-cache: true
     
-    - name: Test
+    - name: Run test/operations/identity.rb
       timeout-minutes: 10
       env:
         MATRIX_VERSION: ${{matrix.version}}

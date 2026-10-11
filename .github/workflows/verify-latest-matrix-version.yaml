@@ -129,7 +129,7 @@ jobs:
           echo "caught_up=$(echo "$caught_up" | paste --serial --delimiters=' ')"
         } >> "$GITHUB_OUTPUT"
     
-    - name: Summary
+    - name: Summarise the specification and Synapse gaps
       env:
         MISSING: ${{steps.specification.outputs.missing}}
         CAUGHT_UP: ${{steps.synapse.outputs.caught_up}}

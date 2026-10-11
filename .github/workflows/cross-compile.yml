@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   ci-data:
-    name: Fetch CI data
+    name: Fetch the supported platforms and Ruby versions
     runs-on: ubuntu-latest
     outputs:
       result: ${{ steps.fetch.outputs.result }}

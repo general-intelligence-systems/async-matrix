@@ -59,11 +59,11 @@ module Async
                   expect(client.pushrules.get_push_rules_global.underride).to be == client.pushrules.get_push_rules.global[:underride]
                 end
 
-                base.it "can setPushRule without scope" do
+                base.it "can setPushRule" do
                   expect(client.pushrules.set_push_rule("sender", rule_id, ["notify"]).value).to be == {}
                 end
 
-                base.it "can getPushRule without scope" do
+                base.it "can getPushRule" do
                   client.pushrules.set_push_rule("sender", rule_id, ["notify"])
 
                   read = client.pushrules.get_push_rule("sender", rule_id)
@@ -72,7 +72,7 @@ module Async
                   expect(read.actions).to be == ["notify"]
                 end
 
-                base.it "can deletePushRule without scope" do
+                base.it "can deletePushRule" do
                   client.pushrules.set_push_rule("sender", rule_id, ["notify"])
 
                   expect(client.pushrules.delete_push_rule("sender", rule_id).value).to be == {}
@@ -82,26 +82,26 @@ module Async
                   end.to raise_exception(Async::Matrix::RequestError)
                 end
 
-                base.it "can getPushRuleActions without scope" do
+                base.it "can getPushRuleActions" do
                   client.pushrules.set_push_rule("sender", rule_id, ["notify"])
 
                   expect(client.pushrules.get_push_rule_actions("sender", rule_id).actions).to be == ["notify"]
                 end
 
-                base.it "can setPushRuleActions without scope" do
+                base.it "can setPushRuleActions" do
                   client.pushrules.set_push_rule("sender", rule_id, ["notify"])
 
                   expect(client.pushrules.set_push_rule_actions("sender", rule_id, ["dont_notify"]).value).to be == {}
                   expect(client.pushrules.get_push_rule_actions("sender", rule_id).actions).to be == ["dont_notify"]
                 end
 
-                base.it "can isPushRuleEnabled without scope" do
+                base.it "can isPushRuleEnabled" do
                   client.pushrules.set_push_rule("sender", rule_id, ["notify"])
 
                   expect(client.pushrules.is_push_rule_enabled("sender", rule_id)).to be(:enabled?)
                 end
 
-                base.it "can setPushRuleEnabled without scope" do
+                base.it "can setPushRuleEnabled" do
                   client.pushrules.set_push_rule("sender", rule_id, ["notify"])
 
                   expect(client.pushrules.set_push_rule_enabled("sender", rule_id, false).value).to be == {}

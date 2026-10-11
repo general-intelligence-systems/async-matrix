@@ -26,13 +26,13 @@ concurrency:
 
 jobs:
   generate:
-    name: Generate
+    name: Regenerate MATRIX_API_VERSIONS.txt
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v5
 
-    - name: Generate MATRIX_API_VERSIONS.txt
+    - name: Read the versions out of the Synapse compose file
       run: |
         set -o pipefail
 
@@ -80,7 +80,7 @@ jobs:
 
         exit "$status"
 
-    - name: Commit
+    - name: Commit MATRIX_API_VERSIONS.txt
       run: |
         if git diff --quiet -- MATRIX_API_VERSIONS.txt; then
           echo "Already up to date."

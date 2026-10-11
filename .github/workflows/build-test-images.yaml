@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   versions:
-    name: Resolve versions
+    name: Resolve the Synapse image versions
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{steps.resolve.outputs.matrix}}
@@ -44,7 +44,7 @@ jobs:
     # top-level shape is not the same across Nix builds: on the runner it returned no `packages`
     # key at all, and jq failed with "null (null) has no keys".
     - id: resolve
-      name: Resolve versions from the flake
+      name: List the Synapse versions the flake defines
       working-directory: synapse
       run: |
         set -o pipefail
@@ -78,7 +78,7 @@ jobs:
         echo "matrix=$(echo "$selected" | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
 
   build:
-    name: ${{matrix.version}}
+    name: Synapse image for ${{matrix.version}}
     needs: versions
     runs-on: ubuntu-latest
     
@@ -102,7 +102,7 @@ jobs:
         password: ${{secrets.GITHUB_TOKEN}}
     
     # The develop versions build Synapse from source, which compiles Rust - give them room:
-    - name: Build and push
+    - name: Build and push the Synapse image for ${{matrix.version}}
       timeout-minutes: 60
       working-directory: synapse
       env:
@@ -110,7 +110,7 @@ jobs:
         PUSH: "1"
       run: nix run ".#\"${{matrix.version}}\""
     
-    - name: Report
+    - name: Report the published Synapse image
       run: |
         echo "### ${{matrix.version}}" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"

@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build and push
+    name: Tuwunel images for every version
     runs-on: ubuntu-latest
 
     steps:
@@ -54,7 +54,7 @@ jobs:
     # same across Nix builds: on the runner it returned no `packages` key at all, and jq failed with
     # "null (null) has no keys".
     - id: resolve
-      name: Resolve versions from the flake
+      name: List the Tuwunel versions the flake defines
       working-directory: tuwunel
       run: |
         set -o pipefail
@@ -85,7 +85,7 @@ jobs:
 
         echo "versions=$(echo "$selected" | paste --serial --delimiters=' ')" >> "$GITHUB_OUTPUT"
 
-    - name: Build and push
+    - name: Build and push the Tuwunel images
       timeout-minutes: 30
       working-directory: tuwunel
       env:
@@ -97,7 +97,7 @@ jobs:
           nix run ".#\"$version\""
         done
 
-    - name: Report
+    - name: Report the published Tuwunel images
       env:
         VERSIONS: ${{steps.resolve.outputs.versions}}
       run: |

@@ -39,6 +39,7 @@ concurrency:
 
 jobs:
   build:
+    name: Build the site for Pages
     runs-on: ubuntu-latest
     
     defaults:
@@ -55,11 +56,11 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
       
-      - name: Configure Pages
+      - name: Configure Pages for the repository subpath
         id: pages
         uses: actions/configure-pages@v6
       
-      - name: Restore build cache
+      - name: Restore the Next.js build cache
         uses: actions/cache@v4
         with:
           path: docs/.next/cache
@@ -67,16 +68,16 @@ jobs:
           restore-keys: |
             ${{runner.os}}-nextjs-${{hashFiles('docs/package-lock.json')}}-
       
-      - name: Install
+      - name: Install the documentation dependencies
         run: npm ci
       
-      - name: Build
+      - name: Build the documentation site
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: ${{steps.pages.outputs.base_path}}
       
       # After the build, because `next typegen` types the routes the build discovers.
-      - name: Check types
+      - name: Check the documentation types
         run: npm run types:check
       
       - uses: actions/upload-pages-artifact@v5
@@ -84,6 +85,7 @@ jobs:
           path: docs/out
   
   deploy:
+    name: Publish the site to Pages
     if: github.event_name != 'pull_request'
     
     needs: build

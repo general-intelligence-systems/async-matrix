@@ -63,7 +63,7 @@ jobs:
         ruby-version: "4.0"
         bundler-cache: true
 
-    - name: Compare
+    - name: Compare the allocations against ${{inputs.revision || github.base_ref}}
       timeout-minutes: 20
       run: bin/benchmark --compare "${{inputs.revision || format('origin/{0}', github.base_ref)}}" --gate allocations
 
