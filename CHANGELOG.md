@@ -6,6 +6,75 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-11
+
+### Added
+
+- **`Async::Matrix::Versions`, and a class per specification version.**
+  `Async::Matrix::ClientServer::Client["v1.19"]` and `Async::Matrix::Events["v1.19"]` build the
+  classes for a version by layering `Abstract`, and cache them, so the same lookup is the same
+  class. `VERSIONS` lists v1.1 to v1.19, `LATEST` is the newest, and an unknown version raises
+  `UnsupportedVersionError`. A class joins by including `Async::Matrix::Versioned`, which answers
+  `.version`, `.api` and `.unversioned`; inside a method, sibling classes are reached through
+  `api::Whatever` so a version's classes keep talking to each other.
+
+- **`Async::Matrix::Removals` and `RemovedOperationError`.** Layers accumulate, so an operation a
+  later version withdrew has to be taken back explicitly: `removed :old, use: :new` where the
+  specification dropped it, `moved :old, to: "Other"` where another class answers it now. Neither
+  undefines the method — calling it raises `RemovedOperationError`, which carries `#name`,
+  `#version`, `#replacement` and `#to`, so the caller is told where the operation went instead of
+  getting a `NoMethodError`. This is also why `respond_to?` is the wrong question to ask of an
+  operation: a withdrawn method still responds.
+
+- **Every operation is named as the specification names it.** `Async::Matrix::Operations` maps an
+  operation ID onto the method name it is owed — `getRoomEvents` to `get_room_events`,
+  `add3PID` to `add_3pid` — and the suite under `test/operations/` checks that every operation the
+  schema names has a method, at every version.
+
+- **`Async::Matrix::ServerServer::Server`**, the federation client: a resource rooted at another
+  homeserver, with a navigator per concept. There is no access token, so
+  `Async::Matrix::Middleware::Signed` signs the method, path, origin, destination and body as a
+  document, `Async::Matrix::ServerKey.load` reads the homeserver's ed25519 key, and
+  `Async::Matrix::Wrapper::Multipart` reads the two-part `multipart/mixed` media download into
+  `ServerServer::FederatedContent`.
+
+- **`Async::Matrix::Credentials` and `Async::Matrix::OAuth`.** `Client#authenticated(access_token)`
+  and `Client#with_credentials(credentials)` derive an authenticated client, with the token below
+  the resource rather than in its headers, and from v1.3 the credentials renew it.
+  `OAuth::AuthorizationServer` covers the `OAuth` flow — `#register`, `#authorization_url`,
+  `#authorize`, `#exchange`, `#revoke` — with `OAuth::Verifier` for PKCE and `OAuth::Tokens`,
+  `OAuth::Registration` as the representations.
+
+- **`Client#get_capabilities`**, returning `Capabilities`. Each capability is read at the version
+  which describes it, so `Capabilities["v1.11"]` has no `set_displayname?` and
+  `Capabilities["v1.12"]` does.
+
+- **`Client#sync`, returning `Sync`.** `#following(timeout:)` continues from the batch before it,
+  `#each(retries:, backoff:)` loops and can be resumed after a failure — the batch which failed
+  to arrive leaves the previous one holding the cursor — and `#each_event` / `#each_message` yield
+  an `Events::Envelope` which names the room it came from. `#next_batch`, `#to_device`,
+  `#changed_devices`, `#left_devices` and `#one_time_keys_count` read the rest of the batch.
+
+- **`Async::Matrix::Events`**, a class per event type the specification describes, with
+  `Events.registry(version)` mapping a type onto the class which reads it, and
+  `Events::Envelope` carrying the event with its room.
+
+- **`Async::Matrix::Middleware::RateLimited`**, which retries `M_LIMIT_EXCEEDED`. Matrix reports
+  the delay as `retry_after_ms` in the body where `async-rest` understands only the `retry-after`
+  header; the middleware reads both, and raises rather than waiting when one delay exceeds
+  `Middleware::RateLimited::MAXIMUM_RETRY_DELAY` (30 seconds), so a homeserver whose rate limit
+  never lifts fails instead of spinning.
+
+- **`Async::Matrix::RequestError`**, raised by the wrapper on any non-2xx answer: `#status`,
+  `#errcode`, `#unknown_token?` and `#limit_exceeded?`. `InteractiveAuthenticationError`
+  subclasses it for the homeserver's user-interactive auth challenge, carrying `#session`,
+  `#flows`, `#params`, `#completed`, `#stages` and `#accepts?(type)`.
+
+- **`Async::Matrix::E2EE`** — `E2EE::Crypto` is the interface encryption is written against, with
+  `E2EE::Machine`, `E2EE::Store`, `E2EE::Device`, `E2EE::Devices` and `E2EE::CanonicalJson`
+  around it. Set `CONSOLE_LEVEL=debug` to see the machine, the device lists and the session
+  sharing narrate themselves.
+
 ### Changed
 
 - **Breaking: the library is a rewrite on top of [async-rest](https://github.com/socketry/async-rest).**
@@ -337,7 +406,8 @@ server-side API.
   Socketry ecosystem, with schema-driven event validation, an OpenAPI-backed
   client, media support, and mautrix-compatible configuration.
 
-[Unreleased]: https://github.com/general-intelligence-systems/async-matrix/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/general-intelligence-systems/async-matrix/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v4.0.0
 [3.0.1]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v3.0.1
 [3.0.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v3.0.0
 [2.1.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v2.1.0
