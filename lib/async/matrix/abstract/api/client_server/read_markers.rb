@@ -69,7 +69,7 @@ module Async
           module V1_5
           end
 
-          # v1.4 added the private receipt, and let the marker be left out.
+          # v1.4 added the private receipt.
           module V1_4
             # Set the read marker, and the receipts which go with it.
             #

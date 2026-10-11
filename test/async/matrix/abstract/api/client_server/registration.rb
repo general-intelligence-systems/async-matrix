@@ -78,7 +78,7 @@ module Async
             module V1_11
             end
 
-            # v1.10 added erase to deactivateAccount, and the case moved out again in v1.15.
+            # v1.10 added erase, which v1.15 moved away.
             module V1_10
               WITHDRAWN_IN = "v1.15"
 

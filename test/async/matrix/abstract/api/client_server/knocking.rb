@@ -42,8 +42,13 @@ module Async
             module V1_13
             end
 
-            # No changes in v1.12.
+            # v1.12 added via, alongside the server names.
             module V1_12
+              def self.included(base)
+                base.it "knocks through the servers it is given" do
+                  expect(knocker.knocking.knock_room(knockable.id, via: ["localhost"]).room_id).to be == knockable.id
+                end
+              end
             end
 
             # No changes in v1.11.

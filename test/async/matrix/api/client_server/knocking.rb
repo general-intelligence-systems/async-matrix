@@ -24,10 +24,6 @@ describe Async::Matrix::ClientServer::Knocking do
     expect(knocker.knocking.knock_room(knockable.id, reason: "let me in").room_id).to be == knockable.id
   end
 
-  it "knocks through the servers it is given" do
-    expect(knocker.knocking.knock_room(knockable.id, via: ["localhost"]).room_id).to be == knockable.id
-  end
-
   # A room nobody may knock on refuses, which is the homeserver reading the join rule rather than this.
   it "is refused where the join rule does not allow it" do
     expect do

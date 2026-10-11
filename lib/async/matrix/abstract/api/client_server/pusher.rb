@@ -61,7 +61,7 @@ module Async
           module V1_7
           end
 
-          # v1.6 let kind be nil, which deletes the pusher, and made the other fields optional to match.
+          # v1.6 let a nil kind delete the pusher.
           module V1_6
             # Set a pusher, or take one away by giving its kind as nil.
             #

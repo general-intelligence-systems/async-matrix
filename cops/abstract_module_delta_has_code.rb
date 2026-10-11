@@ -132,9 +132,9 @@ module RuboCop
           YAML.safe_load_file(deltas)["changed"] == true
         end
 
-        # The version layers in this file, by name, which are the ones written below `Abstract`.
+        # The version layers in this file, by name, taken from below `Abstract`.
         #
-        # Every container in the file declares the same version, so a name holds one layer each.
+        # Every container declares the same versions, so a name holds one layer.
         #
         # @returns [Hash] the layers, keyed by constant name.
         def layers_in(nodes)
