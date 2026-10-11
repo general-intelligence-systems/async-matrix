@@ -1,0 +1,43 @@
+# The benchmarks bin/benchmark will run, which is this file rather than whatever is on disk: a
+# benchmark is registered by being listed here, so a file which supports one - the program
+# boot/require.rb spawns, say - is not mistaken for one.
+#
+# A category says what a benchmark is for. The headline ones are the numbers worth quoting and the
+# ones a regression should be measured against; micro is a single call, measured as a rate; other
+# is a benchmark which answers a question rather than guarding a number.
+
+boot/require:
+  desc: What it costs a program to require the library, and what the loaded library holds.
+  category: headline
+
+versions/build:
+  desc: Building the classes for one version of the client-server API, cold.
+  category: headline
+
+versions/cached:
+  desc: Looking a version up once it has been built, which is what every client after the first pays.
+  category: micro
+
+versions/sweep:
+  desc: Building every version in turn, to see the cost scale with the layers a version is built from.
+  category: other
+
+versions/namespaces:
+  desc: Building the latest version of each API, to see which of them a boot figure is made of.
+  category: other
+
+events/sync:
+  desc: Parsing one sync response and wrapping every event in it, which is what a client does all day.
+  category: headline
+
+events/wrap:
+  desc: Turning a batch of decoded events into objects, which is the work done per message.
+  category: headline
+
+events/dispatch:
+  desc: Deciding which class an event is, for the type whose variant scan is longest.
+  category: micro
+
+events/registry:
+  desc: Building the registry which maps a type onto the class describing it.
+  category: other

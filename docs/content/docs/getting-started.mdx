@@ -30,7 +30,7 @@ $ bundle add async-matrix
 ```ruby
 require "async/matrix"
 
-Async::Matrix::Client.open("http://localhost:8008") do |unauthenticated|
+Async::Matrix::Client.open("http://localhost:7300") do |unauthenticated|
 	client = unauthenticated.logged_in("alice", "password")
 	
 	puts client.get_token_owner.user_id

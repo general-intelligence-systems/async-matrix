@@ -19,8 +19,42 @@
     "root": {
       "inputs": {
         "nixpkgs": "nixpkgs",
+        "sydent": "sydent",
+        "sygnal": "sygnal",
         "synapse-develop": "synapse-develop",
         "utils": "utils"
+      }
+    },
+    "sydent": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788427687,
+        "narHash": "sha256-fvAkFSkCTgQ7LJoHDl1FVBnLIZmWqq3Ci68hros6zkg=",
+        "owner": "element-hq",
+        "repo": "sydent",
+        "rev": "a4d741165ee25fc129e9c478e23c4d3b38678c1f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "element-hq",
+        "repo": "sydent",
+        "type": "github"
+      }
+    },
+    "sygnal": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791458205,
+        "narHash": "sha256-85oNcm6nNsRJwHCApg5uewSn26jxEA2knXF41/l37Hg=",
+        "owner": "element-hq",
+        "repo": "sygnal",
+        "rev": "7e8cc03318a00dfb75b496db3db3c4f617cbbd62",
+        "type": "github"
+      },
+      "original": {
+        "owner": "element-hq",
+        "repo": "sygnal",
+        "type": "github"
       }
     },
     "synapse-develop": {

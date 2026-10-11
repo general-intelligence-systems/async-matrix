@@ -138,6 +138,16 @@
     };
     version = "0.5.0";
   };
+  benchmark-ips = {
+    groups = ["benchmark"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "0n9dh7yxr84k63h6l8x6mpls0wfxrpxw6kqpikvclphhqvrsk887";
+      type = "gem";
+    };
+    version = "2.15.1";
+  };
   bigdecimal = {
     groups = ["default" "test"];
     platforms = [];
@@ -303,6 +313,16 @@
       type = "gem";
     };
     version = "1.7.0";
+  };
+  memory_profiler = {
+    groups = ["benchmark"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "1y58ba08n4lx123c0hjcc752fc4x802mjy39qj1hq50ak3vpv8br";
+      type = "gem";
+    };
+    version = "1.1.0";
   };
   openssl = {
     groups = ["default"];
@@ -554,6 +574,16 @@
       type = "gem";
     };
     version = "0.6.13550";
+  };
+  stackprof = {
+    groups = ["benchmark"];
+    platforms = [];
+    source = {
+      remotes = ["https://rubygems.org"];
+      sha256 = "014s1zxlxcw35shislar3y1i3mqa0c6gh3m21js14q1q5zharhjf";
+      type = "gem";
+    };
+    version = "0.2.28";
   };
   sus = {
     groups = ["test"];

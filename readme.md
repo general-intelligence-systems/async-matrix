@@ -11,7 +11,7 @@ members, sending events, paging through a timeline, and running a sync loop.
 ``` ruby
 require "async/matrix"
 
-Async::Matrix::Client.open("http://localhost:8008") do |unauthenticated|
+Async::Matrix::Client.open("http://localhost:7300") do |unauthenticated|
 	client = unauthenticated.logged_in("alice", "password")
 	
 	room = client.create_room(name: "Hello", topic: "Built with async-rest")
@@ -60,6 +60,56 @@ response is a *representation*.
 
   - **Representations are lazy.** `client.get_joined_rooms` issues no request until something reads its
     value, and a room enumerated from a collection carries its ID without a further request.
+
+## The server-server API
+
+{Async::Matrix::ServerServer::Server} is the federation client: a resource rooted at another
+homeserver, with a navigator per concept the specification names and a representation per answer.
+
+``` ruby
+require "async/matrix"
+
+key = Async::Matrix::ServerKey.load("/etc/synapse/signing.key")
+
+Async::Matrix::ServerServer::Server.open("https://matrix.example.com") do |unsigned|
+	server = unsigned.signed_as("example.com", key, "matrix.example.com")
+	
+	puts unsigned.server_version.get_version.name
+	puts server.query.query_profile("@alice:matrix.example.com").displayname
+	
+	# A join is a template to sign and send back:
+	template = server.joins_v1.make_join(room_id, "@bob:example.com", versions: ["11"])
+end
+```
+
+  - **There is no access token.** A server proves who it is by signing the request, so
+    {Async::Matrix::Middleware::Signed} sits below the resource and signs the method, the path, the
+    origin, the destination and the body as a document. The signature is over the canonical form
+    rather than over the bytes, so it cannot depend on how the sender wrote them.
+
+  - **The signing key is the server's own.** {Async::Matrix::ServerKey} reads the one line a
+    homeserver keeps its ed25519 key in, and is what the other side fetches from
+    `/_matrix/key/v2/server` to check a signature against.
+
+  - **Some endpoints are not signed at all.** The version, the keys, the discovery document and the
+    OpenID exchange are read before there is anything to sign with, so they are asked for through
+    the unsigned resource.
+
+  - **Media comes back in two parts.** `/media/download` answers `multipart/mixed`: a document
+    describing the file, and then the file, or a `Location` pointing at it.
+    {Async::Matrix::Wrapper::Multipart} reads both, so {Async::Matrix::ServerServer::FederatedContent}
+    has bytes and a description rather than a body to parse.
+
+  - **An event carries no ID.** Since room version 3 an event ID is the hash of its redacted form
+    rather than a field, so a representation reads events by type rather than looking one up by ID.
+
+  - **Two endpoints were withdrawn.** v1.18 dropped the first versions of `send_join` and
+    `send_leave`, so those layers register the withdrawal and the methods say what replaced them.
+
+The suite signs as the homeserver it is testing, using the key checked into `synapse/`: a
+homeserver verifies a signature made by its own server name against the key it already holds rather
+than fetching one, so every authenticated endpoint is reachable from a single server. There is no
+other way to do it - a server name invented by the suite would have no keys for anybody to fetch.
 
 ## Documentation
 

@@ -49,6 +49,7 @@ GEM
       bake
     base64 (0.3.0)
     benchmark (0.5.0)
+    benchmark-ips (2.15.1)
     bigdecimal (4.1.3)
     citrus (3.0.2)
     console (1.38.0)
@@ -77,6 +78,7 @@ GEM
     language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
     logger (1.7.0)
+    memory_profiler (1.1.0)
     openssl (4.0.2)
     parallel (2.3.0)
     parser (3.3.12.0)
@@ -133,6 +135,7 @@ GEM
       zeitwerk (>= 1.0)
     simpleidn (0.3.0)
     sorbet-runtime (0.6.13550)
+    stackprof (0.2.28)
     sus (0.38.0)
     sus-fixtures-async (0.2.0)
       async
@@ -161,10 +164,13 @@ DEPENDENCIES
   ast-crispr-ruby-prism
   async-matrix!
   bake-test
+  benchmark-ips
   decode
   json_schemer
+  memory_profiler
   rubocop
   rubocop-socketry
+  stackprof
   sus
   sus-fixtures-async
 
@@ -182,6 +188,7 @@ CHECKSUMS
   bake-test (0.3.0) sha256=02c69efa3461c353f6549844069c151827d88de783891a17dca2632dc9bf62bb
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   benchmark (0.5.0) sha256=465df122341aedcb81a2a24b4d3bd19b6c67c1530713fd533f3ff034e419236c
+  benchmark-ips (2.15.1) sha256=07a1a9f3c6105ecaf68c174fc3fbcddd71a0e9ada6236ae03093a0dcfd812d59
   bigdecimal (4.1.3) sha256=61ebe1e5e559bdc3cc6f2c0ee7f427321fc838f59611c294356eb04d6e21cf66
   citrus (3.0.2) sha256=4ec2412fc389ad186735f4baee1460f7900a8e130ffe3f216b30d4f9c684f650
   console (1.38.0) sha256=35b82f59130e95e9be6b832d9e539c8b3988fc192e4a8e9a86ab4922f44ad5de
@@ -198,6 +205,7 @@ CHECKSUMS
   language_server-protocol (3.17.0.6) sha256=5ef2c0c138f8267e1bc631d3328347d354f96724b0af22f2c79516120443b7f0
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
+  memory_profiler (1.1.0) sha256=79a17df7980a140c83c469785905409d3027ca614c42c086089d128b805aa8f8
   openssl (4.0.2) sha256=1037ad2868ae58df9ad917891c0c0f9815a1172f6846d4bcdd508e4c2ee747c2
   parallel (2.3.0) sha256=f75a3e904101ce6a1ccb6b8dc800cbafd42166d83330192438dcf29395167a6f
   parser (3.3.12.0) sha256=21a6d7f755d5a24dfbdc6e6b772e4e879a52e7631a88bc5a3a134606052c9828
@@ -222,6 +230,7 @@ CHECKSUMS
   service_actor (3.9.4) sha256=e63b523630b9a7e62959b2a90113b08d2565b5de9c148557b281ef847c9539ce
   simpleidn (0.3.0) sha256=12ca730bed2f3db04d11e9bfd1bca3e11fb37f55b21eb2e9793fb5814bf54d03
   sorbet-runtime (0.6.13550) sha256=2e1e14d9259063c2020d05652184b831b6a42b2e9d15109954358699e5c25cea
+  stackprof (0.2.28) sha256=4ec2ace02f386012b40ca20ef80c030ad711831f59511da12e83b34efb0f9a04
   sus (0.38.0) sha256=3223c8ef71ca0718138fe2011b510ad912abf227f75ea23589685a3e6867ca3f
   sus-fixtures-async (0.2.0) sha256=8c2b20b87f62da8cf0ce3efce3f9435370069371cd75ac23cdc7936f6402f9b7
   token-resolver (2.0.13) sha256=aba890ce6be32ff7226e991f9f54d7bd99df312849c119482de48661280e33a5

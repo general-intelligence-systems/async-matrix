@@ -1,0 +1,43 @@
+# The push gateway of the test rig, which a homeserver calls to have a notification delivered.
+#
+# One application is configured because sygnal will not start without one, and nothing is pushed to
+# it: a gateway is told about an application by whoever wrote it, and the rig wrote none. A
+# notification for an application the gateway does not know is one it rejects, which is the answer
+# the specification describes and what the suite reads, and which needs no application at all.
+
+http:
+  bind_addresses: ["::"]
+  port: 5000
+
+log:
+  setup:
+    version: 1
+    formatters:
+      normal:
+        format: "%(asctime)s [%(process)d] %(levelname)-5s %(name)s %(message)s"
+    handlers:
+      stdout:
+        class: "logging.StreamHandler"
+        formatter: "normal"
+        stream: "ext://sys.stdout"
+    loggers:
+      sygnal.access:
+        propagate: false
+        handlers: ["stdout"]
+        level: "INFO"
+      sygnal:
+        propagate: false
+        handlers: ["stdout"]
+        level: "INFO"
+    root:
+      handlers: ["stdout"]
+      level: "INFO"
+  access:
+    x_forwarded_for: false
+
+apps:
+  # The key is never used: a notification is only ever sent here for an application id this one is
+  # not, so the gateway rejects the push key rather than reaching for the key.
+  com.example.configured:
+    type: gcm
+    api_key: "not-a-real-key"

@@ -8,6 +8,15 @@
     # v1.13 and later are only on develop, and no image is published for it, so it is fetched and
     # built from source with the docker/Dockerfile it ships with. Pinned by flake.lock.
     synapse-develop = { url = "github:element-hq/synapse/develop"; flake = false; };
+
+    # The identity server, which is a server of its own rather than a Synapse: it holds which
+    # address belongs to which user. No image is published for it, so it is built from the source
+    # with the Dockerfile it ships with, as the develop Synapses are. Pinned by flake.lock.
+    sydent = { url = "github:element-hq/sydent"; flake = false; };
+
+    # The push gateway, which delivers a notification to an application. No image is published for
+    # it either, so it is built from the source with the Dockerfile it ships with.
+    sygnal = { url = "github:element-hq/sygnal"; flake = false; };
   };
 
   outputs = { self, nixpkgs, utils, ... }@inputs:
@@ -109,9 +118,61 @@
               echo "$tag"
             '';
           };
+
+        # The identity server. One image rather than one per version: the identity API has not
+        # changed across the versions this rig covers - every operation it defines is in all of
+        # them - so there is nothing to vary.
+        sydent = pkgs.writeShellApplication {
+          name = "sydent";
+
+          runtimeInputs = [ pkgs.docker ];
+
+          text = ''
+            repository="''${IMAGE_REPOSITORY:-ghcr.io/n-at-han-k/sydent}"
+            tag="$repository:latest"
+
+            echo "Sydent: building from ${inputs.sydent}" >&2
+            docker build --file ${inputs.sydent}/Dockerfile --tag sydent-source:latest ${inputs.sydent}
+
+            # Sydent writes its configuration and its database into /data, which its image leaves
+            # owned by root while the entrypoint runs as the sydent user. The rig mounts only the
+            # configuration, so without this there is nowhere for the database to go.
+            printf 'FROM %s\nUSER root\nRUN mkdir -p /data && chmod 777 /data\nUSER sydent\n' sydent-source:latest \
+              | docker build --tag "$tag" -
+
+            if [ -n "''${PUSH:-}" ]; then
+              echo "Sydent: pushing $tag" >&2
+              docker push "$tag"
+            fi
+
+            echo "$tag"
+          '';
+        };
+        # The push gateway. One image, for the same reason as the identity server: the push gateway
+        # API has one operation and it is in every version this rig covers.
+        sygnal = pkgs.writeShellApplication {
+          name = "sygnal";
+
+          runtimeInputs = [ pkgs.docker ];
+
+          text = ''
+            repository="''${IMAGE_REPOSITORY:-ghcr.io/n-at-han-k/sygnal}"
+            tag="$repository:latest"
+
+            echo "Sygnal: building from ${inputs.sygnal}" >&2
+            docker build --file ${inputs.sygnal}/docker/Dockerfile --tag "$tag" ${inputs.sygnal}
+
+            if [ -n "''${PUSH:-}" ]; then
+              echo "Sygnal: pushing $tag" >&2
+              docker push "$tag"
+            fi
+
+            echo "$tag"
+          '';
+        };
       in
       {
-        packages = builtins.mapAttrs build versions;
+        packages = builtins.mapAttrs build versions // { inherit sydent sygnal; };
 
         apps = builtins.mapAttrs
           (specification: package: utils.lib.mkApp { drv = package; })

@@ -18,4 +18,18 @@ describe Async::Matrix do
       expect(path).to be(:start_with?, "/")
     end
   end
+
+  # The server-server API is versioned per-endpoint too, and its keys and policies are not under `federation`.
+  it "names the server-server base paths" do
+    expect(Async::Matrix::FEDERATION_V1).to be == "/_matrix/federation/v1"
+    expect(Async::Matrix::FEDERATION_V2).to be == "/_matrix/federation/v2"
+    expect(Async::Matrix::KEY_V2).to be == "/_matrix/key/v2"
+    expect(Async::Matrix::POLICY_V1).to be == "/_matrix/policy/v1"
+  end
+
+  it "gives server-server paths which replace rather than extend" do
+    [Async::Matrix::FEDERATION_V1, Async::Matrix::FEDERATION_V2, Async::Matrix::KEY_V2, Async::Matrix::POLICY_V1].each do |path|
+      expect(path).to be(:start_with?, "/")
+    end
+  end
 end

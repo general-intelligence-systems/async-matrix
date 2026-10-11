@@ -26,7 +26,12 @@ x-synapse: &synapse
     SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
     PYTHONPATH: /config/modules
   ports:
-    - "${SYNAPSE_PORT:-8008}:8008"
+    - "${SYNAPSE_PORT:-7300}:8008"
+    # The identity server and the TLS terminator in front of federation share this namespace, so
+    # their ports are published here: a container which joins another's namespace cannot publish
+    # one of its own. The published ports all sit in an unused range, clear of the defaults
+    # services pick for themselves.
+    - "${SYDENT_PORT:-7302}:8090"
   healthcheck:
     test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
     interval: 3s
@@ -190,6 +195,84 @@ services:
       - *signing-key
       - *modules
 
+  # The identity server, which answers the identity service API: it holds which address belongs to
+  # which user, so that a client can invite somebody it has only an address for. A homeserver does
+  # not answer those paths, which is why this is a server of its own.
+  #
+  # One service rather than one per version: every operation the identity API defines is in all of
+  # the versions this rig covers, so there is nothing to vary. It binds its own port, so it runs
+  # alongside whichever homeserver version is up.
+  # Terminates TLS in front of the homeserver, on the federation port.
+  #
+  # The identity server verifies an OpenID token by asking the homeserver over federation, which is
+  # HTTPS: `use_tls_for_federation` is an argument to Sydent's constructor rather than a setting,
+  # and only its own test harness passes false. The homeserver speaks plain HTTP, so this sits in
+  # front of it. It joins the homeserver's network namespace, so 8448 and 8008 are the same
+  # `localhost` - which is what the homeserver calls itself, and so what the identity server has to
+  # resolve.
+  federation-tls:
+    image: alpine/socat:latest
+    network_mode: "service:${MATRIX_SERVICE:-v1.19}"
+    volumes:
+      - ./tls:/config/tls:ro
+    command:
+      - OPENSSL-LISTEN:8448,reuseaddr,fork,cert=/config/tls/federation.pem,verify=0
+      - TCP:127.0.0.1:8008
+
+  sydent:
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sydent:latest
+    # The same namespace as the homeserver, so that the name the homeserver calls itself resolves
+    # to it from here. Its port is published by the homeserver, above.
+    network_mode: "service:${MATRIX_SERVICE:-v1.19}"
+    depends_on:
+      - federation-tls
+    environment:
+      SYDENT_CONF: /config/sydent.conf
+    volumes:
+      - ./sydent.conf:/config/sydent.conf:ro
+      - ./sydent-terms.yaml:/config/sydent-terms.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8090/_matrix/identity/v2')\""]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # The push gateway, which a homeserver calls to have a notification delivered.
+  #
+  # No applications are configured, so a notification is one it rejects: see sygnal.yaml. It binds
+  # its own port, so it runs alongside whichever homeserver version is up.
+  sygnal:
+    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sygnal:latest
+    environment:
+      SYGNAL_CONF: /config/sygnal.yaml
+    volumes:
+      - ./sygnal.yaml:/config/sygnal.yaml:ro
+    ports:
+      - "${SYGNAL_PORT:-7303}:5000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('localhost', 5000), 2)\""]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # An application service, in as little as answers the specification: see appservice-stub.py.
+  #
+  # The application service API is served by a bridge, and every bridge is a bridge to something.
+  # The rig runs none, so this answers in its place - which is enough for the operations, since each
+  # is a request whose shape the suite is checking and whose answer it reads.
+  appservice:
+    image: python:3-slim
+    command: ["python", "/config/appservice-stub.py"]
+    volumes:
+      - ./appservice-stub.py:/config/appservice-stub.py:ro
+    ports:
+      - "${APPSERVICE_PORT:-7305}:8099"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/_matrix/app/v1/thirdparty/protocols')\""]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
   # The OAuth 2.0 stack. MAS stores its state in PostgreSQL, which it requires, and Synapse
   # delegates authentication to it.
 
@@ -215,9 +298,8 @@ services:
         condition: service_healthy
     volumes:
       - ./mas.yaml:/config/mas.yaml:ro
-    # 8080 is a common default and often already taken, so this sits clear of it:
     ports:
-      - "${MAS_PORT:-8091}:8080"
+      - "${MAS_PORT:-7301}:8080"
 
   # Registers the user the OAuth suite logs in as. MAS has no equivalent of the version rig's
   # register-on-first-login module, so the user is seeded once, here.
@@ -249,7 +331,7 @@ services:
     depends_on:
       - oauth-mas
     ports:
-      - "${OAUTH_SYNAPSE_PORT:-8010}:8008"
+      - "${OAUTH_SYNAPSE_PORT:-7310}:8008"
     volumes:
       - ./homeserver.oauth.yaml:/config/homeserver.yaml:ro
       - ./signing.key:/config/signing.key:ro

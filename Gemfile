@@ -34,3 +34,17 @@ end
 group :maintenance do
   gem "json_schemer"
 end
+
+# The benchmarks, which are a group of their own for the reason the cops are: a run of the suite has no use for them, and a job which only wants to run the suite leaves them out with BUNDLE_WITHOUT.
+#
+# Only the harnesses need gems, one each. The default harness times with `Process.clock_gettime` and counts with `GC.stat`, and writes its own results, so a benchmark can be run with nothing installed beyond what the suite already needs.
+group :benchmark do
+  # harness-bips, which measures a rate rather than a time.
+  gem "benchmark-ips"
+
+  # harness-memory, which says what was allocated and what was kept, by file and by class.
+  gem "memory_profiler"
+
+  # harness-stackprof, which says where the time went.
+  gem "stackprof"
+end

@@ -1,3 +1,4 @@
 .direnv
 .covered.db
 *.bak
+benchmark/data

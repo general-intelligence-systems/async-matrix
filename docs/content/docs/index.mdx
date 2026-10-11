@@ -15,7 +15,7 @@ members, sending events, paging through a timeline, and running a sync loop.
 ```ruby
 require "async/matrix"
 
-Async::Matrix::Client.open("http://localhost:8008") do |unauthenticated|
+Async::Matrix::Client.open("http://localhost:7300") do |unauthenticated|
 	client = unauthenticated.logged_in("alice", "password")
 	
 	room = client.create_room(name: "Hello", topic: "Built with async-rest")

@@ -34,8 +34,8 @@ module Async
           # `getRoomEvents` -> `get_Room_Events`:
           spaced = operation.gsub(/([a-z])([A-Z])/, '\\1_\\2')
 
-          # `add3PID` -> `add_3PID`:
-          spaced = spaced.gsub(/([A-Za-z])(\d)/, '\\1_\\2')
+          # `add3PID` -> `add_3PID`, where the digits start a word. A digit which ends one is part of it - `bindV2` is `bind_v2` - so the split needs letters after the digits.
+          spaced = spaced.gsub(/([A-Za-z])(\d+)(?=[A-Za-z])/, '\\1_\\2')
 
           # A plural acronym is one word, so that `3PIDs` does not become `3pi_ds`:
           spaced = spaced.gsub(/([A-Z]{2,})s(?![a-z])/){"#{$1.downcase}s"}

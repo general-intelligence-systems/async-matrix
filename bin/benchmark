@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+
+# BENCHMARK(1)                       General Commands Manual                     BENCHMARK(1)
+#
+# NAME
+#      bin/benchmark — measure the library against itself
+#
+# SYNOPSIS
+#      bin/benchmark [--harness name] [--category name] [--version version] [--list]
+#                    [benchmark ...]
+#
+# DESCRIPTION
+#      bin/benchmark runs the benchmarks in benchmark/, each in a Ruby of its own, and writes
+#      what they measured into a directory per run under benchmark/data.
+#
+#      A benchmark says what to measure and a harness says how to measure it. The harness is
+#      chosen by the load path rather than by the benchmark, so the same benchmark can be
+#      timed, driven by benchmark-ips, or run under a profiler without being edited.
+#
+#      With no benchmark, every registered one is run. A benchmark is registered by being
+#      listed in benchmark/benchmarks.yml, so a file which merely supports one is not
+#      mistaken for one.
+#
+#      These are the benchmarks which need nothing but a Ruby. The ones which need a
+#      homeserver run against the rig bin/test brings up, and are not here yet.
+#
+# OPTIONS
+#      --harness name
+#              How to measure, which is a directory under benchmark/ holding a harness.rb.
+#              Defaults to harness, which times the block and counts what it allocated. The
+#              others answer a different question about the same benchmark:
+#
+#              harness-bips        a rate rather than a time, via benchmark-ips.
+#              harness-memory      what one run allocated and kept, and where from.
+#              harness-stackprof   where the time went, written out as a profile dump.
+#
+#      --category name
+#              Run only the benchmarks of that category: headline for the numbers worth
+#              quoting, micro for a single call measured as a rate, other for a benchmark
+#              which answers a question rather than guarding a number.
+#
+#      --version version
+#              The specification version to build for, where a benchmark builds one. Defaults
+#              to the latest the library knows about.
+#
+#      --list  Print the registered benchmarks with what each measures, and exit.
+#
+# ENVIRONMENT
+#      MATRIX_VERSION
+#              Read as the default for --version, and set for the benchmark, as it is for the
+#              suite.
+#
+#      BENCHMARK_RESULTS
+#              Set for each benchmark, to the file it is to write. A benchmark run by hand and
+#              not given one writes a file named for the time instead.
+#
+#      WARMUP_ITERATIONS, MINIMUM_ITERATIONS, MINIMUM_TIME, MAXIMUM_ITERATIONS
+#              Read by the default harness: how many iterations are discarded, and the fewest
+#              iterations and least time to measure for. A run goes on until both are met, or
+#              until MAXIMUM_ITERATIONS, which is what stops a fast block being asked for
+#              millions of them.
+#
+#      REPORTED_ITERATIONS
+#              How many iterations the default harness prints one by one before going quiet.
+#
+#      WARMUP_TIME, MEASUREMENT_TIME
+#              Read by harness-bips, in seconds.
+#
+#      REPORTED_LOCATIONS
+#              Read by harness-memory: how many of the heaviest locations to print.
+#
+#      STACKPROF_MODE, STACKPROF_INTERVAL, PROFILED_ITERATIONS, REPORTED_FRAMES
+#              Read by harness-stackprof: what to sample (wall, cpu or object), how often, how
+#              many iterations to profile, and how many frames to print.
+#
+# FILES
+#      benchmark/benchmarks.yml
+#              The benchmarks which can be run, with a description and a category for each.
+#
+#      benchmark/harness/
+#              The default harness, and what every harness shares.
+#
+#      benchmark/data/
+#              A directory per run, holding a JSON document per benchmark, and beside it the
+#              profile dump or allocation report where a harness wrote one. Not checked in.
+#
+# EXIT STATUS
+#      The bin/benchmark utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Run everything:
+#
+#            bin/benchmark
+#
+#      Run the numbers worth quoting:
+#
+#            bin/benchmark --category headline
+#
+#      Run one benchmark, or one directory of them:
+#
+#            bin/benchmark versions/build
+#            bin/benchmark versions
+#
+#      Measure a rate rather than a time:
+#
+#            bin/benchmark --harness harness-bips versions/cached
+#
+#      Find out where a benchmark's time goes, and read the profile:
+#
+#            bin/benchmark --harness harness-stackprof events/sync
+#            stackprof --text benchmark/data/<run>/events-sync.dump
+#
+#      Find out what it allocated:
+#
+#            bin/benchmark --harness harness-memory events/sync
+#
+#      Build for an older version:
+#
+#            bin/benchmark --version v1.1 versions/build
+#
+# SEE ALSO
+#      bin/test(1), benchmark/readme.md
+#
+# async-matrix                          October 11, 2026                        BENCHMARK(1)
+
+set -o errexit
+set -o nounset
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+manifest="$root/benchmark/benchmarks.yml"
+
+harness="harness"
+category=""
+version="${MATRIX_VERSION:-}"
+list="no"
+chosen=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --harness)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--harness needs a name." >&2
+        exit 1
+      fi
+
+      harness="$1"
+      ;;
+    --harness=*)
+      harness="${1#--harness=}"
+      ;;
+    --category)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--category needs a name." >&2
+        exit 1
+      fi
+
+      category="$1"
+      ;;
+    --category=*)
+      category="${1#--category=}"
+      ;;
+    --version)
+      shift
+
+      if [ "$#" -eq 0 ]; then
+        echo "--version needs a version." >&2
+        exit 1
+      fi
+
+      version="$1"
+      ;;
+    --version=*)
+      version="${1#--version=}"
+      ;;
+    --list)
+      list="yes"
+      ;;
+    -*)
+      echo "Unknown option $1." >&2
+      exit 1
+      ;;
+    *)
+      chosen+=("${1%.rb}")
+      ;;
+  esac
+
+  shift
+done
+
+if [ "$list" = "yes" ]; then
+  ruby -ryaml -e '
+    benchmarks = YAML.load_file(ARGV.first)
+    width = benchmarks.keys.map(&:size).max
+
+    benchmarks.each do |name, entry|
+      puts format("%-#{width}s  %-8s  %s", name, entry["category"], entry["desc"])
+    end
+  ' "$manifest"
+
+  exit 0
+fi
+
+if [ ! -f "$root/benchmark/$harness/harness.rb" ]; then
+  echo "Unknown harness $harness: benchmark/$harness/harness.rb does not exist." >&2
+  exit 1
+fi
+
+# Which benchmarks to run, resolved against the manifest rather than against the directory: a name
+# may be a benchmark or a directory of them, and one which is neither is an error rather than a run
+# of nothing.
+selected=$(ruby -ryaml -e '
+  manifest, category, *chosen = ARGV
+  benchmarks = YAML.load_file(manifest)
+
+  unknown = chosen.reject do |want|
+    benchmarks.key?(want) or benchmarks.keys.any?{|name| name.start_with?("#{want}/")}
+  end
+
+  unless unknown.empty?
+    warn "Unknown benchmark #{unknown.join(", ")}, expected one of: #{benchmarks.keys.join(", ")}"
+    exit 1
+  end
+
+  selected = benchmarks.keys
+
+  unless category.empty?
+    selected = selected.select{|name| benchmarks[name]["category"] == category}
+
+    if selected.empty?
+      warn "No benchmark has category #{category}."
+      exit 1
+    end
+  end
+
+  unless chosen.empty?
+    selected = selected.select do |name|
+      chosen.any?{|want| name == want or name.start_with?("#{want}/")}
+    end
+  end
+
+  puts selected
+' "$manifest" "$category" ${chosen[@]+"${chosen[@]}"})
+
+output="$root/benchmark/data/$(date +%F-%H%M%S)"
+mkdir -p "$output"
+
+for name in $selected; do
+  echo "Benchmarking $name on $harness." >&2
+
+  environment=("BENCHMARK_RESULTS=$output/${name//\//-}.json")
+
+  if [ -n "$version" ]; then
+    environment+=("MATRIX_VERSION=$version")
+  fi
+
+  env "${environment[@]}" bundle exec ruby \
+    -I "$root/benchmark/$harness" \
+    -I "$root/lib" \
+    "$root/benchmark/$name.rb"
+done
+
+echo "Results in $output." >&2

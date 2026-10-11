@@ -14,6 +14,17 @@ describe Async::Matrix::Operations do
     expect(Async::Matrix::Operations.method_name("add3PID")).to be == :add_3pid
   end
 
+  # A digit which ends a word is part of it: `V2` is a version rather than a word and a number.
+  it "keeps a version suffix with the letter it belongs to" do
+    expect(Async::Matrix::Operations.method_name("bindV2")).to be == :bind_v2
+    expect(Async::Matrix::Operations.method_name("isPubKeyValidV2")).to be == :is_pub_key_valid_v2
+  end
+
+  # And a digit which starts one is not: `3PID` is a word of its own.
+  it "separates a digit which starts a word, and keeps one which ends it" do
+    expect(Async::Matrix::Operations.method_name("getValidated3pidV2")).to be == :get_validated_3pid_v2
+  end
+
   it "keeps a plural acronym as one word" do
     expect(Async::Matrix::Operations.method_name("get3PIDs")).to be == :get_3pids
   end

@@ -56,6 +56,22 @@ default_room_version: "11"
 # no crypto, so an encrypted room reaches it as undecryptable m.room.encrypted.
 encryption_enabled_by_default_for_room_type: "off"
 
+# Synapse 1.126 changed the default of room_list_publication_rules to deny, so a room which asks
+# to be published is not, and the public room list is empty whatever is in it. The rig is a
+# throwaway with nothing in it worth hiding, so everything may publish.
+room_list_publication_rules:
+  - user_id: "*"
+    alias: "*"
+    room_id: "*"
+    action: allow
+
+# The server-server suite reads the public room list and the server's own discovery document over
+# federation, neither of which Synapse serves unless it is asked to. Both are off by default:
+# publishing the room list to other servers is a choice, and so is answering for .well-known when
+# something else usually does.
+allow_public_rooms_over_federation: true
+serve_server_wellknown: true
+
 trusted_key_servers:
   - server_name: "matrix.org"
 suppress_key_server_warning: true

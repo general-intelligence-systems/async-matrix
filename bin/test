@@ -64,7 +64,7 @@
 #              Read by the compose file, to name the registry the images come from.
 #
 #      SYNAPSE_PORT
-#              Read by the compose file, to move the homeserver off port 8008. A second
+#              Read by the compose file, to move the homeserver off port 7300. A second
 #              version can be brought up alongside the first with it.
 #
 # FILES
@@ -215,6 +215,28 @@ running() {
   docker compose --file "$compose" ps --services --filter status=running 2>/dev/null | head -1
 }
 
+# The servers each API is tested against, which are servers of their own rather than homeservers:
+# the identity API is tested against sydent, the push gateway API against sygnal, and the
+# application service API against the stub which answers in a bridge's place.
+services=()
+
+add_service() {
+  case "$1" in
+    identity) services+=(sydent) ;;
+    push-gateway|push_gateway) services+=(sygnal) ;;
+    application-service|application_service) services+=(appservice) ;;
+  esac
+}
+
+if [ "${#apis[@]}" -eq 0 ] && [ "$core" = "no" ]; then
+  # The whole suite, which is every API.
+  services=(sydent sygnal appservice)
+else
+  for api in ${apis[@]+"${apis[@]}"}; do
+    add_service "$api"
+  done
+fi
+
 start() {
   local version="$1"
 
@@ -223,6 +245,12 @@ start() {
   else
     docker compose --file "$compose" down
     docker compose --file "$compose" up --detach --wait "$version"
+  fi
+
+  if [ "${#services[@]}" -gt 0 ]; then
+    # The identity server joins the homeserver's network namespace, so it is told which homeserver
+    # is running: `localhost` has to mean the homeserver for an OpenID token to be verified.
+    MATRIX_SERVICE="$version" docker compose --file "$compose" up --detach --wait "${services[@]}"
   fi
 }
 
