@@ -78,7 +78,7 @@ describe Async::Matrix::ClientServer::Room do
   end
 
   with "#messages" do
-    # A token to page back from, which the specification requires before v1.3 and accepts at every version. It is taken after the messages are sent, so that the page read backwards from it carries them.
+    # A token to page back from, which v1.1 requires. Taken after the messages are sent.
     def paging_from
       client.sync(timeout: 0).next_batch
     end
