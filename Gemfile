@@ -11,6 +11,19 @@ group :test do
   gem "sus"
   gem "sus-fixtures-async"
 
+  gem "bake-test"
+end
+
+# Separate from :test, because the cops cannot be installed everywhere the suite can run.
+#
+# The gemspec asks for Ruby 3.3, and the suite does run there. ast-crispr-ruby-prism does not: it
+# has only ever been released at 7.1.x, and that line - along with ast-crispr, ast-merge,
+# prism-merge and tree_haver 7 beneath it - requires Ruby 4, so there is no older version to hold
+# back to. Keeping it in :test made `bundle install` fail on Ruby 3.3 before a test could run.
+#
+# So linting is a group of its own, which a job that only wants to run the suite leaves out with
+# BUNDLE_WITHOUT. `bin/rubocop` needs Ruby 4, which is the Ruby it is run on.
+group :lint do
   gem "rubocop"
   gem "rubocop-socketry"
 
@@ -19,8 +32,6 @@ group :test do
 
   # The cops read the file with Prism rather than the parser gem RuboCop hands them: ast-crispr-ruby-prism resolves which comment documents which declaration, and tree_haver walks the tree uniformly.
   gem "ast-crispr-ruby-prism"
-
-  gem "bake-test"
 end
 
 # bin/update-spec reads the matrix-spec submodules, whose schemas are full of $ref - including pointers into other documents. json_schemer resolves them.

@@ -11,8 +11,8 @@ name: Test (Tuwunel)
 #
 # Only one Ruby, where Test runs three. The Ruby dimension is about the gem rather than about the
 # homeserver, and Test already covers it across every version; repeating it here would double the
-# jobs to say nothing new. It is the newest of the three, because that is the one the lock file
-# resolves for: a gem in it wants Ruby 4, so an older Ruby does not reach the homeserver at all.
+# jobs to say nothing new. It is the one the devShell pins, so a failure here reproduces under
+# `nix develop --command bin/test --backend tuwunel <version>` without choosing a Ruby first.
 
 on:
   push:
@@ -67,10 +67,14 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
+    # Without the lint group: the suite does not lint, and the cops need Ruby 4, so installing them
+    # would fail the older Rubies before a test could run. See the Gemfile.
     - uses: ruby/setup-ruby@v1
       with:
         ruby-version: "4.0"
         bundler-cache: true
+      env:
+        BUNDLE_WITHOUT: lint
 
     - uses: docker/login-action@v3
       with:

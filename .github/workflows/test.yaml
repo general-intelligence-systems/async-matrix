@@ -68,10 +68,14 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     
+    # Without the lint group: the suite does not lint, and the cops need Ruby 4, so installing them
+    # would fail the older Rubies before a test could run. See the Gemfile.
     - uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{matrix.ruby}}
         bundler-cache: true
+      env:
+        BUNDLE_WITHOUT: lint
     
     - uses: docker/login-action@v3
       with:
