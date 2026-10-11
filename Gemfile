@@ -17,6 +17,9 @@ group :test do
   # Local/CommentStructure parses comments with decode, so that an annotation is whatever decode recognises as one rather than whatever a regular expression here happens to match.
   gem "decode"
 
+  # The cops read the file with Prism rather than the parser gem RuboCop hands them: ast-crispr-ruby-prism resolves which comment documents which declaration, and tree_haver walks the tree uniformly.
+  gem "ast-crispr-ruby-prism"
+
   gem "bake-test"
 end
 

@@ -41,5 +41,11 @@ module Async
         "#{@errcode || @status}: #{super}"
       end
     end
+
+    # Raised when a rejected access token could not be replaced, so the caller must log in again.
+    #
+    # It is a {RequestError}: the refusal is the `cause`.
+    class AuthenticationError < RequestError
+    end
   end
 end

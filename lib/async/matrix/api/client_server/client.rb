@@ -12,6 +12,8 @@ require_relative "../../versions"
 require_relative "../../versioned"
 require_relative "../../paths"
 require_relative "../../representation"
+require_relative "../../credentials"
+require_relative "../../authenticated"
 require_relative "session"
 require_relative "key_backup"
 require_relative "keys"
@@ -20,6 +22,61 @@ require_relative "cross_signing"
 require_relative "device_management"
 require_relative "rooms"
 require_relative "sync"
+require_relative "account_data"
+require_relative "account_deactivation"
+require_relative "admin"
+require_relative "administrative_contact"
+require_relative "appservice_ping"
+require_relative "appservice_room_directory"
+require_relative "authed_content_repo"
+require_relative "banning"
+require_relative "capabilities"
+require_relative "content_repo"
+require_relative "directory"
+require_relative "event_context"
+require_relative "filter"
+require_relative "inviting"
+require_relative "kicking"
+require_relative "knocking"
+require_relative "list_public_rooms"
+require_relative "login_token"
+require_relative "mutual_rooms"
+require_relative "notifications"
+require_relative "oauth_server_metadata"
+require_relative "old_sync"
+require_relative "openid"
+require_relative "password_management"
+require_relative "peeking_events"
+require_relative "policy_server"
+require_relative "presence"
+require_relative "profile"
+require_relative "pusher"
+require_relative "pushrules"
+require_relative "read_markers"
+require_relative "receipts"
+require_relative "redaction"
+require_relative "refresh"
+require_relative "registration"
+require_relative "registration_tokens"
+require_relative "relations"
+require_relative "report_content"
+require_relative "room_event_by_timestamp"
+require_relative "room_initial_sync"
+require_relative "room_summary"
+require_relative "room_upgrades"
+require_relative "search"
+require_relative "space_hierarchy"
+require_relative "sso_login_redirect"
+require_relative "support"
+require_relative "tags"
+require_relative "third_party_lookup"
+require_relative "third_party_membership"
+require_relative "threads_list"
+require_relative "typing"
+require_relative "users"
+require_relative "versions"
+require_relative "voip"
+require_relative "wellknown"
 
 module Async
   module Matrix
@@ -71,10 +128,20 @@ module Async
 
         # Derive a client which authenticates using the given access token.
         #
+        # The token goes below the resource, not into its headers, which `#with` copies into every derived resource.
+        #
         # @parameter access_token [String] the access token obtained from {#login}.
+        # @parameter refresh_token [String | nil] the token which buys a new access token, from v1.3.
+        # @parameter expires_in_ms [Integer | nil] how long the access token lasts.
         # @returns [Client] an authenticated client.
-        def authenticated(access_token)
-          self.with(headers: {"authorization" => "Bearer #{access_token}"})
+        def authenticated(access_token, refresh_token: nil, expires_in_ms: nil)
+          credentials = Credentials.new(self.refresh,
+            access_token: access_token,
+            refresh_token: refresh_token,
+            expires_in_ms: expires_in_ms,
+          )
+
+          self.class.new(Authenticated.new(self.delegate, credentials), self.reference, self.headers)
         end
 
         # Log in using a password.
@@ -82,10 +149,13 @@ module Async
         # @parameter user [String] the localpart or fully qualified ID of the user.
         # @parameter password [String] the user's password.
         # @returns [Login] the login response, which carries the access token.
-        def login(user, password, type: "m.login.password", **payload)
+        def login(user, password, type: "m.login.password", refresh_token: false, **payload)
           payload[:type] = type
           payload[:identifier] = {type: "m.id.user", user: user}
           payload[:password] = password
+
+          # Off by default, because asking for one shortens the access token: Synapse issues a refreshable token for `refreshable_access_token_lifetime`, five minutes by default, where one without a refresh token does not expire at all. {#logged_in} asks for one, since it can renew it.
+          payload[:refresh_token] = refresh_token
 
           api::Login.post(self.with(path: "#{V3}/login"), payload)
         end
@@ -95,11 +165,17 @@ module Async
         # @parameter user [String] the localpart or fully qualified ID of the user.
         # @parameter password [String] the user's password.
         # @returns [Client] an authenticated client.
-        def logged_in(user, password, **options)
-          login = self.login(user, password, **options)
+        def logged_in(user, password, refresh_token: true, **options)
+          login = self.login(user, password, refresh_token: refresh_token, **options)
 
-          # Note: the login representation shares this client's connection, so it must not be closed here - see {Client#close}.
-          self.authenticated(login.access_token)
+          # The login representation shares this client's connection, so it is not closed here: closing it would close the connection the derived client is about to use.
+          #
+          # Refresh tokens arrived in v1.3, so an older version has no such field to read.
+          if login.respond_to?(:refresh_token)
+            self.authenticated(login.access_token, refresh_token: login.refresh_token, expires_in_ms: login.expires_in_ms)
+          else
+            self.authenticated(login.access_token)
+          end
         end
 
         # The ways this homeserver will let a user log in. No authentication is required.
@@ -161,6 +237,11 @@ module Async
           joined = api::RoomReference.post(self.with(path: path), payload)
 
           self.room(joined.room_id)
+        end
+
+        # @returns [Refresh] the endpoint which exchanges a refresh token for an access token.
+        def refresh
+          api::Refresh.for(self)
         end
 
         # @returns [Keys] the end to end encryption keys.
