@@ -47,6 +47,16 @@ module Async
       end
 
       class KeyVerificationStartSasV1 < KeyVerificationStart
+        # The short authentication string methods this client offers, in the order it prefers them.
+        #
+        # Decimal alone, because MSC4405 deprecated emoji: a client shows the names in its own language, so two users can hold different words for the same picture and never agree.
+        #
+        # The specification requires decimal of every client, so offering only decimal still agrees with anybody.
+        OFFERED = ["decimal"].freeze
+
+        # Every method the specification defines, which is what another device may offer us.
+        DEFINED = ["decimal", "emoji"].freeze
+
         class << self
           def event_type = "m.key.verification.start"
 
@@ -68,6 +78,12 @@ module Async
         def message_authentication_codes = @value[:message_authentication_codes]
 
         def short_authentication_string = @value[:short_authentication_string]
+
+        # The methods to accept with, being a subset of what was offered.
+        #
+        # @parameter offered [Array(String)] what this client is willing to use.
+        # @returns [Array(String)] the methods both sides understand, preferred first.
+        def agreed(offered: OFFERED) = offered & (self.short_authentication_string || [])
       end
     end
   end

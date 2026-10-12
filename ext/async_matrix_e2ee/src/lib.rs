@@ -8,6 +8,21 @@
 //! wrapped key objects around: Matrix moves keys and ciphertext as base64
 //! strings inside JSON, so a string API drops straight into the protocol layer
 //! and keeps the magnus surface small.
+//!
+//! # Provenance
+//!
+//! matrix-rust-sdk is the reference for how these primitives are driven, and it
+//! is licensed Apache-2.0, as this project is. Logic may therefore be ported
+//! from it directly: section 4(b) of the licence asks that a derived file carry
+//! a prominent notice of the change, so a method which follows its logic says
+//! so where it appears, and the root NOTICE records the attribution.
+//!
+//! Fractal is worth reading for how a client sequences these calls, but it is
+//! GPL-3.0-or-later. Nothing may be copied from it into this file.
+//!
+//!   - <https://github.com/matrix-org/matrix-rust-sdk> (Apache-2.0)
+//!   - <https://github.com/matrix-org/vodozemac> (Apache-2.0)
+//!   - <https://gitlab.gnome.org/World/fractal> (GPL-3.0-or-later; read only)
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -350,31 +365,67 @@ impl Sas {
             .borrow_mut()
             .take()
             .ok_or_else(|| rt_err("this Sas has already been established"))?;
-        Ok(EstablishedSas(sas.diffie_hellman(key).map_err(rt_err)?))
+
+        Ok(EstablishedSas {
+            sas: sas.diffie_hellman(key).map_err(rt_err)?,
+            our_public_key: self.public_key.clone(),
+            // Re-encoded from the parsed key rather than kept as given, so that
+            // the pair is canonical base64 on both sides: the info strings are
+            // built by concatenating these, and must match byte for byte.
+            their_public_key: key.to_base64(),
+        })
     }
 }
 
+/// An established SAS channel, which carries both public keys.
+///
+/// vodozemac drops them at this point, but every info string the spec defines
+/// is built from both, so carrying them here is what lets a caller construct
+/// one without tracking the keys itself.
 #[magnus::wrap(class = "Async::Matrix::E2EE::EstablishedSas", free_immediately, size)]
-struct EstablishedSas(vodozemac::sas::EstablishedSas);
+struct EstablishedSas {
+    sas: vodozemac::sas::EstablishedSas,
+    our_public_key: String,
+    their_public_key: String,
+}
 
 impl EstablishedSas {
-    /// The seven emoji indices of the `emoji` SAS method, as table offsets.
-    fn emoji_indices(&self, info: String) -> Vec<u8> {
-        self.0.bytes(&info).emoji_indices().to_vec()
+    /// Our own ephemeral public key, as sent in `m.key.verification.key`.
+    fn our_public_key(&self) -> String {
+        self.our_public_key.clone()
+    }
+
+    /// The other device's ephemeral public key, as received.
+    fn their_public_key(&self) -> String {
+        self.their_public_key.clone()
     }
 
     /// The three numbers of the `decimal` SAS method, already offset by 1000.
+    ///
+    /// This is the method to offer. Decimal is required of every client, so it
+    /// always agrees, and MSC4405 deprecates the alternative.
     fn decimals(&self, info: String) -> (u16, u16, u16) {
-        self.0.bytes(&info).decimals()
+        self.sas.bytes(&info).decimals()
+    }
+
+    /// The seven emoji indices of the `emoji` SAS method, as table offsets.
+    ///
+    /// Deprecated by MSC4405, because each client names the emoji in its own
+    /// language and two users can therefore hold different words for the same
+    /// picture. Kept so that a verification with a client which offers nothing
+    /// else can still be shown, and not to be offered otherwise: see
+    /// `Events::KeyVerificationStartSasV1::OFFERED`.
+    fn emoji_indices(&self, info: String) -> Vec<u8> {
+        self.sas.bytes(&info).emoji_indices().to_vec()
     }
 
     /// The raw bytes, for a SAS method this crate does not implement.
     fn bytes(&self, info: String) -> Vec<u8> {
-        self.0.bytes(&info).as_bytes().to_vec()
+        self.sas.bytes(&info).as_bytes().to_vec()
     }
 
     fn calculate_mac(&self, input: String, info: String) -> String {
-        self.0.calculate_mac(&input, &info).to_base64()
+        self.sas.calculate_mac(&input, &info).to_base64()
     }
 
     /// The `hkdf-hmac-sha256` MAC, which libolm encoded incorrectly.
@@ -382,12 +433,12 @@ impl EstablishedSas {
     /// Deprecated by the spec in favour of `hkdf-hmac-sha256.v2`, and kept only
     /// so that a verification with an older client can still be read.
     fn calculate_mac_invalid_base64(&self, input: String, info: String) -> String {
-        self.0.calculate_mac_invalid_base64(&input, &info)
+        self.sas.calculate_mac_invalid_base64(&input, &info)
     }
 
     fn verify_mac(&self, input: String, info: String, tag: String) -> Result<bool, Error> {
         let mac = vodozemac::sas::Mac::from_base64(&tag).map_err(rt_err)?;
-        Ok(self.0.verify_mac(&input, &info, &mac).is_ok())
+        Ok(self.sas.verify_mac(&input, &info, &mac).is_ok())
     }
 }
 
@@ -462,6 +513,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     sas.define_method("diffie_hellman", method!(Sas::diffie_hellman, 1))?;
 
     let established = namespace.define_class("EstablishedSas", ruby.class_object())?;
+    established.define_method("our_public_key", method!(EstablishedSas::our_public_key, 0))?;
+    established.define_method("their_public_key", method!(EstablishedSas::their_public_key, 0))?;
     established.define_method("emoji_indices", method!(EstablishedSas::emoji_indices, 1))?;
     established.define_method("decimals", method!(EstablishedSas::decimals, 1))?;
     established.define_method("bytes", method!(EstablishedSas::bytes, 1))?;

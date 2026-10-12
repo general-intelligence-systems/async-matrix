@@ -31,4 +31,4 @@ magnus = "0.9"
 #   (RUSTFLAGS=--cfg fuzzing). A normal `cargo build`/`rake compile` never
 #   enables it. Never build production artifacts with `cargo fuzz`.
 [dependencies.vodozemac]
-version = "0.10"
+version = "0.11"

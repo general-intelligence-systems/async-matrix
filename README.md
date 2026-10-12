@@ -344,6 +344,21 @@ sync.each(retries: 3) do |batch|
 			
 			client.to_device.send_to_device("m.key.verification.ready", {sender => {from_device => ready}})
 		
+		# The other side chose SAS, so the accept narrows their offer to what we will use: decimal, since MSC4405 deprecated emoji.
+		in {sender:, content: Async::Matrix::Events::KeyVerificationStartSasV1(from_device:, transaction_id:) => start}
+			sas = Async::Matrix::E2EE::Sas.new
+			
+			accept = {
+				transaction_id: transaction_id,
+				key_agreement_protocol: "curve25519-hkdf-sha256",
+				hash: "sha256",
+				message_authentication_code: "hkdf-hmac-sha256.v2",
+				short_authentication_string: start.agreed,
+				commitment: machine.commitment(sas, start),
+			}
+			
+			client.to_device.send_to_device("m.key.verification.accept", {sender => {from_device => accept}})
+		
 		in {sender:, content: Async::Matrix::Events::KeyVerificationCancel(code:)}
 			Console.warn(self, "A verification was cancelled.", sender: sender, code: code)
 		

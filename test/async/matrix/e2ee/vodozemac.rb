@@ -284,4 +284,54 @@ describe Async::Matrix::E2EE::Vodozemac do
       expect{crypto.dump("too short")}.to raise_exception(RuntimeError)
     end
   end
+
+  # The binding defines these, so they are tested beside it rather than in a file of their own.
+  with Async::Matrix::E2EE::Sas do
+    let(:ours) {Async::Matrix::E2EE::Sas.new}
+
+    let(:theirs) {Async::Matrix::E2EE::Sas.new}
+
+    # The info strings the specification defines are built from both keys, so an established channel must name both.
+    it "names both public keys, and agrees with the other side about which is which" do
+      our_key, their_key = ours.public_key, theirs.public_key
+
+      established = ours.diffie_hellman(their_key)
+      other = theirs.diffie_hellman(our_key)
+
+      expect(established.our_public_key).to be == our_key
+      expect(established.their_public_key).to be == their_key
+      expect(other.our_public_key).to be == their_key
+      expect(other.their_public_key).to be == our_key
+    end
+
+    # A caller can therefore build the info string from the channel alone, and both sides build the same one.
+    it "agrees on the short authentication string" do
+      established = ours.diffie_hellman(theirs.public_key)
+      other = theirs.diffie_hellman(ours.public_key)
+
+      info = "MATRIX_KEY_VERIFICATION_SAS|@a:localhost|AAA|#{established.our_public_key}|@b:localhost|BBB|#{established.their_public_key}|txn"
+
+      expect(established.decimals(info)).to be == other.decimals(info)
+      expect(established.emoji_indices(info)).to be == other.emoji_indices(info)
+      expect(established.decimals(info).all?{|number| (1000..9191).cover?(number)}).to be == true
+    end
+
+    it "verifies a message authentication code the other side calculated" do
+      established = ours.diffie_hellman(theirs.public_key)
+      other = theirs.diffie_hellman(ours.public_key)
+
+      mac = established.calculate_mac("ed25519:DEVICEID", "info")
+
+      expect(other.verify_mac("ed25519:DEVICEID", "info", mac)).to be == true
+      expect(other.verify_mac("ed25519:OTHERKEY", "info", mac)).to be == false
+    end
+
+    # One exchange establishes one secret, so a second attempt is a mistake rather than a thing to allow.
+    it "cannot be established twice" do
+      key = theirs.public_key
+      ours.diffie_hellman(key)
+
+      expect{ours.diffie_hellman(key)}.to raise_exception(RuntimeError)
+    end
+  end
 end

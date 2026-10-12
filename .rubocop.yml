@@ -176,6 +176,9 @@ AsyncMatrix/EachFileHasMatchingTest:
     - "test/operations/*.rb"
     - "test/events.rb"
 
+    # Runs what is in `examples/`, so its counterpart is there rather than in lib.
+    - "test/examples/*.rb"
+
 # House style, shared with ratalada.
 
 # Bans assigning a `begin...end` expression; the assignment goes inside the block.

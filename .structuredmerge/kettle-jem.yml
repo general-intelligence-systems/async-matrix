@@ -1,0 +1,34 @@
+# kettle-jem configuration. Its reference is the gem's readme, which the generated file at the repository it templates reproduces in full; this one says only what this project asks for.
+#
+# What it is asked for is the file header contract: the skywalking-eyes integration, whose `.licenserc.yaml` says which files carry the notice and what it reads.
+#
+# Everything else here follows the async-rest house style rather than kettle-jem's own, so the catch-all pattern keeps the destination and a run is scoped to the path it is meant to touch:
+#
+#   kettle-jem plan  . --only .licenserc.yaml
+#   kettle-jem apply . --only .licenserc.yaml --accept
+#
+# Without the scope a run rewrites the workflows, the readme and the Rakefile, and takes the notice out of version.rb on its way past.
+licenses:
+  - Apache-2.0
+
+# skywalking-eyes is off by default for anything but MIT, and it is the integration which owns the headers.
+integrations:
+  skywalking-eyes: true
+
+# The file template pipeline, which `.licenserc.yaml` is part of. Without it only the maintenance recipes run, and those are the ones this project does not want.
+templates:
+  root: packaged
+  apply: true
+  profile: full
+
+defaults:
+  preference: destination
+
+# First match wins. The two catch-alls are the whole policy: kettle-jem creates nothing and rewrites nothing which is not named above them. `**` does not cross a separator, so a nested path needs its own entry.
+patterns:
+  - path: ".licenserc.yaml"
+    strategy: merge
+  - path: "**"
+    strategy: keep_destination
+  - path: "**/*"
+    strategy: keep_destination
