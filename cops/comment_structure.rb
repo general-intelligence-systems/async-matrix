@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# Released under the Apache License, Version 2.0.
+# Copyright, 2026, by General Intelligence Systems.
+
 # Checks the structure of a comment, which decode parses into three parts: the summary, the annotations, and the summary belonging to each annotation.
 #
 # @example

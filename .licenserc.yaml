@@ -1,6 +1,6 @@
 # Apache SkyWalking Eyes reads this. `license-eye header check` verifies the notice every Ruby file in this repository opens with, and `license-eye header fix` writes it into a file which has none.
 #
-# kettle-jem owns this file: `.structuredmerge/kettle-jem.yml` enables the skywalking-eyes integration, which is where the spdx-id and the dependency block come from. The rest is this project's, and the merge keeps it.
+# `license-eye` comes from the devshell rather than the bundle, because it is Go: see the skywalking-eyes entry in flake.nix.
 #
 # `fix` inserts the notice above `# frozen_string_literal: true` rather than below it, which is not where the other files carry it. So a new file is better served by copying a neighbour, and `check` accepts either order.
 header:
