@@ -16,7 +16,7 @@ require_relative "../../lib/async/matrix"
 
 # Encryption is not part of what `async/matrix` requires, and the binding is required by name because it is optional.
 require_relative "../../lib/async/matrix/e2ee"
-require_relative "../lib/async/matrix/e2ee/olm"
+require_relative "../../lib/async/matrix/e2ee/olm"
 
 require "console"
 require "securerandom"

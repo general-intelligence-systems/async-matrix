@@ -286,10 +286,10 @@ describe Async::Matrix::E2EE::Olm do
   end
 
   # The binding defines these, so they are tested beside it rather than in a file of their own.
-  with Async::Matrix::E2EE::Sas do
-    let(:ours) {Async::Matrix::E2EE::Sas.new}
+  with Vodozemac::Sas do
+    let(:ours) {Vodozemac::Sas.new}
 
-    let(:theirs) {Async::Matrix::E2EE::Sas.new}
+    let(:theirs) {Vodozemac::Sas.new}
 
     # The info strings the specification defines are built from both keys, so an established channel must name both.
     it "names both public keys, and agrees with the other side about which is which" do
