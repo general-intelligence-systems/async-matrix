@@ -6,7 +6,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [4.0.0] - 2026-10-11
+## [4.0.0] - 2026-10-12
 
 ### Added
 
@@ -70,10 +70,41 @@ project adheres to [Semantic Versioning](https://semver.org/).
   subclasses it for the homeserver's user-interactive auth challenge, carrying `#session`,
   `#flows`, `#params`, `#completed`, `#stages` and `#accepts?(type)`.
 
-- **`Async::Matrix::E2EE`** — `E2EE::Crypto` is the interface encryption is written against, with
-  `E2EE::Machine`, `E2EE::Store`, `E2EE::Device`, `E2EE::Devices` and `E2EE::CanonicalJson`
-  around it. Set `CONSOLE_LEVEL=debug` to see the machine, the device lists and the session
-  sharing narrate themselves.
+- **`Async::Matrix::E2EE`** — `E2EE::Crypto` is the interface encryption is written against,
+  with `E2EE::Machine`, `E2EE::Store`, `E2EE::Device`, `E2EE::Devices` and
+  `E2EE::CanonicalJSON` around it. `E2EE::Olm` wraps the `vodozemac` gem for Olm and Megolm;
+  `E2EE::Plaintext` satisfies the same interface without encrypting, so a flow can be driven
+  where the real thing is not wanted. `E2EE::Backup` is the key pair a server side backup
+  (`m.megolm_backup.v1.curve25519-aes-sha2`) is encrypted to, with `.generate`,
+  `.from_private_key` and `.from_public_key`; `E2EE::CrossSigning::Key` is one ed25519 key of
+  the three a user signs with. `E2EE::SecretStorage` is the AES-CTR/HMAC side of `m.secret_storage`
+  — `SecretStorage::Key.generate`, `.from_passphrase`, `.from_recovery_key`, with
+  `#encrypt_secret` and `#decrypt_secret` — and `E2EE::Secrets` tracks which private keys a
+  device holds and what to write to the server. Set `CONSOLE_LEVEL=debug` to see the machine,
+  the device lists and the session sharing narrate themselves.
+
+- **`Async::Matrix::Identifier`** — the identifiers the specification gives a grammar:
+  `Identifier::UserID`, `RoomID`, `RoomAlias`, `EventID` and `ServerName`, with `Generic`,
+  `Opaque` and `Namespaced` as the shared bases. Each one parses and validates, and
+  `InvalidIdentifierError` is raised when a string is not what it was read as.
+
+- **`Async::Matrix::Signatures`**, with `Signatures::Keyring` and `Signatures::VerificationKey`.
+  `Signatures.sign(object, key:, as:)` files a signature beside any already there, and
+  `Signatures.verify(object, keyring:, as:)` walks the appendices' algorithm and raises
+  `SignatureError` with the step which failed. `Keyring.for_device` and `Keyring.for_server`
+  turn a published key set into something `verify` reads.
+
+- **`Async::Matrix::KeyRepresentation`** — the base58 encoding a user writes a key down as,
+  with `.encode(bytes)` and `.decode(string, length:)`. It is what `SecretStorage::Key` and
+  the backup private key are shown as.
+
+- **`Async::Matrix::ServerKey.load(path)` and `.parse(text)`**, which read the ed25519 key a
+  homeserver signs with from its on-disk form; `#sign(object)` canonicalises and signs.
+
+- **Encrypted event envelopes.** `Events::Decrypted` carries the plaintext along with the
+  session it came over (`#session_id`, `#message_index`, `#released?`,
+  `#sender_device_keys?`); `Events::Undecryptable`, `Events::Deferred` and `Events::Withheld`
+  stand in where decryption did not read, so one `case` covers what read and what did not.
 
 ### Changed
 
@@ -98,10 +129,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - **Breaking: `Async::Matrix::Config` is gone**, along with `Config::Vivify`. A client is
   constructed from an endpoint and credentials.
 
-- **Breaking: encryption is an interface.** `E2EE::Crypto` is what the encryption machinery is
-  written against, and `E2EE::Plaintext` is the only implementation in the library. The
-  vodozemac binding under `ext/` is still built and still cross-compiled into precompiled
-  platform gems, but nothing under `lib/` loads it yet — see the `Rakefile`.
+- **Breaking: encryption is an interface, and the binding is a separate gem.** `E2EE::Crypto`
+  is what the encryption machinery is written against; `E2EE::Olm` is the live implementation
+  and `E2EE::Plaintext` is a decoy that satisfies the interface without encrypting. The Rust
+  crate which used to live under `ext/async_matrix_e2ee` has moved out to the
+  [`vodozemac`](https://github.com/n-at-han-k/vodozemac-rb) gem, which ships precompiled per
+  platform. async-matrix is pure Ruby now and installs without a Rust toolchain; the
+  `cross-compile.yml` workflow, `Rakefile` extension task and the `Cargo.toml`/`Cargo.lock`
+  at the root are gone.
 
 - **Breaking: the suite is [sus](https://github.com/socketry/sus) under `test/`**, run against a
   real homeserver by `bin/test`, replacing the inline co-located scampi specs in `__END__`

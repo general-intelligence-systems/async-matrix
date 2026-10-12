@@ -59,7 +59,7 @@
 
         gems = pkgs.bundlerEnv {
           name = "async-matrix-gems";
-          ruby = pkgs.ruby_4_0;
+          ruby = pkgs.ruby_3_4;
           gemfile = ./Gemfile;
           lockfile = ./Gemfile.lock;
           gemset = gemset // { vodozemac = vodozemacGem; };
