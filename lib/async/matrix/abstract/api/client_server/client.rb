@@ -17,16 +17,8 @@ module Async
           module V1_18
           end
 
-          # v1.17 let a service name the device it acts as.
+          # No changes in v1.17.
           module V1_17
-            # A service holds keys per device, so encrypting means acting as one.
-            #
-            # @parameter user_id [String] the user to act as, which a `users` namespace must cover.
-            # @parameter device_id [String | nil] the device to act as, or nil for whichever the homeserver picks.
-            # @returns [Client] a client which acts as that user, on that device.
-            def as_user(user_id, device_id: nil)
-              super(user_id).with(parameters: {device_id: device_id}.compact)
-            end
           end
 
           # No changes in v1.16.

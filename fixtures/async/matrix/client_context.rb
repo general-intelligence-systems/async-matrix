@@ -32,12 +32,6 @@ module Async
 
     TEST_PASSWORD = "password"
 
-    # The token of the application service the rig registers, from `synapse/appservice.yaml`.
-    TEST_AS_TOKEN = ENV.fetch("MATRIX_AS_TOKEN", "as_token_for_the_suite")
-
-    # The namespace that registration claims, which is the only one a service may act in.
-    TEST_AS_PREFIX = ENV.fetch("MATRIX_AS_PREFIX", "_async_matrix_")
-
     TEST_ROOM_NAME = "Test Room"
 
     TEST_ROOM_TOPIC = "Testing async-matrix"
