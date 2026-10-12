@@ -1,0 +1,98 @@
+# frozen_string_literal: true
+
+require "sequel/model"
+
+require_relative "typecasting"
+
+module Models
+  module Matrix
+    # A 1:1 Olm session with one other device, identified by its curve25519 key.
+    #
+    # Only ever used to wrap and unwrap to-device messages — chiefly m.room.key, the
+    # event that carries a Megolm session key. Room messages themselves are Megolm;
+    # nothing here touches them.
+    class OlmSession < Sequel::Model(:matrix_olm_sessions)
+      plugin :timestamps, update_on_create: true
+      plugin :validation_helpers
+
+      extend Typecasting
+
+      def validate
+        super
+        validates_presence :session_id
+        validates_presence %i[sender_key pickle]
+        validates_unique %i[user_id session_id]
+      end
+
+      # Sessions with +sender_key+, most recently used first. The spec says to try
+      # decrypting with each known session for a peer, and to encrypt with the most
+      # recent — several can exist when both sides established one concurrently.
+      dataset_module do
+        def with_peer(sender_key)
+          where(sender_key: sender_key).order(Sequel.lit("last_used_at DESC NULLS LAST"))
+        end
+      end
+
+      def session
+        @session ||= Async::Matrix::E2EE::Session.from_pickle(
+          pickle, ::Matrix::Device::Crypto.pickle_key,
+        )
+      end
+
+      # Olm sessions ratchet on every message, so the pickle MUST be written back
+      # after each encrypt/decrypt or the chain desynchronises with the peer.
+      def save_session!
+        update(
+          pickle:       session.pickle(::Matrix::Device::Crypto.pickle_key),
+          last_used_at: Time.now,
+        )
+      end
+
+      def self.persist!(user:, sender_key:, session:)
+        create(
+          user_id:      user.id,
+          sender_key:   sender_key,
+          session_id:   session.session_id,
+          pickle:       session.pickle(::Matrix::Device::Crypto.pickle_key),
+          last_used_at: Time.now,
+        )
+      end
+    end
+  end
+end
+
+__END__
+
+create_table?(:matrix_olm_sessions) do
+  primary_key :id, type: :Bignum, serial: true
+  column      :created_at, TIMESTAMP, null: false
+  column      :last_used_at, TIMESTAMP
+  column      :pickle, :text, null: false
+  column      :sender_key, TEXT, null: false
+  column      :session_id, TEXT, null: false
+  column      :updated_at, TIMESTAMP, null: false
+  column      :user_id, :bigint, null: false
+
+  # ── Beyond the Rails schema ────────────────────────────────────────
+  #
+  # PickledSession also carries creation_time and last_use_time, which
+  # `created_at` and `last_used_at` already cover. This is the one field
+  # with no equivalent: a session opened against a FALLBACK key is not
+  # as trustworthy as one opened against a one-time key, because a
+  # fallback key is reused and therefore replayable.
+  column      :created_using_fallback_key, :boolean, default: false, null: false
+
+  index %i[user_id sender_key], name: :index_matrix_olm_sessions_on_user_id_and_sender_key
+  index %i[user_id session_id],
+    unique: true,
+    name:   :index_matrix_olm_sessions_on_user_id_and_session_id
+  index :user_id, name: :index_matrix_olm_sessions_on_user_id
+end
+
+# The same columns again, for a database that already has this table -- an
+# import of the Rails app's ten. create_table? above is a no-op there, so
+# without this not one of them would ever be created. See
+# Migrations.added_columns.
+added_columns(
+  [:created_using_fallback_key, :boolean, {default: false, null: false}],
+)

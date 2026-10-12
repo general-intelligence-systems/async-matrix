@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+#bin/kill-dev
+
+#OVERMIND_PROCFILE=Procfile.dev overmind start --daemonize --any-can-die --auto-restart web,vite "$@"
+
+exec echo "DO NOT RUN bin/dev there are systemd processes!!!!!! for bin/serve and bin/vite"

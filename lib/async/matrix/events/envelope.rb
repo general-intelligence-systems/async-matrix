@@ -60,9 +60,9 @@ module Async
         def deconstruct_keys(keys) = super.merge(state_key: self.state_key, prev_content: self.prev_content)
       end
 
-      # An event which arrived encrypted, and what reading it established.
+      # An event which arrived encrypted, carrying the plaintext and where it came from.
       #
-      # The content is the plaintext, so a pattern which does not care reads it as any other event. What is added is the provenance: the session it came over, the index it was sent at, and whether it was waiting for its key.
+      # So a pattern reads it as any other event, or asks about the session it came over.
       class Decrypted < RoomEvent
         def initialize(value, content, room_id: nil, session_id: nil, message_index: nil, released: false, sender_device_keys: false)
           super(value, content, room_id: room_id)

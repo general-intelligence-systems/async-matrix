@@ -172,6 +172,22 @@ module Async
           self.class.new(Middleware::Authenticated.new(self.delegate, credentials), self.reference, self.headers)
         end
 
+        # Derive a client which authenticates as an application service.
+        #
+        # @parameter as_token [String] the `as_token` from the registration.
+        # @returns [Client] a client which acts as the service.
+        def as_application_service(as_token)
+          self.authenticated(as_token)
+        end
+
+        # Derive a client acting as one of the service's own users, named on every request.
+        #
+        # @parameter user_id [String] the user to act as, which a `users` namespace must cover.
+        # @returns [Client] a client which acts as that user.
+        def as_user(user_id)
+          self.with(parameters: {user_id: user_id})
+        end
+
         # Log in using a password.
         #
         # @parameter user [String] the localpart or fully qualified ID of the user.

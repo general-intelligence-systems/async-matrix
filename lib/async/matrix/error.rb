@@ -9,6 +9,10 @@ module Async
     class Error < StandardError
     end
 
+    # Raised when a cryptographic key cannot be read.
+    class InvalidKeyError < Error
+    end
+
     # Represents a Matrix API error, which is reported with a non-2xx status and a body of the form `{"errcode": "M_FORBIDDEN", "error": "..."}`.
     class RequestError < Error
       # @parameter status [Integer] the HTTP status code of the response.

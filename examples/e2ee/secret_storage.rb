@@ -16,7 +16,7 @@ require_relative "../../lib/async/matrix"
 
 # Encryption is not part of what `async/matrix` requires, and the binding is required by name because it is optional.
 require_relative "../../lib/async/matrix/e2ee"
-require_relative "../../lib/async/matrix/e2ee/vodozemac"
+require_relative "../lib/async/matrix/e2ee/olm"
 
 require "console"
 require "securerandom"
@@ -37,16 +37,28 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
   machine = Async::Matrix::E2EE::Machine.new(
     user_id: me,
     device_id: owner.device_id,
-    crypto: Async::Matrix::E2EE::Vodozemac.new,
+    crypto: Async::Matrix::E2EE::Olm.new,
   )
 
+  # Absent account data is an error rather than an empty answer, so "nothing there" arrives this way.
+  stored = lambda do |type|
+    begin
+      client.account_data.get_account_data(me, type)
+    rescue Async::Matrix::RequestError => error
+      case error.errcode
+      in "M_NOT_FOUND"
+        nil
+      end
+    end
+  end
+
   # Which key the account's storage is encrypted with, and therefore which description to read.
-  default = client.account_data.get_account_data(me, "m.secret_storage.default_key")
+  default = stored.call("m.secret_storage.default_key")
 
   case {default: default, passphrase: PASSPHRASE}
   # A storage key exists and the user gave us the passphrase, so the keys in it can be opened here.
   in {default: {key: String => key_id}, passphrase: String => passphrase}
-    description = client.account_data.get_account_data(me, "m.secret_storage.key.#{key_id}")
+    description = stored.call("m.secret_storage.key.#{key_id}")
 
     case description
     # Derived from a passphrase, which is the usual case: the salt and the rounds are in the description.
@@ -59,7 +71,7 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
         Console.error(self, "That passphrase does not open this storage.")
       in true
         WANTED.each do |name|
-          case client.account_data.get_account_data(me, name)
+          case stored.call(name)
           in {encrypted: Hash => encrypted}
             # A hash pattern is keyed by label, so the copy under this key is read out before it is used.
             case encrypted[key_id.to_sym]

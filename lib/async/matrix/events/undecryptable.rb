@@ -10,7 +10,7 @@ module Async
     module Events
       # A message which could not be read, which no homeserver ever sends.
       #
-      # These are synthesised where the ciphertext was, so that a sync loop can say why a message is missing in the same `case` which reads the ones that are not.
+      # Synthesised where the ciphertext was, so one `case` covers what read and what did not.
       class Undecryptable < Content
         class << self
           def event_type = "m.room.encrypted.undecryptable"

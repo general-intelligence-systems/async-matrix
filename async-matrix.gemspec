@@ -23,33 +23,28 @@ Gem::Specification.new do |spec|
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["documentation_uri"] = "https://general-intelligence-systems.github.io/async-matrix/"
 
-  # The library, the specification schemas it is generated from, and the native extension's sources.
+  # The library, and the specification schemas it is generated from.
   #
-  # The crate ships because spec.extensions builds it at install time from the source gem, and Cargo.toml and Cargo.lock ship with it because they are the workspace root rb_sys runs `cargo metadata` from. A precompiled platform gem carries the built object instead, and builds nothing.
-  #
-  # The built object is rejected: `rake compile` installs one into lib/async/matrix, and that one belongs to this machine's Ruby. The source gem compiles its own, and rake-compiler puts the right one into each precompiled gem itself.
+  # This gem is pure Ruby: the vodozemac binding it used to carry is the `vodozemac` gem, which ships precompiled per platform, so nothing here is built at install time.
   #
   # LICENSE and NOTICE ship because the Apache License asks for both: section 4(a) wants every recipient given a copy of the licence, and 4(d) wants the attribution notices carried along with it.
   spec.files = Dir.glob(
-    ["{lib}/**/*", "{ext}/**/*.{rs,rb,toml}", "Cargo.toml", "Cargo.lock", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md"],
+    ["{lib}/**/*", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md"],
     File::FNM_DOTMATCH,
     base: __dir__,
-  ).reject{|path| File.fnmatch?("*.{so,bundle,dll,o,a}", path, File::FNM_EXTGLOB)}
+  )
 
   spec.require_paths = ["lib"]
-  spec.extensions = ["ext/async_matrix_e2ee/extconf.rb"]
 
   spec.add_dependency "async-rest", "~> 0.20"
   spec.add_dependency "base64", "~> 0.3"
   spec.add_dependency "console", "~> 1.29"
 
+  # Olm, Megolm, SAS and the key types, as bindings over the vodozemac crate. It was `ext/async_matrix_e2ee` here until it became a gem of its own: see E2EE::Olm, E2EE::Backup and E2EE::CrossSigning::Key, which are what drive it.
+  spec.add_dependency "vodozemac", "~> 0.1"
+
   # GemKit::Deprecate declares a deprecation as a dated promise: the replacement, and the version the old name stops existing in.
   spec.add_dependency "gem_kit", "~> 0.2"
 
-  # Wanted at install time rather than only in development: ext/async_matrix_e2ee/extconf.rb requires rb_sys/mkmf, so installing the source gem resolves this before it can compile.
-  spec.add_dependency "rb_sys", "~> 0.9"
-
-  # The Rakefile's RbSys::ExtensionTask, which `rake compile` and the cross-compile workflow drive.
-  spec.add_development_dependency "rake-compiler", "~> 1.3"
   spec.add_development_dependency "lefthook", "~> 2.2"
 end

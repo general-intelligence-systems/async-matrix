@@ -15,11 +15,13 @@ module Async
         # @parameter device_id [String] the ID of the device.
         # @parameter value [Hash] the device keys the server answered with.
         # @parameter trust [Symbol] how much it is trusted.
-        def initialize(user_id, device_id, value, trust: :unverified)
+        # @parameter cross_signed [Boolean] whether its owner's self signing key signed it.
+        def initialize(user_id, device_id, value, trust: :unverified, cross_signed: false)
           @user_id = user_id
           @device_id = device_id
           @value = value
           @trust = trust
+          @cross_signed = cross_signed
         end
 
         # @attribute [String] the user the device belongs to.
@@ -72,6 +74,18 @@ module Async
         # @returns [Boolean] whether its owner has refused it.
         def blocked?
           @trust == :blocked
+        end
+
+        # Whether the owner's own self signing key signed this device.
+        #
+        # A server can make a device for anybody, so this is what says the user did. Only a cross signed device is sent a room key, which is what MSC4153 asks of a client.
+        #
+        # @attribute [Boolean] whether it is cross signed.
+        attr_writer :cross_signed
+
+        # @returns [Boolean] whether its owner's self signing key signed it.
+        def cross_signed?
+          @cross_signed
         end
 
         # @parameter algorithm [String] the algorithm to look for.

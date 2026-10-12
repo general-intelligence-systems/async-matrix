@@ -1,0 +1,9 @@
+allowBuilds:
+  # react-email ships the esbuild CLI; nothing here invokes it, so its native
+  # postinstall stays unrun.
+  '@carbon/grid': false
+  '@carbon/layout': false
+  esbuild: false
+  inferno: false
+minimumReleaseAgeExclude:
+  - vite@8.3.0

@@ -160,7 +160,7 @@ module Async
         # Enumerate over each membership event.
         #
         # @yields {|event| ...}
-        # 	@parameter event [Hash] the membership event.
+        # @parameter event [Hash] the membership event.
         def each(&block)
           if block_given?
             self.events.each(&block)

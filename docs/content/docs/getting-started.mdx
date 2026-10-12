@@ -31,10 +31,10 @@ $ bundle add async-matrix
 require "async/matrix"
 
 Async::Matrix::Client.open("http://localhost:7300") do |unauthenticated|
-	client = unauthenticated.logged_in("alice", "password")
-	
-	puts client.get_token_owner.user_id
-	# @alice:localhost
+  client = unauthenticated.logged_in("alice", "password")
+
+  puts client.get_token_owner.user_id
+  # @alice:localhost
 end
 ```
 
@@ -62,7 +62,7 @@ list already knows its own ID:
 
 ```ruby
 client.get_joined_rooms.each do |room|
-	puts room.id
+  puts room.id
 end
 ```
 
@@ -73,11 +73,11 @@ where the previous page ended, and returns `nil` at the end:
 page = room.get_room_events(dir: "b", limit: 20)
 
 while page
-	page.each do |event|
-		puts event.dig(:content, :body)
-	end
-	
-	page = page.following
+  page.each do |event|
+    puts event.dig(:content, :body)
+  end
+
+  page = page.following
 end
 ```
 
@@ -92,11 +92,11 @@ chain of `Async::Matrix::Sync#following` calls.
 sync = client.sync(timeout: 0)
 
 while true
-	sync = sync.following(timeout: 30_000)
-	
-	sync.each_message do |room_id, sender, body, event|
-		puts "#{room_id} #{sender}: #{body}"
-	end
+  sync = sync.following(timeout: 30_000)
+
+  sync.each_message do |room_id, sender, body, event|
+    puts "#{room_id} #{sender}: #{body}"
+  end
 end
 ```
 
@@ -111,10 +111,10 @@ Matrix `errcode`:
 
 ```ruby
 begin
-	client.join("#nonexistent:localhost")
+  client.join("#nonexistent:localhost")
 rescue Async::Matrix::RequestError => error
-	puts error.status  # 404
-	puts error.errcode # M_NOT_FOUND
+  puts error.status  # 404
+  puts error.errcode # M_NOT_FOUND
 end
 ```
 

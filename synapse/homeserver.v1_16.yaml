@@ -28,9 +28,10 @@ database:
 media_store_path: /tmp/media_store
 signing_key_path: /config/signing.key
 
-# Blank app service registration, for the agent bridge to fill in.
-# The appservice registrations were removed along with the appservice services in
-# docker-compose.yml: this rig is only used to test the client.
+# The application service the suite acts as, whose registration is mounted beside this file.
+app_service_config_files:
+  - /config/appservice.yaml
+
 
 # Any user, any password, created on login -- so there is no user setup. A
 # throwaway rig; see /config/modules/any_password.py.

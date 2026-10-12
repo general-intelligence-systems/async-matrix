@@ -8,13 +8,10 @@ require "openssl"
 
 require_relative "error"
 require_relative "e2ee/canonical_json"
+require_relative "signatures/verification_key"
 
 module Async
   module Matrix
-    # Raised when a signing key cannot be read.
-    class InvalidKeyError < Error
-    end
-
     # The key a homeserver signs for its own server name with.
     #
     # A request is signed rather than carrying a token, and the same key signs events.
@@ -109,9 +106,16 @@ module Async
       # @parameter signature [String] the signature to check, as unpadded base64.
       # @returns [Boolean] whether it was made by this key.
       def verify(object, signature)
-        @key.verify(nil, Base64.decode64(signature), E2EE::CanonicalJSON.for_signing(object))
-      rescue OpenSSL::PKey::PKeyError
+        self.verification_key.verify(E2EE::CanonicalJSON.for_signing(object), Signatures::VerificationKey.decode(signature))
+      rescue ArgumentError
         false
+      end
+
+      # The public half, as the thing which checks a signature with it.
+      #
+      # @returns [Signatures::VerificationKey] the key.
+      def verification_key
+        @verification_key ||= Signatures::VerificationKey.new(ALGORITHM, self.public_key)
       end
 
       def inspect

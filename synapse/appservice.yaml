@@ -1,0 +1,25 @@
+# The application service this rig registers, so that the suite can act as one.
+#
+# A registration is a file rather than an API call: a service which could register itself could
+# claim `.*` and read everything, so a homeserver admin has to put it here by hand.
+#
+# `url` points at the stub, which answers every path the homeserver pushes to with a 200. Without it
+# the homeserver retries each transaction and fills its log with the failures.
+id: async-matrix
+url: http://appservice:8099
+as_token: as_token_for_the_suite
+hs_token: hs_token_for_the_suite
+
+# The user an unnamed request acts as, which is `@_async_matrix_bot:localhost`.
+sender_localpart: _async_matrix_bot
+
+# Exclusive, and under an underscore, which is what keeps these out of the way of real users. The
+# suite masquerades as users in this namespace, and the homeserver refuses any other.
+namespaces:
+  users:
+    - exclusive: true
+      regex: "@_async_matrix_.*"
+  aliases:
+    - exclusive: true
+      regex: "#_async_matrix_.*"
+  rooms: []

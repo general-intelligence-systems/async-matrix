@@ -16,25 +16,25 @@ members, sending events, paging through a timeline, and running a sync loop.
 require "async/matrix"
 
 Async::Matrix::Client.open("http://localhost:7300") do |unauthenticated|
-	client = unauthenticated.logged_in("alice", "password")
-	
-	room = client.create_room(name: "Hello", topic: "Built with async-rest")
-	room.send_message("Hello, World!")
-	
-	client.get_joined_rooms.each do |room|
-		puts "#{room.id}: #{room.state.name}"
-	end
-	
-	# Sync is a long poll: each batch continues from the one before it.
-	sync = client.sync(timeout: 0)
-	
-	while true
-		sync = sync.following(timeout: 30_000)
-		
-		sync.each_message do |room_id, sender, body, event|
-			puts "#{room_id} #{sender}: #{body}"
-		end
-	end
+  client = unauthenticated.logged_in("alice", "password")
+
+  room = client.create_room(name: "Hello", topic: "Built with async-rest")
+  room.send_message("Hello, World!")
+
+  client.get_joined_rooms.each do |room|
+    puts "#{room.id}: #{room.state.name}"
+  end
+
+  # Sync is a long poll: each batch continues from the one before it.
+  sync = client.sync(timeout: 0)
+
+  while true
+    sync = sync.following(timeout: 30_000)
+
+    sync.each_message do |room_id, sender, body, event|
+      puts "#{room_id} #{sender}: #{body}"
+    end
+  end
 end
 ```
 
@@ -43,8 +43,8 @@ See `examples/echo.rb` for a bot which joins rooms it is invited to and replies 
 ## Where to go next
 
 <Cards>
-	<Card title="Getting Started" href="/docs/getting-started" description="Install the gem, log in, send a message, and run a sync loop." />
-	<Card title="Design" href="/docs/design" description="Why the client looks the way it does: resources, representations, and errors." />
-	<Card title="Testing" href="/docs/testing" description="Run the suite against a real homeserver, on either backend." />
-	<Card title="Matrix Specification" href="https://spec.matrix.org" description="The specification the client implements." />
+  <Card title="Getting Started" href="/docs/getting-started" description="Install the gem, log in, send a message, and run a sync loop." />
+  <Card title="Design" href="/docs/design" description="Why the client looks the way it does: resources, representations, and errors." />
+  <Card title="Testing" href="/docs/testing" description="Run the suite against a real homeserver, on either backend." />
+  <Card title="Matrix Specification" href="https://spec.matrix.org" description="The specification the client implements." />
 </Cards>

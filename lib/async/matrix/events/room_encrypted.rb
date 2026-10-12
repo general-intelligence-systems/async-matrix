@@ -14,7 +14,7 @@ module Async
         class << self
           def event_type = "m.room.encrypted"
 
-          def framing = :room_event
+          def framing = :event
         end
 
         def algorithm = @value[:algorithm]

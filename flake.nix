@@ -72,18 +72,11 @@
             gems
             gems.wrappedRuby
 
-            rustc
-            cargo
-            clang
-            libclang
-
             # license-eye, which reads .licenserc.yaml: `license-eye header check` verifies the notice every Ruby file opens with. It is Go rather than Ruby, so it comes from here rather than from the bundle.
             skywalking-eyes
           ];
 
           shellHook = /* bash */ ''
-            export LIBCLANG_PATH="${pkgs.libclang.lib}/lib"
-
             export BUNDLE_GEMFILE="$PWD/Gemfile"
             export BUNDLE_FROZEN=false
 

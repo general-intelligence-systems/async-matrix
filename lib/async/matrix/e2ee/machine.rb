@@ -7,9 +7,12 @@ require "console"
 require "json"
 
 require_relative "../events"
+require_relative "backup"
 require_relative "canonical_json"
+require_relative "cross_signing"
 require_relative "devices"
 require_relative "plaintext"
+require_relative "secrets"
 require_relative "store"
 
 module Async
@@ -25,19 +28,35 @@ module Async
         # The algorithm a device is encrypted to, which is how every key travels.
         OLM = "m.olm.v1.curve25519-aes-sha2"
 
+        # How long a session may be used for, where the room says nothing: a week.
+        DEFAULT_PERIOD = 604_800_000
+
+        # How many messages a session may carry, where the room says nothing.
+        DEFAULT_MESSAGES = 100
+
+        # The history visibilities which let a session be passed on to a later member.
+        SHAREABLE = ["shared", "world_readable"].freeze
+
         # @parameter user_id [String] the user this device belongs to.
         # @parameter device_id [String] this device.
         # @parameter crypto [Crypto] the implementation to encrypt with.
         # @parameter store [Store] what to remember between batches.
         # @parameter devices [Devices] which devices each user has.
         # @parameter version [String] the specification version to read events as.
-        def initialize(user_id:, device_id:, crypto: Plaintext.new, store: Store.new, devices: Devices.new, version: Async::Matrix::LATEST)
+        def initialize(user_id:, device_id:, crypto: Plaintext.new, store: Store.new, devices: nil, version: Async::Matrix::LATEST)
           @user_id = user_id
           @device_id = device_id
 
           @crypto = crypto
           @store = store
-          @devices = devices
+          @secrets = Secrets.new
+
+          # Our own cross signing identity, which is empty until it is created or opened from storage.
+          @identity = CrossSigning.new(user_id)
+          @devices = devices || Devices.new(crypto: crypto)
+
+          # What each room's state said, since the machine cannot ask and a rotation turns on it.
+          @rooms = {}
 
           @events = Events.registry(version)
 
@@ -59,6 +78,9 @@ module Async
 
         # @attribute [Store] what is remembered between batches.
         attr :store
+
+        # @attribute [Secrets] the private keys this device holds.
+        attr :secrets
 
         # The identity keys of this device, signed so that others can trust them.
         #
@@ -98,6 +120,270 @@ module Async
         # @returns [Boolean] whether to publish more.
         def one_time_keys_low?(counts)
           (counts[:signed_curve25519] || 0) < @crypto.one_time_key_target / 2
+        end
+
+        # @attribute [CrossSigning] our own identity, as far as this device holds it.
+        attr :identity
+
+        # A whole new cross signing identity, which replaces whatever the user had.
+        #
+        # @returns [CrossSigning] the three keys, whose private halves belong in secret storage.
+        def create_cross_signing_keys
+          @identity = CrossSigning.generate(@user_id)
+        end
+
+        # Take on one of our own cross signing keys, which arrived from storage or from a sibling device.
+        #
+        # @parameter name [String] which secret it is, e.g. `m.cross_signing.self_signing`.
+        # @parameter secret [String] the private key, base64 encoded.
+        # @returns [CrossSigning | nil] our identity, or nil where the name is not one of the three.
+        def accept_cross_signing_secret(name, secret)
+          case name.to_s
+          in "m.cross_signing.master" then @identity[:master] = CrossSigning::Key.from_base64(secret)
+          in "m.cross_signing.self_signing" then @identity[:self_signing] = CrossSigning::Key.from_base64(secret)
+          in "m.cross_signing.user_signing" then @identity[:user_signing] = CrossSigning::Key.from_base64(secret)
+          else
+            Console.warn(self, "That is not a cross signing key.", name: name)
+
+            return nil
+          end
+
+          Console.info(self, "Took on a cross signing key.", name: name)
+
+          @identity
+        end
+
+        # Sign this device with our own self signing key, which is what makes it cross signed.
+        #
+        # @returns [Hash | nil] the signatures to upload, or nil without the key to write them.
+        def sign_own_device
+          @identity.sign_device(self.device_keys)
+        end
+
+        # Sign what a verification established, so that it holds for every device rather than this one.
+        #
+        # @parameter keys [Array(String)] the keys which were verified.
+        # @returns [Array(Hash)] the signatures to upload, which is none where we cannot sign.
+        def sign_verified(keys)
+          keys.filter_map do |key|
+            user_id = @devices.identities.find{|_, held| held[:master] == key}&.first
+
+            case user_id
+            in String => whose
+              @identity.sign_master(whose, @devices.identity(whose)[:object])
+            in nil
+              Console.warn(self, "Nothing is known about the key which was verified.", key: key)
+
+              nil
+            end
+          end
+        end
+
+        # @parameter user_id [String] the user.
+        # @parameter device_id [String] the device.
+        # @returns [Boolean] whether that device carries its owner's signature.
+        def cross_signed?(user_id, device_id)
+          @devices[user_id, device_id]&.cross_signed? == true
+        end
+
+        # Whether our own user signing key signed this identity, which is what verifying somebody leaves behind.
+        #
+        # @parameter user_id [String] whose identity it is.
+        # @parameter master [String] their master key.
+        # @returns [Boolean] whether we signed it.
+        def signed_by_us?(user_id, master)
+          signing = @identity.user_signing_key
+          object = @devices.identity(user_id)&.fetch(:object, nil)
+
+          case {signing: signing, object: object}
+          in {signing: String => key, object: {signatures: Hash => signatures}}
+            signatures.each_value.any?{|held| held.key?(:"ed25519:#{key}")}
+          else
+            false
+          end
+        end
+
+        # Whether the device which encrypted an event carries its owner's signature.
+        #
+        # A message from a device nothing vouches for cannot be shown as though somebody did.
+        #
+        # @parameter event [Async::Matrix::Events::Envelope] the event.
+        # @returns [Boolean] whether its sender can be placed.
+        def cross_signed_sender?(event)
+          case event
+          in {session_id: String => session_id, sender: String => sender}
+            @store.sender_device(session_id).then do |device_id|
+              case device_id
+              in String => held
+                self.cross_signed?(sender, held)
+              in nil
+                @devices.of(sender).any?(&:cross_signed?)
+              end
+            end
+          else
+            false
+          end
+        end
+
+        # Every session this device holds, which is what a backup or an export is made of.
+        #
+        # @returns [Array(Hash)] the sessions, by room and session ID.
+        def sessions
+          @store.sessions.map do |(room_id, session_id), held|
+            {room_id: room_id, session_id: session_id, **held}
+          end
+        end
+
+        # One session, as a backup wants it.
+        #
+        # A restored session carries no signature, so what it claims about its sender is only as good as whoever put it there: that is why `is_verified` is what the sender's device was, not what the backup says.
+        #
+        # @parameter session [Hash] the session, as {#sessions} answers it.
+        # @returns [Hash] the fields a backup is written from.
+        def export_for_backup(session)
+          room_id = session[:room_id]
+          session_id = session[:session_id]
+          index = @store.first_known_index(room_id, session_id)
+
+          {
+            room_id: room_id,
+            session_id: session_id,
+            algorithm: MEGOLM,
+            session_key: @crypto.export_session(session_id, index: index),
+            sender_key: session[:sender_key],
+            sender_claimed_keys: session[:sender_claimed_keys] || {},
+            forwarding_curve25519_key_chain: session[:forwarding_curve25519_key_chain] || [],
+            shared_history: session[:shared_history] || false,
+            first_message_index: index,
+            forwarded_count: (session[:forwarding_curve25519_key_chain] || []).size,
+            is_verified: @devices.verified?(session[:sender], session[:device_id].to_s),
+          }
+        end
+
+        # Accept a session which arrived without a signature of its own.
+        #
+        # @parameter room_id [String] the room.
+        # @parameter session_id [String] the session.
+        # @parameter session_key [String] the exported key.
+        # @parameter sender [String | nil] who it is claimed to have come from.
+        # @parameter shareable [Boolean] whether its creator meant it to travel.
+        def import_inbound_session(room_id, session_id:, session_key:, sender: nil, shareable: false, **rest)
+          @crypto.import_inbound_session(room_id, session_id: session_id, exported_key: session_key)
+          @store.remember(room_id, session_id: session_id, sender: sender, imported: true, shareable: shareable, **rest)
+
+          Console.debug(self, "Imported a session.", room_id: room_id, session_id: session_id, sender: sender)
+
+          self.release(room_id, session_id)
+        end
+
+        # The master key of our own cross signing identity, where there is one.
+        #
+        # @returns [String | nil] the key.
+        def own_master_key
+          @devices.identity(@user_id)&.fetch(:master, nil)
+        end
+
+        # Sign an object as this device, which is how a backup is claimed as ours.
+        #
+        # @parameter object [Hash] what to sign.
+        # @returns [Hash] the object, with this device's signature added.
+        def sign_as_own(object)
+          object.merge(signatures: self.signature_for(object))
+        end
+
+        # Whether an object carries a signature by any of these keys.
+        #
+        # @parameter object [Hash] the signed object.
+        # @parameter by [String | Array | nil] the keys, or the devices holding them.
+        # @returns [Boolean] whether one of them signed it.
+        def verify_signatures(object, by:)
+          signatures = object[:signatures] || {}
+          unsigned = object.reject{|name, _| name == :signatures}
+
+          self.class.keys_of(by).any? do |key|
+            signed = signatures.each_value.filter_map{|held| held[:"ed25519:#{key}"]}
+
+            signed.any?{|signature| @crypto.verify(unsigned, key: key, signature: signature)}
+          end
+        end
+
+        # The ed25519 keys a caller named, however it named them.
+        #
+        # @parameter by [String | Array | nil] a key, the devices holding them, or nothing.
+        # @returns [Array(String)] the keys.
+        def self.keys_of(by)
+          case by
+          in nil
+            []
+          in String => key
+            [key]
+          in Array => named
+            named.filter_map do |one|
+              case one
+              in String => key
+                key
+              in Device => device
+                device.ed25519
+              else
+                nil
+              end
+            end
+          end
+        end
+
+        # Note what a room's encryption state says, which is what a rotation is measured against.
+        #
+        # @parameter room_id [String] the room.
+        # @parameter period [Integer | nil] how long a session may be used for, in milliseconds.
+        # @parameter messages [Integer | nil] how many messages a session may carry.
+        def policy(room_id, period: nil, messages: nil)
+          room = (@rooms[room_id] ||= {})
+
+          room[:encrypted] = true
+          room[:period] = period || DEFAULT_PERIOD
+          room[:messages] = messages || DEFAULT_MESSAGES
+        end
+
+        # Note what a room's history visibility says, which decides whether a session may be passed on.
+        #
+        # @parameter room_id [String] the room.
+        # @parameter visibility [String] what the state event said.
+        def history(room_id, visibility)
+          (@rooms[room_id] ||= {})[:visibility] = visibility
+        end
+
+        # @parameter room_id [String] the room.
+        # @returns [Boolean] whether this room is known to be encrypted.
+        def encrypted?(room_id)
+          @rooms.dig(room_id, :encrypted) == true
+        end
+
+        # Whether a session for this room may be given to somebody who joins later.
+        #
+        # True only while the history is visible to them, which is what the flag on a shared key reports.
+        #
+        # @parameter room_id [String] the room.
+        # @returns [Boolean] whether the history is shared.
+        def shared_history?(room_id)
+          SHAREABLE.include?(@rooms.dig(room_id, :visibility))
+        end
+
+        # The rooms whose session has been used for too long, or for too many messages.
+        #
+        # Neither is an event, so neither can be noticed by reading one: they are measured here instead.
+        #
+        # @returns [Hash] why each room is due, by room ID.
+        def rooms_due_for_rotation
+          @rooms.each_with_object({}) do |(room_id, room), due|
+            session = @crypto.session_for(room_id)
+
+            case self.overdue(room_id, room, session)
+            in String => because
+              due[room_id] = because
+            else
+              nil
+            end
+          end
         end
 
         # Take on what a device list query answered.
@@ -217,15 +503,16 @@ module Async
           else
             @crypto.create_outbound_session(room_id).tap do |begun|
               @store.remember(room_id, session_id: begun[:session_id], sender: @user_id)
+              @store.starting(room_id)
 
               Console.debug(self, "Began a session.", room_id: room_id, session_id: begun[:session_id], rotate: rotate)
             end
           end
         end
 
-        # Every event in a batch which this device can read, and a marker where one it cannot would be.
+        # Every event in a batch, read where it can be and marked where it cannot.
         #
-        # The device messages are drained first, so a key arriving in this batch releases the messages which were waiting for it, including ones from earlier batches. A released event is older than the batch which carried its key, so a caller ordering by arrival will put history out of order.
+        # The device messages drain first, so a key here releases what waited for it.
         #
         # @parameter sync [Async::Matrix::ClientServer::Sync] the batch.
         # @parameter replay [Boolean] whether to yield the events a key released.
@@ -248,6 +535,8 @@ module Async
             @released = []
 
             sync.each_event do |event|
+              self.note(event)
+
               case event.content
               when Events::RoomEncrypted
                 yield self.read(event)
@@ -364,6 +653,44 @@ module Async
 
         private
 
+        # Note the room state an event carries, so that a rotation can be measured without asking.
+        #
+        # @parameter event [Async::Matrix::Events::Envelope] the event.
+        def note(event)
+          case event
+          in {room_id: String => room_id, content: Events::RoomEncryption => content}
+            self.policy(room_id, period: content[:rotation_period_ms], messages: content[:rotation_period_msgs])
+          in {room_id: String => room_id, content: Events::RoomHistoryVisibility => content}
+            self.history(room_id, content[:history_visibility])
+          else
+            nil
+          end
+        end
+
+        # Why a room's session should be replaced, if it should.
+        #
+        # @parameter room_id [String] the room.
+        # @parameter room [Hash] what its state said.
+        # @parameter session [Hash | nil] the session it is on.
+        # @returns [String | nil] the reason, or nil while it may still be used.
+        def overdue(room_id, room, session)
+          case session
+          in nil
+            nil
+          in {message_index: Integer => index} if index >= room.fetch(:messages, DEFAULT_MESSAGES)
+            "it has carried #{index} messages"
+          else
+            started = @store.started(room_id)
+
+            case started
+            in Time => at if (Time.now - at) * 1000 >= room.fetch(:period, DEFAULT_PERIOD)
+              "it has been in use since #{at}"
+            else
+              nil
+            end
+          end
+        end
+
         # Read a timeline event, answering a marker where it cannot be read.
         #
         # @parameter event [Async::Matrix::Events::Envelope] the encrypted event.
@@ -408,10 +735,17 @@ module Async
 
           case addressed
           # A type 0 carries the session, so it opens one when there is none to read it with.
-          in {type: 0, body: String => body} unless @crypto.session?(sender_key)
-            self.believed(event, @crypto.accept_session(identity_key: sender_key, body: body), sender, sender_key)
-          in {type: 0 | 1 => type, body: String => body}
-            self.believed(event, @crypto.decrypt_from_device(sender_key, type: type, body: body), sender, sender_key)
+          in {type: 0, body: String => body}
+            # A session already open is what a type 0 is read with; otherwise the message carries one.
+            case @crypto.session?(sender_key)
+            in true
+              self.believed(event, @crypto.decrypt_from_device(sender_key, type: 0, body: body), sender, sender_key)
+            in false
+              self.believed(event, @crypto.accept_session(identity_key: sender_key, body: body), sender, sender_key)
+            end
+
+          in {type: 1, body: String => body}
+            self.believed(event, @crypto.decrypt_from_device(sender_key, type: 1, body: body), sender, sender_key)
 
           # One event carries a copy per device, so most of them are not for this one.
           else
@@ -428,7 +762,7 @@ module Async
 
         # What an Olm plaintext decrypted to, if it is what it claims to be.
         #
-        # The specification lists checks an incoming payload MUST pass, and says to discard anything which fails one. That is what this pattern is: a payload which does not match is never believed.
+        # The checks the specification demands are this one pattern, and what fails it is discarded.
         #
         # @parameter event [Async::Matrix::Events::Envelope] the envelope it arrived in.
         # @parameter plaintext [String] what it decrypted to.
@@ -441,7 +775,7 @@ module Async
           ours = @crypto.identity_keys[:ed25519]
 
           case payload
-          in {type: String => type, content: Hash => content, sender: ^sender, recipient: ^@user_id, recipient_keys: {ed25519: ^ours}, keys: {ed25519: String => claimed}} if theirs.nil? || theirs.ed25519 == claimed
+          in {type: String => type, content: Hash => content, sender: ^sender, recipient: ^@user_id, recipient_keys: {ed25519: ^ours}, keys: {ed25519: ^(theirs&.ed25519 || payload.dig(:keys, :ed25519))}}
             Events::Decrypted.new(
               event.to_h.merge(type: type),
               @events.content(type, content),

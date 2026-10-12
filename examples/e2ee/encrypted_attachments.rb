@@ -16,7 +16,7 @@ require_relative "../../lib/async/matrix"
 
 # Encryption is not part of what `async/matrix` requires, and the binding is required by name because it is optional.
 require_relative "../../lib/async/matrix/e2ee"
-require_relative "../../lib/async/matrix/e2ee/vodozemac"
+require_relative "../lib/async/matrix/e2ee/olm"
 
 require "console"
 
@@ -33,7 +33,7 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
   machine = Async::Matrix::E2EE::Machine.new(
     user_id: owner.user_id,
     device_id: owner.device_id,
-    crypto: Async::Matrix::E2EE::Vodozemac.new,
+    crypto: Async::Matrix::E2EE::Olm.new,
   )
 
   case {room: ROOM, file: FILE}

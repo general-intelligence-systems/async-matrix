@@ -22,7 +22,6 @@ header:
   paths:
     - "*.gemspec"
     - "Gemfile"
-    - "Rakefile"
     - "benchmark/**/*.rb"
     - "bin/generate-event-spec-deltas"
     - "bin/generate-spec-deltas"
@@ -32,7 +31,6 @@ header:
     - "config/**/*.rb"
     - "cops/**/*.rb"
     - "examples/**/*.rb"
-    - "ext/**/*.rb"
     - "fixtures/**/*.rb"
     - "lib/**/*.rb"
     - "test/**/*.rb"
@@ -45,8 +43,7 @@ header:
         - ".gemspec"
       filenames:
         - "Gemfile"
-        - "Rakefile"
-        - "generate-event-spec-deltas"
+            - "generate-event-spec-deltas"
         - "generate-spec-deltas"
         - "release-gem"
         - "update-event-spec"

@@ -1,76 +1,76 @@
 [submodule "data/matrix-spec-v1.1"]
-	shallow = true
-	path = data/matrix-spec-v1.1
-	url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
+  path = data/matrix-spec-v1.1
+  url = https://github.com/matrix-org/matrix-spec.git
 [submodule "data/matrix-spec-v1.2"]
-	path = data/matrix-spec-v1.2
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.2
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.3"]
-	path = data/matrix-spec-v1.3
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.3
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.4"]
-	path = data/matrix-spec-v1.4
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.4
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.5"]
-	path = data/matrix-spec-v1.5
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.5
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.6"]
-	path = data/matrix-spec-v1.6
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.6
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.7"]
-	path = data/matrix-spec-v1.7
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.7
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.8"]
-	path = data/matrix-spec-v1.8
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.8
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.9"]
-	path = data/matrix-spec-v1.9
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.9
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.10"]
-	path = data/matrix-spec-v1.10
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.10
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.11"]
-	path = data/matrix-spec-v1.11
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.11
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.12"]
-	path = data/matrix-spec-v1.12
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.12
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.13"]
-	path = data/matrix-spec-v1.13
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.13
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.14"]
-	path = data/matrix-spec-v1.14
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.14
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.15"]
-	path = data/matrix-spec-v1.15
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.15
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.16"]
-	path = data/matrix-spec-v1.16
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.16
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.17"]
-	path = data/matrix-spec-v1.17
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.17
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.18"]
-	path = data/matrix-spec-v1.18
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.18
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true
 [submodule "data/matrix-spec-v1.19"]
-	path = data/matrix-spec-v1.19
-	url = https://github.com/matrix-org/matrix-spec.git
-	shallow = true
+  path = data/matrix-spec-v1.19
+  url = https://github.com/matrix-org/matrix-spec.git
+  shallow = true

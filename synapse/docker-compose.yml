@@ -68,6 +68,7 @@ x-synapse: &synapse
 x-volumes:
   signing-key: &signing-key ./signing.key:/config/signing.key:ro
   modules: &modules ./modules:/config/modules:ro
+  appservice-registration: &appservice-registration ./appservice.yaml:/config/appservice.yaml:ro
 
 services:
   v1.1:
@@ -77,6 +78,7 @@ services:
       - ./homeserver.v1_1.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.2:
     <<: *synapse
@@ -85,6 +87,7 @@ services:
       - ./homeserver.v1_2.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.3:
     <<: *synapse
@@ -93,6 +96,7 @@ services:
       - ./homeserver.v1_3.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.4:
     <<: *synapse
@@ -101,6 +105,7 @@ services:
       - ./homeserver.v1_4.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.5:
     <<: *synapse
@@ -109,6 +114,7 @@ services:
       - ./homeserver.v1_5.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.6:
     <<: *synapse
@@ -117,6 +123,7 @@ services:
       - ./homeserver.v1_6.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.7:
     <<: *synapse
@@ -125,6 +132,7 @@ services:
       - ./homeserver.v1_7.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.8:
     <<: *synapse
@@ -133,6 +141,7 @@ services:
       - ./homeserver.v1_8.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.9:
     <<: *synapse
@@ -141,6 +150,7 @@ services:
       - ./homeserver.v1_9.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.10:
     <<: *synapse
@@ -149,6 +159,7 @@ services:
       - ./homeserver.v1_10.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.11:
     <<: *synapse
@@ -157,6 +168,7 @@ services:
       - ./homeserver.v1_11.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.12:
     <<: *synapse
@@ -165,6 +177,7 @@ services:
       - ./homeserver.v1_12.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.13:
     <<: *synapse
@@ -173,6 +186,7 @@ services:
       - ./homeserver.v1_13.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.14:
     <<: *synapse
@@ -181,6 +195,7 @@ services:
       - ./homeserver.v1_14.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.15:
     <<: *synapse
@@ -189,6 +204,7 @@ services:
       - ./homeserver.v1_15.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.16:
     <<: *synapse
@@ -197,6 +213,7 @@ services:
       - ./homeserver.v1_16.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.17:
     <<: *synapse
@@ -205,6 +222,7 @@ services:
       - ./homeserver.v1_17.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.18:
     <<: *synapse
@@ -213,6 +231,7 @@ services:
       - ./homeserver.v1_18.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   v1.19:
     <<: *synapse
@@ -221,6 +240,7 @@ services:
       - ./homeserver.v1_19.yaml:/config/homeserver.yaml:ro
       - *signing-key
       - *modules
+      - *appservice-registration
 
   # The identity server, which answers the identity service API: it holds which address belongs to
   # which user, so that a client can invite somebody it has only an address for. A homeserver does
@@ -293,7 +313,9 @@ services:
   # The rig runs none, so this answers in its place - which is enough for the operations, since each
   # is a request whose shape the suite is checking and whose answer it reads.
   appservice:
-    profiles: [application-service]
+    # Also up for a client-server run, because every homeserver now registers it: a registration
+    # whose `url` answers nothing leaves the homeserver retrying each transaction into the log.
+    profiles: [application-service, client-server]
     image: python:3-slim
     command: ["python", "/config/appservice-stub.py"]
     volumes:

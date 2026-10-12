@@ -14,10 +14,14 @@ module Async
       #
       # It makes no request: a batch says whose list changed, a caller queries them, and what the homeserver answered is handed back here.
       class Devices
-        def initialize
+        # @parameter crypto [Crypto | nil] what to check a cross signing signature with.
+        def initialize(crypto: nil)
+          @crypto = crypto
+
           @devices = {}
           @stale = {}
           @tracking = {}
+          @identities = {}
         end
 
         # @attribute [Hash] the devices of each user, by user ID and then device ID.
@@ -49,10 +53,34 @@ module Async
         # @returns [Hash] the devices of each user it named.
         def accept(queried)
           queried.device_keys.each_key do |user_id|
+            self.accept_identity(user_id.to_s, queried)
             self.accept_user(user_id.to_s, queried)
           end
 
           @devices
+        end
+
+        # @attribute [Hash] every identity which is known, by user ID.
+        attr :identities
+
+        # The cross signing keys a user published, which is their identity.
+        #
+        # @parameter user_id [String] the user to ask about.
+        # @returns [Hash | nil] their master and self signing keys.
+        def identity(user_id)
+          @identities[user_id.to_s]
+        end
+
+        # Stop believing anything about a user, because their identity changed under us.
+        #
+        # @parameter user_id [String] the user to distrust.
+        def untrust(user_id)
+          self.of(user_id).each do |device|
+            device.trust = :unverified
+            device.cross_signed = false
+          end
+
+          @stale[user_id.to_s] = true
         end
 
         # @parameter user_id [String] the user to ask about.
@@ -135,12 +163,54 @@ module Async
         # @parameter queried [Async::Matrix::ClientServer::QueriedKeys] what the homeserver said.
         def accept_user(user_id, queried)
           @devices[user_id] = queried.devices_of(user_id).each_with_object({}) do |(device_id, value), devices|
-            devices[device_id.to_s] = Device.new(user_id, device_id.to_s, value)
+            devices[device_id.to_s] = Device.new(user_id, device_id.to_s, value, cross_signed: self.cross_signed?(user_id, value))
           end
 
           @stale.delete(user_id)
 
           Console.debug(self, "Read the devices of a user.", user_id: user_id, device_ids: @devices[user_id].keys)
+        end
+
+        # What a user's cross signing keys say, which is what their devices are measured against.
+        #
+        # @parameter user_id [String] the user.
+        # @parameter queried [Async::Matrix::ClientServer::QueriedKeys] what the homeserver said.
+        def accept_identity(user_id, queried)
+          master = queried.master_keys[user_id.to_sym]
+          self_signing = queried.self_signing_keys[user_id.to_sym]
+
+          case {master: master, self_signing: self_signing}
+          in {master: {keys: Hash => master_keys}, self_signing: {keys: Hash => signing_keys}}
+            @identities[user_id] = {
+              user_id: user_id,
+              master: master_keys.each_value.first,
+              self_signing: signing_keys.each_value.first,
+              object: master,
+            }
+          else
+            @identities.delete(user_id)
+          end
+        end
+
+        # Whether this device carries a signature by its owner's self signing key.
+        #
+        # The signature is checked where there is something to check it with, because its presence alone says only that somebody wrote one.
+        #
+        # @parameter user_id [String] the user.
+        # @parameter value [Hash] the device keys the homeserver answered with.
+        # @returns [Boolean] whether it is cross signed.
+        def cross_signed?(user_id, value)
+          signing = @identities.dig(user_id, :self_signing)
+          signature = value.dig(:signatures, user_id.to_sym, :"ed25519:#{signing}")
+
+          case {signing: signing, signature: signature, crypto: @crypto}
+          in {signing: String, signature: String => claimed, crypto: Crypto => crypto}
+            crypto.verify(value.reject{|name, _| name == :signatures}, key: signing, signature: claimed)
+          in {signing: String, signature: String}
+            true
+          else
+            false
+          end
         end
       end
     end

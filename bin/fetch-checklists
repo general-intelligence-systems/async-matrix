@@ -73,18 +73,18 @@ dry_run=""
 
 arguments=()
 for argument in "$@"; do
-	if [ "$argument" = "--dry-run" ]; then
-		dry_run="yes"
-	else
-		arguments+=("$argument")
-	fi
+  if [ "$argument" = "--dry-run" ]; then
+    dry_run="yes"
+  else
+    arguments+=("$argument")
+  fi
 done
 
 if [ ${#arguments[@]} -eq 0 ]; then
-	mapfile -t versions < MATRIX_API_VERSIONS.txt
-	versions+=(unstable)
+  mapfile -t versions < MATRIX_API_VERSIONS.txt
+  versions+=(unstable)
 else
-	versions=("${arguments[@]}")
+  versions=("${arguments[@]}")
 fi
 
 work="$(mktemp -d)"
@@ -95,111 +95,111 @@ mkdir -p "$output"
 # A box's state is ours, not upstream's, so comparison reads both sides with every box cleared: the
 # only differences left are the ones upstream made.
 untick() {
-	sed 's/^\([[:space:]]*\)- \[[xX]\]/\1- [ ]/' "$1"
+  sed 's/^\([[:space:]]*\)- \[[xX]\]/\1- [ ]/' "$1"
 }
 
 # Writes the checklist to $work/<version>.md, or reports why there is none and returns non-zero.
 download() {
-	local version="$1" status
+  local version="$1" status
 
-	status=$(curl --silent --show-error --location --max-time 30 \
-		--write-out '%{http_code}' \
-		--output "$work/$version.md" \
-		"https://spec.matrix.org/$version/changelog/$version/checklist.md")
+  status=$(curl --silent --show-error --location --max-time 30 \
+    --write-out '%{http_code}' \
+    --output "$work/$version.md" \
+    "https://spec.matrix.org/$version/changelog/$version/checklist.md")
 
-	if [ "$status" = "200" ]; then
-		return 0
-	fi
+  if [ "$status" = "200" ]; then
+    return 0
+  fi
 
-	if [ "$status" = "404" ]; then
-		printf "%-9s no checklist published\n" "$version"
-	else
-		printf "%-9s HTTP %s\n" "$version" "$status" >&2
-	fi
+  if [ "$status" = "404" ]; then
+    printf "%-9s no checklist published\n" "$version"
+  else
+    printf "%-9s HTTP %s\n" "$version" "$status" >&2
+  fi
 
-	return 1
+  return 1
 }
 
 # The local ticks are the thing worth protecting, so an upstream change to unstable becomes an issue
 # on origin rather than a write. The fingerprint of the upstream text is in the title, so a change
 # which is already reported is not reported again, and a further change gets its own issue.
 raise_issue() {
-	local fingerprint="$1" title="$2" body="$3"
+  local fingerprint="$1" title="$2" body="$3"
 
-	if [ -n "$dry_run" ]; then
-		echo "--- would raise: $title"
-		echo "$body"
-		echo "--- end"
+  if [ -n "$dry_run" ]; then
+    echo "--- would raise: $title"
+    echo "$body"
+    echo "--- end"
 
-		return 0
-	fi
+    return 0
+  fi
 
-	if [ -n "$(gh issue list --state all --search "$fingerprint in:title" --json number --jq '.[].number')" ]; then
-		echo "unstable  changed upstream, already reported"
+  if [ -n "$(gh issue list --state all --search "$fingerprint in:title" --json number --jq '.[].number')" ]; then
+    echo "unstable  changed upstream, already reported"
 
-		return 0
-	fi
+    return 0
+  fi
 
-	gh issue create --title "$title" --body "$body" > /dev/null
-	echo "unstable  changed upstream, issue raised: $title"
+  gh issue create --title "$title" --body "$body" > /dev/null
+  echo "unstable  changed upstream, issue raised: $title"
 }
 
 update_unstable() {
-	local existing="$output/unstable.md" fingerprint difference ticked
+  local existing="$output/unstable.md" fingerprint difference ticked
 
-	if [ ! -f "$existing" ]; then
-		cp "$work/unstable.md" "$existing"
-		printf "%-9s %s\n" "unstable" "fetched, $(grep -c '^\s*- \[' "$existing") items"
+  if [ ! -f "$existing" ]; then
+    cp "$work/unstable.md" "$existing"
+    printf "%-9s %s\n" "unstable" "fetched, $(grep -c '^\s*- \[' "$existing") items"
 
-		return 0
-	fi
+    return 0
+  fi
 
-	if [ "$(untick "$existing")" = "$(untick "$work/unstable.md")" ]; then
-		echo "unstable  up to date"
+  if [ "$(untick "$existing")" = "$(untick "$work/unstable.md")" ]; then
+    echo "unstable  up to date"
 
-		return 0
-	fi
+    return 0
+  fi
 
-	# Nothing has been ticked, so there is no record to lose and the file can simply follow upstream.
-	ticked=$(grep -c '^\s*- \[[xX]\]' "$existing" || true)
+  # Nothing has been ticked, so there is no record to lose and the file can simply follow upstream.
+  ticked=$(grep -c '^\s*- \[[xX]\]' "$existing" || true)
 
-	if [ "$ticked" -eq 0 ]; then
-		cp "$work/unstable.md" "$existing"
-		echo "unstable  updated (nothing was ticked)"
+  if [ "$ticked" -eq 0 ]; then
+    cp "$work/unstable.md" "$existing"
+    echo "unstable  updated (nothing was ticked)"
 
-		return 0
-	fi
+    return 0
+  fi
 
-	fingerprint=$(untick "$work/unstable.md" | sha256sum | cut -c1-12)
-	difference=$(diff --unified=1 \
-		--label "$existing (ours, $ticked ticked)" <(untick "$existing") \
-		--label "spec.matrix.org/unstable" <(untick "$work/unstable.md") || true)
+  fingerprint=$(untick "$work/unstable.md" | sha256sum | cut -c1-12)
+  difference=$(diff --unified=1 \
+    --label "$existing (ours, $ticked ticked)" <(untick "$existing") \
+    --label "spec.matrix.org/unstable" <(untick "$work/unstable.md") || true)
 
-	raise_issue "$fingerprint" \
-		"Unstable spec checklist changed upstream ($fingerprint)" \
-		"$(printf '%s\n\n%s\n\n```diff\n%s\n```\n' \
-			"\`$existing\` has $ticked of $(grep -c '^\s*- \[' "$existing") boxes ticked, so \`bin/fetch-checklists\` left it alone. The changes below need carrying across by hand, keeping the ticks that still apply." \
-			"Source: <https://spec.matrix.org/unstable/changelog/unstable/checklist.md>" \
-			"$difference")"
+  raise_issue "$fingerprint" \
+    "Unstable spec checklist changed upstream ($fingerprint)" \
+    "$(printf '%s\n\n%s\n\n```diff\n%s\n```\n' \
+      "\`$existing\` has $ticked of $(grep -c '^\s*- \[' "$existing") boxes ticked, so \`bin/fetch-checklists\` left it alone. The changes below need carrying across by hand, keeping the ticks that still apply." \
+      "Source: <https://spec.matrix.org/unstable/changelog/unstable/checklist.md>" \
+      "$difference")"
 }
 
 for version in "${versions[@]}"; do
-	[ -n "$version" ] || continue
+  [ -n "$version" ] || continue
 
-	if [ "$version" = "unstable" ]; then
-		download unstable && update_unstable
+  if [ "$version" = "unstable" ]; then
+    download unstable && update_unstable
 
-		continue
-	fi
+    continue
+  fi
 
-	if [ -f "$output/$version.md" ]; then
-		printf "%-9s %s\n" "$version" "already downloaded, $(grep -c '^\s*- \[[xX]\]' "$output/$version.md" || true) of $(grep -c '^\s*- \[' "$output/$version.md") ticked"
+  if [ -f "$output/$version.md" ]; then
+    printf "%-9s %s\n" "$version" "already downloaded, $(grep -c '^\s*- \[[xX]\]' "$output/$version.md" || true) of $(grep -c '^\s*- \[' "$output/$version.md") ticked"
 
-		continue
-	fi
+    continue
+  fi
 
-	if download "$version"; then
-		cp "$work/$version.md" "$output/$version.md"
-		printf "%-9s %s\n" "$version" "fetched, $(grep -c '^\s*- \[' "$output/$version.md") items"
-	fi
+  if download "$version"; then
+    cp "$work/$version.md" "$output/$version.md"
+    printf "%-9s %s\n" "$version" "fetched, $(grep -c '^\s*- \[' "$output/$version.md") items"
+  fi
 done

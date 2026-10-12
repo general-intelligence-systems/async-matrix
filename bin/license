@@ -62,7 +62,7 @@ action="${1:-check}"
 # The hook fires outside the flake devshell, so re-enter it when license-eye is not already on
 # PATH. Inside the shell it is, and the extra evaluation is skipped.
 if command -v license-eye > /dev/null 2>&1; then
-	license-eye header "$action"
+  license-eye header "$action"
 else
-	nix develop --command license-eye header "$action"
+  nix develop --command license-eye header "$action"
 fi

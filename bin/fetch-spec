@@ -61,32 +61,32 @@ repository="https://github.com/matrix-org/matrix-spec.git"
 paths=(data/api data/event-schemas data/schemas)
 
 if [ $# -eq 0 ]; then
-	mapfile -t versions < MATRIX_API_VERSIONS.txt
+  mapfile -t versions < MATRIX_API_VERSIONS.txt
 else
-	versions=("$@")
+  versions=("$@")
 fi
 
 for version in "${versions[@]}"; do
-	submodule="data/matrix-spec-$version"
-	
-	if ! git config --file .gitmodules --get "submodule.$submodule.path" > /dev/null 2>&1; then
-		echo "There is no submodule for $version. Add one with:" >&2
-		echo >&2
-		echo "  git clone --depth 1 --branch $version $repository $submodule" >&2
-		echo "  git submodule add $repository $submodule" >&2
-		echo "  git config --file .gitmodules submodule.$submodule.shallow true" >&2
-		
-		exit 1
-	fi
-	
-	git submodule update --init --depth 1 -- "$submodule"
-	
-	# Sparse checkout is local to a clone rather than something the parent repository records, so it
-	# is applied here instead of being inherited.
-	git -C "$submodule" sparse-checkout set --cone "${paths[@]}"
-	
-	printf "%-6s %s  %s endpoints\n" \
-		"$version" \
-		"$(git -C "$submodule" rev-parse --short HEAD)" \
-		"$(find "$submodule/data/api/client-server" -maxdepth 1 -name '*.yaml' | wc -l)"
+  submodule="data/matrix-spec-$version"
+
+  if ! git config --file .gitmodules --get "submodule.$submodule.path" > /dev/null 2>&1; then
+    echo "There is no submodule for $version. Add one with:" >&2
+    echo >&2
+    echo "  git clone --depth 1 --branch $version $repository $submodule" >&2
+    echo "  git submodule add $repository $submodule" >&2
+    echo "  git config --file .gitmodules submodule.$submodule.shallow true" >&2
+
+    exit 1
+  fi
+
+  git submodule update --init --depth 1 -- "$submodule"
+
+  # Sparse checkout is local to a clone rather than something the parent repository records, so it
+  # is applied here instead of being inherited.
+  git -C "$submodule" sparse-checkout set --cone "${paths[@]}"
+
+  printf "%-6s %s  %s endpoints\n" \
+    "$version" \
+    "$(git -C "$submodule" rev-parse --short HEAD)" \
+    "$(find "$submodule/data/api/client-server" -maxdepth 1 -name '*.yaml' | wc -l)"
 done

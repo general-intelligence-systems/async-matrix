@@ -1,0 +1,86 @@
+# frozen_string_literal: true
+
+require "sequel/model"
+
+require_relative "jsonb"
+require_relative "typecasting"
+
+module Models
+  module Matrix
+    # Account data, global and per-room in one table.
+    #
+    # ONE TABLE, NOT TWO. The SDK splits global_account_data from
+    # room_account_data because its keys differ; here the only difference is
+    # whether room_id is set, and splitting would mean two reads to answer
+    # "what does this account say about notifications" (m.push_rules is
+    # global, the per-room override is not).
+    #
+    # This is the missing half of the sidebar. m.tag is where Favorite and
+    # Low priority come from, m.direct is what makes a room a DM,
+    # m.fully_read positions the unread divider, m.ignored_user_list hides
+    # rooms outright -- none of which were derivable from the ten tables.
+    class AccountData < Sequel::Model(:matrix_account_data)
+      # The event types the sidebar is built out of, so the places that read
+      # them are not spelling them inline. The two `marked_unread` spellings are
+      # both in the wild -- see matrix_rooms.marked_unread_source.
+      TAG           = "m.tag"
+      DIRECT        = "m.direct"
+      FULLY_READ    = "m.fully_read"
+      IGNORED_USERS = "m.ignored_user_list"
+      PUSH_RULES    = "m.push_rules"
+      MARKED_UNREAD = "m.marked_unread"
+
+      # "" is global, for the same uniqueness reason as the column's default.
+      GLOBAL = ""
+
+      plugin :timestamps, update_on_create: true
+      plugin :validation_helpers
+
+      extend JSONB
+      extend Typecasting
+
+      jsonb :content
+
+      def validate
+        super
+        validates_presence :event_type
+        validates_unique %i[user_id room_id event_type]
+      end
+
+      dataset_module do
+        def global          = where(room_id: GLOBAL)
+        def in_room(room_id) = where(room_id: room_id)
+        def of_type(type)   = where(event_type: type)
+      end
+
+      def global? = room_id == GLOBAL
+
+      # The content of one account data event, or nil. The per-room override
+      # falls back to the global event, which is the whole reason the two live
+      # in one table.
+      def self.content_for(user_id:, event_type:, room_id: GLOBAL)
+        row = first(user_id: user_id, room_id: room_id, event_type: event_type) ||
+          first(user_id: user_id, room_id: GLOBAL, event_type: event_type)
+        row&.content
+      end
+    end
+  end
+end
+
+__END__
+
+create_table?(:matrix_account_data) do
+  primary_key :id, type: :Bignum, serial: true
+  column      :user_id, :bigint, null: false
+  # "" for global account data, for the same uniqueness reason as
+  # room_state's state_key.
+  column      :room_id, TEXT, default: "", null: false
+  column      :event_type, TEXT, null: false
+  column      :content, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :created_at, TIMESTAMP, null: false
+  column      :updated_at, TIMESTAMP, null: false
+
+  index %i[user_id room_id event_type],
+    unique: true,
+    name:   :index_matrix_account_data_on_user_id_and_room_id_and_type
+end

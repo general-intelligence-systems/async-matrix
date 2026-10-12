@@ -16,7 +16,7 @@ require_relative "../../lib/async/matrix"
 
 # Encryption is not part of what `async/matrix` requires, and the binding is required by name because it is optional.
 require_relative "../../lib/async/matrix/e2ee"
-require_relative "../../lib/async/matrix/e2ee/vodozemac"
+require_relative "../lib/async/matrix/e2ee/olm"
 
 require "console"
 
@@ -34,11 +34,23 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
   machine = Async::Matrix::E2EE::Machine.new(
     user_id: me,
     device_id: owner.device_id,
-    crypto: Async::Matrix::E2EE::Vodozemac.new,
+    crypto: Async::Matrix::E2EE::Olm.new,
   )
 
+  # Absent account data is an error rather than an empty answer, so "nothing there" arrives this way.
+  stored = lambda do |type|
+    begin
+      client.account_data.get_account_data(me, type)
+    rescue Async::Matrix::RequestError => error
+      case error.errcode
+      in "M_NOT_FOUND"
+        nil
+      end
+    end
+  end
+
   # The user's own preference, which a client honours rather than deciding for them.
-  case client.account_data.get_account_data(me, "m.key_backup")
+  case stored.call("m.key_backup")
   in {enabled: true | false => enabled}
     wanted = enabled
   else
@@ -53,7 +65,7 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
   end
 
   if wanted
-    version = client.key_backup.get_room_keys_version
+    version = client.key_backup.get_room_keys_version_current
 
     case version
     # A backup exists, and whether to write to it depends entirely on whether its key can be trusted.
@@ -65,7 +77,7 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
 
       # Otherwise the signature of the master key, or of a verified device of ours, is what makes it ours.
       in nil
-        trusted = machine.verify_signatures(auth_data, by: machine.own_master_key) || machine.verify_signatures(auth_data, by: machine.verified_devices_of(me))
+        trusted = machine.verify_signatures(auth_data, by: machine.own_master_key) || machine.verify_signatures(auth_data, by: machine.devices.verified_of(me))
       end
 
       case trusted

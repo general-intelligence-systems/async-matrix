@@ -59,6 +59,92 @@ describe Async::Matrix::ClientServer::Client do
     end
   end
 
+  with "#as_user" do
+    let(:service) {unauthenticated.as_application_service("an-as-token")}
+
+    # The token says which service, so the user has to be named on the request itself.
+    it "names the user it acts as" do
+      expect(service.as_user("@_irc_alice:localhost").reference.parameters).to be == {user_id: "@_irc_alice:localhost"}
+    end
+
+    # Every operation builds its own absolute path, so the user must survive that rather than being replaced by it.
+    it "keeps naming the user once an operation has supplied its path" do
+      derived = service.as_user("@_irc_alice:localhost").with(path: "/_matrix/client/v3/sync", parameters: {timeout: 0})
+
+      expect(derived.reference.path).to be == "/_matrix/client/v3/sync"
+      expect(derived.reference.parameters).to be == {user_id: "@_irc_alice:localhost", timeout: 0}
+    end
+
+    # The service's own token, which is below the resource where an access token goes.
+    it "carries the service's token rather than the user's" do
+      puppet = service.as_user("@_irc_alice:localhost")
+
+      expect(puppet.delegate).to be_a(Async::Matrix::Middleware::Authenticated)
+      expect(puppet.headers["authorization"]).to be_nil
+    end
+
+    # Which way round it is asked makes no difference, because one is a header and the other a parameter.
+    it "can be derived in either order" do
+      expect(unauthenticated.as_user("@_irc_alice:localhost").as_application_service("an-as-token").reference.parameters)
+        .to be == {user_id: "@_irc_alice:localhost"}
+    end
+
+    # The sender implied by `sender_localpart` is what an unnamed request acts as, so a bot asks for nothing.
+    it "names nobody when it was not asked to" do
+      expect(service.reference.parameters).to be_nil
+    end
+  end
+
+  # Against the homeserver, which is the only thing that can say whether masquerading works.
+  with "#as_user against the homeserver" do
+    let(:service) {unauthenticated.as_application_service(Async::Matrix::TEST_AS_TOKEN)}
+
+    let(:localpart) {"#{Async::Matrix::TEST_AS_PREFIX}#{SecureRandom.hex(6)}"}
+
+    let(:puppet_id) {"@#{localpart}:localhost"}
+
+    # A puppet exists once the service has registered it, which it does with the login type naming itself.
+    def provisioned
+      service.registration.register(username: localpart, type: "m.login.application_service")
+
+      service.as_user(puppet_id)
+    end
+
+    # The registration's `sender_localpart`, which is who an unnamed request acts as.
+    it "acts as the service's own user when it names nobody" do
+      expect(service.get_token_owner.user_id).to be == "@_async_matrix_bot:localhost"
+    end
+
+    it "acts as the user it names" do
+      expect(provisioned.get_token_owner.user_id).to be == puppet_id
+    end
+
+    # The namespace in the registration is the whole of the service's authority.
+    it "is refused a user outside its namespace" do
+      error = nil
+
+      begin
+        service.as_user("@someone-else:localhost").get_token_owner
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(error).to be_a(Async::Matrix::RequestError)
+      expect(error.status).to be == 403
+    end
+
+    # A service which has not registered the user cannot act as them, however its namespace reads.
+    it "is refused a user it has not registered" do
+      error = nil
+
+      begin
+        service.as_user("@#{Async::Matrix::TEST_AS_PREFIX}never:localhost").get_token_owner
+      rescue Async::Matrix::RequestError => error
+      end
+
+      expect(error.status).to be == 403
+    end
+  end
+
   with ".login_token_from" do
     it "takes the token out of a redirect URL" do
       expect(subject.login_token_from("http://127.0.0.1:9999/cb?loginToken=abc123")).to be == "abc123"

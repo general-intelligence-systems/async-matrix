@@ -1,5 +1,5 @@
 {
-	"title": "Async::Matrix",
-	"root": true,
-	"pages": ["index", "getting-started", "design", "server-server", "testing"]
+  "title": "Async::Matrix",
+  "root": true,
+  "pages": ["index", "getting-started", "design", "server-server", "testing"]
 }

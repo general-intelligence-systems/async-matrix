@@ -21,8 +21,66 @@ module Async
             module V1_18
             end
 
-            # No changes in v1.17.
+            # v1.17 let a service name the device it acts as.
             module V1_17
+              # Encrypting as a user means acting as one of their devices, so both are named.
+              def self.included(base)
+                base.it "acts as a device of the user as well as the user" do
+                  service = unauthenticated.as_application_service("an-as-token")
+                  puppet = service.as_user("@_irc_alice:localhost", device_id: "IRCALICE")
+
+                  expect(puppet.reference.parameters).to be == {user_id: "@_irc_alice:localhost", device_id: "IRCALICE"}
+                end
+
+                # The homeserver picks one when none is named, which is what a service holding no keys wants.
+                base.it "acts as no particular device when it was not asked to" do
+                  service = unauthenticated.as_application_service("an-as-token")
+
+                  expect(service.as_user("@_irc_alice:localhost").reference.parameters).to be == {user_id: "@_irc_alice:localhost"}
+                end
+
+                # Every operation builds its own absolute path, so both must survive that.
+                base.it "keeps naming the user and the device once an operation has supplied its path" do
+                  service = unauthenticated.as_application_service("an-as-token")
+                  derived = service.as_user("@_irc_alice:localhost", device_id: "IRCALICE").with(path: "#{Async::Matrix::V3}/keys/upload")
+
+                  expect(derived.reference.parameters).to be == {user_id: "@_irc_alice:localhost", device_id: "IRCALICE"}
+                end
+
+                # The homeserver is the only thing which can say whether it honoured the device.
+                base.it "acts as a device the service made for one of its own users" do
+                  service = unauthenticated.as_application_service(Async::Matrix::TEST_AS_TOKEN)
+                  localpart = "#{Async::Matrix::TEST_AS_PREFIX}#{SecureRandom.hex(6)}"
+
+                  service.registration.register(username: localpart, type: "m.login.application_service")
+
+                  # A service makes its own devices, which is what v1.17 added: there is no login to make one.
+                  service.as_user("@#{localpart}:localhost").devices.update_device("BRIDGED", display_name: "Bridged")
+
+                  owner = service.as_user("@#{localpart}:localhost", device_id: "BRIDGED").get_token_owner
+
+                  expect(owner.user_id).to be == "@#{localpart}:localhost"
+                  expect(owner.device_id).to be == "BRIDGED"
+                end
+
+                # A device which was never made cannot be acted as, which is how a typo is caught.
+                base.it "is refused a device which does not exist" do
+                  service = unauthenticated.as_application_service(Async::Matrix::TEST_AS_TOKEN)
+                  localpart = "#{Async::Matrix::TEST_AS_PREFIX}#{SecureRandom.hex(6)}"
+
+                  service.registration.register(username: localpart, type: "m.login.application_service")
+
+                  error = nil
+
+                  begin
+                    service.as_user("@#{localpart}:localhost", device_id: "NOSUCHDEVICE").get_token_owner
+                  rescue Async::Matrix::RequestError => error
+                  end
+
+                  expect(error).to be_a(Async::Matrix::RequestError)
+                  expect(error.errcode).to be == "M_UNKNOWN_DEVICE"
+                end
+              end
             end
 
             # No changes in v1.16.
