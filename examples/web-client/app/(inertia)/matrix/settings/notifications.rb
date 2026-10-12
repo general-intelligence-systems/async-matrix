@@ -63,7 +63,6 @@ get "/" do
     .compact
 
   overrides = Models::Matrix::Room
-    .where(user_id: matrix_user_id)
     .exclude(notification_mode: nil)
     .all
     .map { |room| { roomId: room[:room_id], title: matrix_room_title(room), mode: room[:notification_mode] } }

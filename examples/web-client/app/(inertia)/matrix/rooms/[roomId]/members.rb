@@ -132,7 +132,7 @@ get "/" do
     members:    matrix_members(room, membership: membership),
     counts:     %w[join invite ban knock].to_h do |kind|
       [kind, Models::Matrix::RoomMember.where(
-        user_id: matrix_user_id, room_id: room[:room_id], membership: kind,
+        room_id: room[:room_id], membership: kind,
       ).count]
     end,
   )

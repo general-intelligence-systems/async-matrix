@@ -26,10 +26,12 @@ module Models
     #     either way -- but the ciphertext will not decrypt on this side. The
     #     tokens do not matter (they expire, and the appservice transport has
     #     none), the recovery key does: it has to be re-entered here once.
-    #   * `validates :user_id, uniqueness: true` is a UNIQUE INDEX in the
-    #     schema, so the database enforces it regardless; validates_unique is
-    #     what turns the violation into a validation failure rather than a
-    #     Sequel::UniqueConstraintViolation.
+    #   * there is no uniqueness rule any more, because there is no `user_id` to
+    #     be unique over -- the database is one session's and this table has one
+    #     row. Fractal keeps the same thing in the Secret Service rather than a
+    #     table: one keyring item per session, whose attributes are homeserver,
+    #     user, device-id, id and client-id, with the store passphrase as the
+    #     secret.
     class Credential < Sequel::Model(:matrix_credentials)
       # Device ids are minted by us and handed to MAS through the MSC2967 `device:`
       # scope, which accepts 10 characters of [A-Za-z0-9_-].
@@ -55,7 +57,6 @@ module Models
         validates_presence :device_id
         validates_presence :homeserver_url
         validates_presence :matrix_user_id
-        validates_unique :user_id
       end
 
       # A fresh device id. Only ever called when a user has none yet, or when MAS
@@ -64,12 +65,12 @@ module Models
         SecureRandom.alphanumeric(DEVICE_ID_LENGTH)
       end
 
-      # The user's durable credentials for +homeserver_url+, or nil when they are
+      # This session's durable credentials for +homeserver_url+, or nil when they are
       # for a different homeserver (a redeploy pointing at a new one) and must be
       # re-minted. The DEVICE still survives that — callers re-request it — because
       # the row is only rebuilt, never deleted.
-      def self.for(user, homeserver_url)
-        record = first(user_id: user.id)
+      def self.for(homeserver_url)
+        record = first
         if record && record.homeserver_url == homeserver_url
           record
         end
@@ -109,7 +110,6 @@ create_table?(:matrix_credentials) do
   column      :recovery_key, :text
   column      :refresh_token, :text
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
 
-  index :user_id, unique: true, name: :index_matrix_credentials_on_user_id
+
 end

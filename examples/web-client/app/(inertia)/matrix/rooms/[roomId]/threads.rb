@@ -30,17 +30,17 @@ get "/" do
   room = matrix_room!
 
   roots = Models::Matrix::Event
-    .where(user_id: matrix_user_id, room_id: room[:room_id])
+    .where(room_id: room[:room_id])
     .exclude(thread_root_id: nil)
     .group_and_count(:thread_root_id)
     .to_h { |row| [row[:thread_root_id], row[:count]] }
 
   subscribed = DB[:matrix_thread_subscriptions]
-    .where(user_id: matrix_user_id, room_id: room[:room_id], status: "subscribed")
+    .where(room_id: room[:room_id], status: "subscribed")
     .select_map(:event_id)
 
   threads = Models::Matrix::Event
-    .where(user_id: matrix_user_id, room_id: room[:room_id], event_id: roots.keys)
+    .where(room_id: room[:room_id], event_id: roots.keys)
     .all
     .map do |event|
       matrix_event_json(event, []).merge(

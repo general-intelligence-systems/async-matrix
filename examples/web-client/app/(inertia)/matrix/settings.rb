@@ -148,9 +148,9 @@
 # The account. One device, so there is no session list -- see _layout.rb.
 get "/" do
   credential = Models::Matrix::Credential.first
-  state = Models::Matrix::DeviceState.first(user_id: matrix_user_id)
+  state = Models::Matrix::DeviceState.current
   profile = credential && DB[:matrix_global_profiles].first(
-    user_id: matrix_user_id, matrix_user_id: credential[:matrix_user_id],
+    matrix_user_id: credential[:matrix_user_id],
   )
 
   render(

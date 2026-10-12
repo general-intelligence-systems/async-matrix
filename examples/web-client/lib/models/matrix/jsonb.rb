@@ -32,6 +32,21 @@ module Models
     #
     # WHAT NOT TO DO: `Sequel.pg_jsonb`. It is Postgres's, it needs the
     # pg_json extension, and the serializer below is what replaced it.
+    #
+    # ── Why the column DEFAULTS are text and not JSONB ──────────────────────
+    #
+    # A defaulted column reads `DEFAULT ('{}')`, not `DEFAULT (jsonb('{}'))`,
+    # and that is deliberate: SQLite refuses to ALTER TABLE ADD COLUMN with a
+    # non-constant default -- "Cannot add a column with non-constant default" --
+    # and a function call is not constant. The ten transcribed tables gain
+    # columns that way on a database imported from the Rails app, so a
+    # `jsonb()` default would work on a fresh database and fail on an imported
+    # one, which is the worse of the two ways round.
+    #
+    # So a row nobody has written holds the TEXT "{}" and a row something has
+    # written holds a JSONB blob. Both are readable: `json()` renders either,
+    # and `->>` reads either -- it is only faster against the blob. Nothing has
+    # to know which it got.
     module JSONB
       # Declare which of this model's BLOB columns hold JSONB.
       def jsonb(*names)

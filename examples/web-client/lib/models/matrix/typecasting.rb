@@ -42,9 +42,10 @@ module Models
     # Same for Receipt's "m.read" and RoomKeyBundle's "pending".
     #
     # The plugin reads those defaults off the schema and fills them in on #new,
-    # so a validation sees what the row is actually going to contain. It leaves
-    # the JSONB columns alone, because `jsonb('{}')` is a function call rather
-    # than a literal and Sequel does not pretend to know what it evaluates to.
+    # so a validation sees what the row is actually going to contain. A JSONB
+    # column's default comes back as the STRING "{}" rather than an empty Hash,
+    # which is harmless -- JSONB's serializer is what runs on the way out, and
+    # it is given a value it will encode faithfully either way.
     module Typecasting
       # Sequel's normalized types, not SQLite's declared ones. A jsonb column is
       # a blob and is absent from this list on purpose: JSONB owns those, and

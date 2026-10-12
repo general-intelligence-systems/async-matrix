@@ -1,20 +1,11 @@
 # frozen_string_literal: true
 
 require "base64"
-require "sequel"
 
-Sequel.extension :fiber_concurrency
-
-# SQLite through extralite, which vendors its own (3.44+, so the matrix_*
-# tables' JSONB columns work whatever the system library is). The adapter ships
-# with the gem rather than with Sequel; requiring it is what registers the
-# scheme.
-#
-# Migrations.create! is idempotent, so it runs on every boot: it creates what is
-# missing and leaves what is there, and on a database imported from the Rails
-# app it adds the columns that app never had.
-#DB = Sequel.connect(ENV.fetch("DATABASE_URL", "extralite://matrix.db"))
-#Models::Matrix::Migrations.create!(DB)
+# DB, the matrix_* tables and every model under Models::Matrix, in that order.
+# One database per session, named by MATRIX_SESSION; the tables are created on
+# every boot and the creates are idempotent.
+require_relative "config/sequel"
 
 RELOAD = "USR2"
 reloading = false

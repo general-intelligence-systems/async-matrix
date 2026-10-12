@@ -25,7 +25,7 @@ module Models
       def validate
         super
         validates_presence :matrix_user_id
-        validates_unique %i[user_id matrix_user_id]
+        validates_unique :matrix_user_id
       end
 
       dataset_module do
@@ -46,7 +46,7 @@ module Models
       # This identity's devices. The self-signing key is what signs them, which
       # is why trusting the master key transitively trusts the list.
       def devices
-        Device.where(user_id: user_id, matrix_user_id: matrix_user_id)
+        Device.where(matrix_user_id: matrix_user_id)
       end
     end
   end
@@ -56,7 +56,6 @@ __END__
 
 create_table?(:matrix_user_identities) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :matrix_user_id, TEXT, null: false
   column      :own, :boolean, default: false, null: false
   column      :master_key, :blob
@@ -66,7 +65,5 @@ create_table?(:matrix_user_identities) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id matrix_user_id],
-    unique: true,
-    name:   :index_matrix_user_identities_on_user_id_and_matrix_user_id
+  index :matrix_user_id, unique: true, name: :index_matrix_user_identities_on_matrix_user_id
 end

@@ -80,7 +80,7 @@ get "/" do
   credential = Models::Matrix::Credential.first
 
   devices = credential ? DB[:matrix_devices].where(
-    user_id: matrix_user_id, matrix_user_id: credential[:matrix_user_id], deleted: false,
+    matrix_user_id: credential[:matrix_user_id], deleted: false,
   ).order(Sequel.desc(:first_seen_at)).all : []
 
   render(

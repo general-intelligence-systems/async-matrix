@@ -33,17 +33,17 @@ get "/" do
   thread_id = params["threadId"].to_s
 
   root = Models::Matrix::Event.first(
-    user_id: matrix_user_id, room_id: room[:room_id], event_id: thread_id,
+    room_id: room[:room_id], event_id: thread_id,
   ) || halt(404, "matrix: no such thread\n")
 
   replies = Models::Matrix::Event
-    .where(user_id: matrix_user_id, room_id: room[:room_id], thread_root_id: thread_id)
+    .where(room_id: room[:room_id], thread_root_id: thread_id)
     .exclude(type: "m.reaction")
     .order(:origin_server_ts)
     .all
 
   subscription = DB[:matrix_thread_subscriptions].first(
-    user_id: matrix_user_id, room_id: room[:room_id], event_id: thread_id,
+    room_id: room[:room_id], event_id: thread_id,
   )
 
   render(

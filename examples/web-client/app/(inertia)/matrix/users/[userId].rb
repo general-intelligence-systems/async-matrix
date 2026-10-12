@@ -110,17 +110,17 @@
 get "/" do
   user_id = params["userId"].to_s
 
-  profile = DB[:matrix_global_profiles].first(user_id: matrix_user_id, matrix_user_id: user_id)
+  profile = DB[:matrix_global_profiles].first(matrix_user_id: user_id)
   devices = DB[:matrix_devices]
-    .where(user_id: matrix_user_id, matrix_user_id: user_id, deleted: false)
+    .where(matrix_user_id: user_id, deleted: false)
     .order(:device_id)
     .all
-  identity = DB[:matrix_user_identities].first(user_id: matrix_user_id, matrix_user_id: user_id)
+  identity = DB[:matrix_user_identities].first(matrix_user_id: user_id)
   ignored = Array(matrix_account_data("m.ignored_user_list")["ignored_users"].to_h.keys)
 
   # The rooms we share, which is the honest answer to "who is this".
   shared = Models::Matrix::RoomMember
-    .where(user_id: matrix_user_id, member_id: user_id, membership: "join")
+    .where(member_id: user_id, membership: "join")
     .select_map(:room_id)
 
   render(
@@ -142,7 +142,7 @@ get "/" do
       }
     end,
     rooms: Models::Matrix::Room
-      .where(user_id: matrix_user_id, room_id: shared)
+      .where(room_id: shared)
       .all
       .map { |room| { roomId: room[:room_id], title: matrix_room_title(room) } },
   )

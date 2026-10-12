@@ -17,7 +17,7 @@ module Models
       def validate
         super
         validates_presence :member_id
-        validates_unique %i[user_id room_id member_id]
+        validates_unique %i[room_id member_id]
       end
 
       dataset_module do
@@ -48,9 +48,7 @@ create_table?(:matrix_room_members) do
   column      :power_level, :integer, default: 0, null: false
   column      :room_id, TEXT, null: false
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
 
-  # ── Beyond the Rails schema ────────────────────────────────────────
   #
   # A STRIPPED MEMBER IS NOT A MEMBER. Invite state arrives as stripped
   # events -- no event_id, no origin_server_ts, no guarantee of
@@ -60,17 +58,10 @@ create_table?(:matrix_room_members) do
   # indistinguishable from a synced member list.
   column      :stripped, :boolean, default: false, null: false
 
-  index %i[user_id room_id member_id],
+  index %i[room_id member_id],
     unique: true,
-    name:   :index_matrix_room_members_on_user_id_and_room_id_and_member_id
-  index %i[user_id room_id], name: :index_matrix_room_members_on_user_id_and_room_id
-  index :user_id, name: :index_matrix_room_members_on_user_id
+    name:   :index_matrix_room_members_on_room_id_and_member_id
+  index :room_id, name: :index_matrix_room_members_on_room_id
+
 end
 
-# The same columns again, for a database that already has this table -- an
-# import of the Rails app's ten. create_table? above is a no-op there, so
-# without this not one of them would ever be created. See
-# Migrations.added_columns.
-added_columns(
-  [:stripped, :boolean, {default: false, null: false}],
-)

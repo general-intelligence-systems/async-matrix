@@ -38,7 +38,7 @@ module Models
       def validate
         super
         validates_presence %i[room_id transaction_id event_type]
-        validates_unique %i[user_id room_id transaction_id]
+        validates_unique %i[room_id transaction_id]
       end
 
       dataset_module do
@@ -67,12 +67,12 @@ module Models
 
       # Sends parked against this one, waiting for its event_id.
       def dependents
-        SendQueueDependent.where(user_id: user_id, parent_transaction_id: transaction_id)
+        SendQueueDependent.where(parent_transaction_id: transaction_id)
       end
 
       # The local echo in matrix_events, if sync has not replaced it yet.
       def local_echo
-        Event.first(user_id: user_id, transaction_id: transaction_id)
+        Event.first(transaction_id: transaction_id)
       end
     end
   end
@@ -82,13 +82,12 @@ __END__
 
 create_table?(:matrix_send_queue) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   # Ours, generated before the request, and the only handle on this
   # message until the homeserver assigns an event_id.
   column      :transaction_id, TEXT, null: false
   column      :event_type, TEXT, null: false
-  column      :content, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :content, :blob, default: Sequel.lit("'{}'"), null: false
   # Higher goes first. Reactions and receipts should not queue behind a
   # 40MB video.
   column      :priority, :integer, default: 0, null: false
@@ -100,9 +99,8 @@ create_table?(:matrix_send_queue) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id transaction_id],
+  index %i[room_id transaction_id],
     unique: true,
-    name:   :index_matrix_send_queue_on_user_id_and_room_id_and_txn_id
-  index %i[user_id priority enqueued_at],
-    name: :index_matrix_send_queue_on_user_id_and_priority_and_enqueued
+    name:   :index_matrix_send_queue_on_room_id_and_transaction_id
+  index %i[priority enqueued_at], name: :index_matrix_send_queue_on_priority_and_enqueued_at
 end

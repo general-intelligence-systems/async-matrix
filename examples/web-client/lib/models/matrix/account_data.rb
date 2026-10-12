@@ -44,7 +44,7 @@ module Models
       def validate
         super
         validates_presence :event_type
-        validates_unique %i[user_id room_id event_type]
+        validates_unique %i[room_id event_type]
       end
 
       dataset_module do
@@ -58,9 +58,9 @@ module Models
       # The content of one account data event, or nil. The per-room override
       # falls back to the global event, which is the whole reason the two live
       # in one table.
-      def self.content_for(user_id:, event_type:, room_id: GLOBAL)
-        row = first(user_id: user_id, room_id: room_id, event_type: event_type) ||
-          first(user_id: user_id, room_id: GLOBAL, event_type: event_type)
+      def self.content_for(event_type:, room_id: GLOBAL)
+        row = first(room_id: room_id, event_type: event_type) ||
+          first(room_id: GLOBAL, event_type: event_type)
         row&.content
       end
     end
@@ -71,16 +71,15 @@ __END__
 
 create_table?(:matrix_account_data) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   # "" for global account data, for the same uniqueness reason as
   # room_state's state_key.
   column      :room_id, TEXT, default: "", null: false
   column      :event_type, TEXT, null: false
-  column      :content, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :content, :blob, default: Sequel.lit("'{}'"), null: false
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id event_type],
+  index %i[room_id event_type],
     unique: true,
-    name:   :index_matrix_account_data_on_user_id_and_room_id_and_type
+    name:   :index_matrix_account_data_on_room_id_and_event_type
 end

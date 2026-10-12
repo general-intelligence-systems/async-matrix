@@ -21,7 +21,7 @@ module Models
         super
         validates_presence :session_id
         validates_presence %i[sender_key pickle]
-        validates_unique %i[user_id session_id]
+        validates_unique :session_id
       end
 
       # Sessions with +sender_key+, most recently used first. The spec says to try
@@ -48,9 +48,8 @@ module Models
         )
       end
 
-      def self.persist!(user:, sender_key:, session:)
+      def self.persist!(sender_key:, session:)
         create(
-          user_id:      user.id,
           sender_key:   sender_key,
           session_id:   session.session_id,
           pickle:       session.pickle(::Matrix::Device::Crypto.pickle_key),
@@ -71,9 +70,7 @@ create_table?(:matrix_olm_sessions) do
   column      :sender_key, TEXT, null: false
   column      :session_id, TEXT, null: false
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
 
-  # ── Beyond the Rails schema ────────────────────────────────────────
   #
   # PickledSession also carries creation_time and last_use_time, which
   # `created_at` and `last_used_at` already cover. This is the one field
@@ -82,17 +79,8 @@ create_table?(:matrix_olm_sessions) do
   # fallback key is reused and therefore replayable.
   column      :created_using_fallback_key, :boolean, default: false, null: false
 
-  index %i[user_id sender_key], name: :index_matrix_olm_sessions_on_user_id_and_sender_key
-  index %i[user_id session_id],
-    unique: true,
-    name:   :index_matrix_olm_sessions_on_user_id_and_session_id
-  index :user_id, name: :index_matrix_olm_sessions_on_user_id
+  index :sender_key, name: :index_matrix_olm_sessions_on_sender_key
+  index :session_id, unique: true, name: :index_matrix_olm_sessions_on_session_id
+
 end
 
-# The same columns again, for a database that already has this table -- an
-# import of the Rails app's ten. create_table? above is a no-op there, so
-# without this not one of them would ever be created. See
-# Migrations.added_columns.
-added_columns(
-  [:created_using_fallback_key, :boolean, {default: false, null: false}],
-)

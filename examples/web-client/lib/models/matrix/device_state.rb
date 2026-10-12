@@ -29,16 +29,18 @@ module Models
         validates_presence :account_pickle
       end
 
-      # This user's device state, creating the Olm account on first use. The account
-      # is generated once and then never replaced — see the class comment.
-      def self.for(user)
-        first(user_id: user.id) || create_account!(user)
+      # This session's device state, creating the Olm account on first use. The
+      # account is generated once and then never replaced — see the class comment.
+      #
+      # There is one row. The database is one session's, so a session's device
+      # state is the only device state there is.
+      def self.current
+        first || create_account!
       end
 
-      def self.create_account!(user)
+      def self.create_account!
         account = Async::Matrix::E2EE::Account.new
         create(
-          user_id:        user.id,
           account_pickle: account.pickle(::Matrix::Device::Crypto.pickle_key),
         )
       end
@@ -78,9 +80,8 @@ create_table?(:matrix_device_states) do
   column      :otk_count, :integer, default: 0, null: false
   column      :sync_token, TEXT
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
 
-  # ── Beyond the Rails schema: the rest of PickledAccount ────────────
+  # The rest of PickledAccount.
   #
   # matrix-sdk-crypto pickles an account as {user_id, device_id, pickle,
   # shared, dehydrated, uploaded_signed_key_count, creation_local_time,
@@ -91,15 +92,6 @@ create_table?(:matrix_device_states) do
   column      :creation_local_time, :bigint
   column      :fallback_key_created_at, :bigint
 
-  index :user_id, unique: true, name: :index_matrix_device_states_on_user_id
+
 end
 
-# The same columns again, for a database that already has this table -- an
-# import of the Rails app's ten. create_table? above is a no-op there, so
-# without this not one of them would ever be created. See
-# Migrations.added_columns.
-added_columns(
-  [:dehydrated, :boolean, {default: false, null: false}],
-  [:creation_local_time, :bigint, {}],
-  [:fallback_key_created_at, :bigint, {}],
-)

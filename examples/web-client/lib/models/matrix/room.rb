@@ -30,7 +30,7 @@ module Models
       def validate
         super
         validates_presence :room_id
-        validates_unique %i[user_id room_id]
+        validates_unique :room_id
       end
 
       dataset_module do
@@ -41,11 +41,11 @@ module Models
       end
 
       def events
-        Event.where(user_id: user_id, room_id: room_id)
+        Event.where(room_id: room_id)
       end
 
       def members
-        RoomMember.where(user_id: user_id, room_id: room_id)
+        RoomMember.where(room_id: room_id)
       end
 
       # Power level required for +action+ ("kick", "ban", "invite", "redact"), or the
@@ -68,7 +68,7 @@ __END__
 create_table?(:matrix_rooms) do
   primary_key :id, type: :Bignum, serial: true
   column      :avatar_url, TEXT
-  column      :children, :blob, default: Sequel.lit("jsonb('[]')"), null: false
+  column      :children, :blob, default: Sequel.lit("'[]'"), null: false
   column      :created_at, TIMESTAMP, null: false
   column      :direct, :boolean, default: false, null: false
   column      :encrypted, :boolean, default: false, null: false
@@ -76,8 +76,8 @@ create_table?(:matrix_rooms) do
   column      :last_activity_at, :bigint
   column      :membership, TEXT, default: "join", null: false
   column      :name, TEXT
-  column      :pinned, :blob, default: Sequel.lit("jsonb('[]')"), null: false
-  column      :power_levels, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :pinned, :blob, default: Sequel.lit("'[]'"), null: false
+  column      :power_levels, :blob, default: Sequel.lit("'{}'"), null: false
   column      :preview, :text
   column      :preview_sender, TEXT
   column      :room_id, TEXT, null: false
@@ -85,9 +85,7 @@ create_table?(:matrix_rooms) do
   column      :topic, :text
   column      :unread_count, :integer, default: 0, null: false
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
 
-  # ── Beyond the Rails schema ────────────────────────────────────────
   #
   # Everything below is a field of matrix-sdk-base's RoomInfo that had
   # no column here. RoomInfo is ONE serialized blob in the SDK's
@@ -104,7 +102,7 @@ create_table?(:matrix_rooms) do
 
   # m.room.canonical_alias. `alt_aliases` is the published set.
   column      :canonical_alias, TEXT
-  column      :alt_aliases, :blob, default: Sequel.lit("jsonb('[]')"), null: false
+  column      :alt_aliases, :blob, default: Sequel.lit("'[]'"), null: false
 
   # m.room.create, unpacked. `space` already covers create.type, but the
   # rest of that event was being discarded -- including the predecessor
@@ -122,7 +120,7 @@ create_table?(:matrix_rooms) do
   # `join_rule_allow` is the restricted-room allow list, which is part of
   # the join rule rather than a separate event.
   column      :join_rule, TEXT
-  column      :join_rule_allow, :blob, default: Sequel.lit("jsonb('[]')"), null: false
+  column      :join_rule_allow, :blob, default: Sequel.lit("'[]'"), null: false
   column      :guest_access, TEXT
   column      :history_visibility, TEXT
 
@@ -130,13 +128,13 @@ create_table?(:matrix_rooms) do
   # this is the content it was derived from, and the rotation parameters
   # in it are what DeviceStore#outbound_session needs to decide when a
   # megolm session is stale.
-  column      :encryption, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :encryption, :blob, default: Sequel.lit("'{}'"), null: false
 
   # RoomSummary: who the homeserver nominates to name the room, and the
   # counts it reports. The counts are NOT a count of matrix_room_members
   # -- that table holds the members we have synced, which for a large
   # room is a subset, and for an invite is a handful of stripped rows.
-  column      :heroes, :blob, default: Sequel.lit("jsonb('[]')"), null: false
+  column      :heroes, :blob, default: Sequel.lit("'[]'"), null: false
   column      :joined_member_count, :integer, default: 0, null: false
   column      :invited_member_count, :integer, default: 0, null: false
 
@@ -152,7 +150,7 @@ create_table?(:matrix_rooms) do
   # per-tag `order` the sections sort by.
   column      :favourite, :boolean, default: false, null: false
   column      :low_priority, :boolean, default: false, null: false
-  column      :tags, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :tags, :blob, default: Sequel.lit("'{}'"), null: false
 
   # Manually marked unread, and which account-data event said so -- the
   # spec'd m.marked_unread and the older com.famedly.marked_unread are
@@ -202,55 +200,12 @@ create_table?(:matrix_rooms) do
   # m.room.retention, m.room.member_hints and the MSC3401 call member
   # events. Kept as content because nothing filters on them; dropped
   # entirely they would have to be re-fetched from /state.
-  column      :retention, :blob, default: Sequel.lit("jsonb('{}')"), null: false
-  column      :member_hints, :blob, default: Sequel.lit("jsonb('{}')"), null: false
-  column      :rtc_members, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :retention, :blob, default: Sequel.lit("'{}'"), null: false
+  column      :member_hints, :blob, default: Sequel.lit("'{}'"), null: false
+  column      :rtc_members, :blob, default: Sequel.lit("'{}'"), null: false
 
-  index %i[user_id last_activity_at], name: :index_matrix_rooms_on_user_id_and_last_activity_at
-  index %i[user_id room_id], unique: true, name: :index_matrix_rooms_on_user_id_and_room_id
-  index :user_id, name: :index_matrix_rooms_on_user_id
+  index :last_activity_at, name: :index_matrix_rooms_on_last_activity_at
+  index :room_id, unique: true, name: :index_matrix_rooms_on_room_id
+
 end
 
-# The same columns again, for a database that already has this table -- an
-# import of the Rails app's ten. create_table? above is a no-op there, so
-# without this not one of them would ever be created. See
-# Migrations.added_columns.
-added_columns(
-  [:canonical_alias, TEXT, {}],
-  [:alt_aliases, :blob, {default: Sequel.lit("jsonb('[]')"), null: false}],
-  [:room_version, TEXT, {}],
-  [:creator, TEXT, {}],
-  [:federated, :boolean, {default: true, null: false}],
-  [:predecessor_room_id, TEXT, {}],
-  [:tombstoned, :boolean, {default: false, null: false}],
-  [:successor_room_id, TEXT, {}],
-  [:join_rule, TEXT, {}],
-  [:join_rule_allow, :blob, {default: Sequel.lit("jsonb('[]')"), null: false}],
-  [:guest_access, TEXT, {}],
-  [:history_visibility, TEXT, {}],
-  [:encryption, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-  [:heroes, :blob, {default: Sequel.lit("jsonb('[]')"), null: false}],
-  [:joined_member_count, :integer, {default: 0, null: false}],
-  [:invited_member_count, :integer, {default: 0, null: false}],
-  [:display_name, TEXT, {}],
-  [:favourite, :boolean, {default: false, null: false}],
-  [:low_priority, :boolean, {default: false, null: false}],
-  [:tags, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-  [:marked_unread, :boolean, {default: false, null: false}],
-  [:marked_unread_source, TEXT, {}],
-  [:fully_read_event_id, TEXT, {}],
-  [:notification_mode, TEXT, {}],
-  [:num_unread, :integer, {default: 0, null: false}],
-  [:num_notifications, :integer, {default: 0, null: false}],
-  [:num_mentions, :integer, {default: 0, null: false}],
-  [:latest_receipt_event_id, TEXT, {}],
-  [:prev_batch, TEXT, {}],
-  [:sync_info, TEXT, {default: "no_state", null: false}],
-  [:members_synced, :boolean, {default: false, null: false}],
-  [:encryption_state_synced, :boolean, {default: false, null: false}],
-  [:invited_by, TEXT, {}],
-  [:key_backup_fully_downloaded, :boolean, {default: false, null: false}],
-  [:retention, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-  [:member_hints, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-  [:rtc_members, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-)

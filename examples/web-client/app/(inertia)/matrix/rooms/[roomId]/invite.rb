@@ -96,7 +96,7 @@ get "/" do
     roomTitle: matrix_room_title(room),
     # Already in the room, so the view can mark them rather than offer them.
     existing:  Models::Matrix::RoomMember
-      .where(user_id: matrix_user_id, room_id: room[:room_id])
+      .where(room_id: room[:room_id])
       .exclude(membership: %w[leave ban])
       .select_map(:member_id),
   )

@@ -121,7 +121,7 @@ get "/" do
     server: params["server"].to_s,
     # Rooms we are already in, so a row offers Open rather than Join.
     joined: Models::Matrix::Room
-      .where(user_id: matrix_user_id, membership: "join")
+      .where(membership: "join")
       .select_map(:room_id),
     results: [],
   )

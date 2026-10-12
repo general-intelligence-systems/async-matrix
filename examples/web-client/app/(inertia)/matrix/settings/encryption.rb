@@ -275,11 +275,11 @@
 get "/" do
   credential = Models::Matrix::Credential.first
   identity = credential && DB[:matrix_user_identities].first(
-    user_id: matrix_user_id, matrix_user_id: credential[:matrix_user_id],
+    matrix_user_id: credential[:matrix_user_id],
   )
 
   own_devices = credential ? DB[:matrix_devices].where(
-    user_id: matrix_user_id, matrix_user_id: credential[:matrix_user_id], deleted: false,
+    matrix_user_id: credential[:matrix_user_id], deleted: false,
   ).all : []
 
   render(
@@ -293,8 +293,8 @@ get "/" do
     # Unverified sessions are the thing worth shouting about: each one can read
     # everything sent to this account.
     unverified: own_devices.count { |device| device[:trust_state] != "verified" },
-    backedUp: DB[:matrix_megolm_inbound_sessions].where(user_id: matrix_user_id, backed_up: true).count,
-    total:    DB[:matrix_megolm_inbound_sessions].where(user_id: matrix_user_id).count,
+    backedUp: DB[:matrix_megolm_inbound_sessions].where(backed_up: true).count,
+    total:    DB[:matrix_megolm_inbound_sessions].count,
   )
 end
 

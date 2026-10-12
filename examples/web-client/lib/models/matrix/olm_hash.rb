@@ -35,15 +35,15 @@ module Models
       end
 
       # Record a prekey message, or report that it has been seen before.
-      def self.record!(user_id:, sender_key:, message_hash:)
-        create(user_id: user_id, sender_key: sender_key, message_hash: message_hash)
+      def self.record!(sender_key:, message_hash:)
+        create(sender_key: sender_key, message_hash: message_hash)
         true
       rescue Sequel::UniqueConstraintViolation
         false
       end
 
-      def self.seen?(user_id:, sender_key:, message_hash:)
-        where(user_id: user_id, sender_key: sender_key, message_hash: message_hash).any?
+      def self.seen?(sender_key:, message_hash:)
+        where(sender_key: sender_key, message_hash: message_hash).any?
       end
     end
   end
@@ -53,13 +53,12 @@ __END__
 
 create_table?(:matrix_olm_hashes) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :sender_key, TEXT, null: false
   column      :message_hash, TEXT, null: false
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id sender_key message_hash],
+  index %i[sender_key message_hash],
     unique: true,
-    name:   :index_matrix_olm_hashes_on_user_id_and_sender_key_and_hash
+    name:   :index_matrix_olm_hashes_on_sender_key_and_message_hash
 end

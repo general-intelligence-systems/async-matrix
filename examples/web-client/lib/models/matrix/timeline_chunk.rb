@@ -45,7 +45,7 @@ module Models
         super
         validates_presence %i[room_id chunk_id]
         validates_includes KINDS, :kind
-        validates_unique %i[user_id room_id thread_root_id chunk_id]
+        validates_unique %i[room_id thread_root_id chunk_id]
       end
 
       dataset_module do
@@ -65,9 +65,8 @@ module Models
 
       # A timeline with no gaps is complete, and this is what makes that a query
       # rather than a hope -- see the class comment.
-      def self.complete?(user_id:, room_id:, thread_root_id: MAIN)
+      def self.complete?(room_id:, thread_root_id: MAIN)
         where(
-          user_id:        user_id,
           room_id:        room_id,
           thread_root_id: thread_root_id,
           kind:           GAP,
@@ -82,7 +81,6 @@ module Models
       def entries
         TimelineEntry
           .where(
-            user_id:        user_id,
             room_id:        room_id,
             thread_root_id: thread_root_id,
             chunk_id:       chunk_id,
@@ -97,7 +95,6 @@ module Models
           nil
         else
           self.class.first(
-            user_id:        user_id,
             room_id:        room_id,
             thread_root_id: thread_root_id,
             chunk_id:       id,
@@ -112,7 +109,6 @@ __END__
 
 create_table?(:matrix_timeline_chunks) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   column      :thread_root_id, TEXT, default: "", null: false
   # Not the primary key: chunk ids are assigned per timeline and the
@@ -132,9 +128,9 @@ create_table?(:matrix_timeline_chunks) do
 
   constraint :matrix_timeline_chunks_kind, kind: %w[event gap]
 
-  index %i[user_id room_id thread_root_id chunk_id],
+  index %i[room_id thread_root_id chunk_id],
     unique: true,
-    name:   :index_matrix_timeline_chunks_on_timeline_and_chunk_id
-  index %i[user_id room_id thread_root_id kind],
-    name: :index_matrix_timeline_chunks_on_timeline_and_kind
+    name:   :index_matrix_timeline_chunks_on_room_id_and_thread_root_id_and_chunk_id
+  index %i[room_id thread_root_id kind],
+    name:   :index_matrix_timeline_chunks_on_room_id_and_thread_root_id_and_kind
 end

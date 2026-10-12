@@ -30,7 +30,7 @@ module Models
         super
         validates_presence %i[room_id member_id event_id]
         validates_includes TYPES, :receipt_type
-        validates_unique %i[user_id room_id member_id receipt_type thread_id]
+        validates_unique %i[room_id member_id receipt_type thread_id]
       end
 
       dataset_module do
@@ -51,11 +51,9 @@ __END__
 
 create_table?(:matrix_receipts) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   # The member whose receipt this is -- ours or anyone else's. Named
-  # member_id to match matrix_room_members rather than `user_id`, which
-  # in this schema is always the local account.
+  # member_id to match matrix_room_members.
   column      :member_id, TEXT, null: false
   column      :receipt_type, TEXT, default: "m.read", null: false
   column      :thread_id, TEXT, default: "main", null: false
@@ -64,9 +62,8 @@ create_table?(:matrix_receipts) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id member_id receipt_type thread_id],
+  index %i[room_id member_id receipt_type thread_id],
     unique: true,
-    name:   :index_matrix_receipts_on_user_id_and_room_and_member_and_type
-  index %i[user_id room_id event_id],
-    name: :index_matrix_receipts_on_user_id_and_room_id_and_event_id
+    name:   :index_matrix_receipts_on_room_id_and_member_id_and_receipt_type_and_thread_id
+  index %i[room_id event_id], name: :index_matrix_receipts_on_room_id_and_event_id
 end

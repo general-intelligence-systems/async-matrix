@@ -1,1 +1,4 @@
 node_modules
+
+# One SQLite database per Matrix session, created on boot by config/sequel.rb.
+sessions/

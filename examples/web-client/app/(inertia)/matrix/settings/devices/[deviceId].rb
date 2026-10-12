@@ -58,7 +58,7 @@ get "/" do
   device_id = params["deviceId"].to_s
 
   device = credential && DB[:matrix_devices].first(
-    user_id: matrix_user_id, matrix_user_id: credential[:matrix_user_id], device_id: device_id,
+    matrix_user_id: credential[:matrix_user_id], device_id: device_id,
   )
 
   device || halt(404, "matrix: no such device\n")

@@ -532,7 +532,7 @@
 # rather than three routes.
 get "/" do
   room_id = params["roomId"].to_s
-  room = Models::Matrix::Room.first(user_id: matrix_user_id, room_id: room_id)
+  room = Models::Matrix::Room.first(room_id: room_id)
 
   if room.nil?
     halt(404, "matrix: no such room\n")

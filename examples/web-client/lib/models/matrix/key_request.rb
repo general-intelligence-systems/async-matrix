@@ -25,7 +25,7 @@ module Models
       def validate
         super
         validates_presence :request_id
-        validates_unique %i[user_id request_id]
+        validates_unique :request_id
       end
 
       dataset_module do
@@ -53,7 +53,7 @@ module Models
       # The events this key would unlock, so that a cancelled or answered
       # request can say what it was for.
       def blocked_events
-        Event.where(user_id: user_id, room_id: room_id, session_id: session_id)
+        Event.where(room_id: room_id, session_id: session_id)
       end
     end
   end
@@ -63,18 +63,15 @@ __END__
 
 create_table?(:matrix_key_requests) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :request_id, TEXT, null: false
   column      :sent_out, :boolean, default: false, null: false
   # room_id / sender_key / session_id / algorithm: what was asked for,
   # indexed so an arriving key can be matched to the request it answers.
-  column      :info, :blob, default: Sequel.lit("jsonb('{}')"), null: false
-  column      :content, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :info, :blob, default: Sequel.lit("'{}'"), null: false
+  column      :content, :blob, default: Sequel.lit("'{}'"), null: false
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id request_id],
-    unique: true,
-    name:   :index_matrix_key_requests_on_user_id_and_request_id
-  index %i[user_id sent_out], name: :index_matrix_key_requests_on_user_id_and_sent_out
+  index :request_id, unique: true, name: :index_matrix_key_requests_on_request_id
+  index :sent_out, name: :index_matrix_key_requests_on_sent_out
 end

@@ -20,16 +20,15 @@ module Models
         super
         validates_presence :session_id
         validates_presence %i[room_id sender_key pickle]
-        validates_unique %i[user_id session_id]
+        validates_unique :session_id
       end
 
-      def self.store!(user:, room_id:, session_id:, sender_key:, session_key:)
-        if where(user_id: user.id, session_id: session_id).any?
+      def self.store!(room_id:, session_id:, sender_key:, session_key:)
+        if where(session_id: session_id).any?
           nil
         else
           inbound = Async::Matrix::E2EE::InboundGroupSession.new(session_key)
           persist!(
-            user:       user,
             room_id:    room_id,
             session_id: session_id,
             sender_key: sender_key,
@@ -38,13 +37,12 @@ module Models
         end
       end
 
-      def self.import!(user:, room_id:, session_id:, sender_key:, exported_key:)
-        if where(user_id: user.id, session_id: session_id).any?
+      def self.import!(room_id:, session_id:, sender_key:, exported_key:)
+        if where(session_id: session_id).any?
           nil
         else
           inbound = Async::Matrix::E2EE::InboundGroupSession.import(exported_key)
           persist!(
-            user:       user,
             room_id:    room_id,
             session_id: session_id,
             sender_key: sender_key,
@@ -53,9 +51,8 @@ module Models
         end
       end
 
-      def self.persist!(user:, room_id:, session_id:, sender_key:, inbound:)
+      def self.persist!(room_id:, session_id:, sender_key:, inbound:)
         create(
-          user_id:    user.id,
           room_id:    room_id,
           session_id: session_id,
           sender_key: sender_key,
@@ -82,9 +79,8 @@ create_table?(:matrix_megolm_inbound_sessions) do
   column      :sender_key, TEXT, null: false
   column      :session_id, TEXT, null: false
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
 
-  # ── Beyond the Rails schema: the rest of PickledInboundGroupSession ─
+  # The rest of PickledInboundGroupSession.
   #
   # The pickle is {pickle, sender_key, signing_key, sender_data,
   # forwarder_data, room_id, imported, backed_up} and this table held
@@ -96,13 +92,13 @@ create_table?(:matrix_megolm_inbound_sessions) do
   # sender, and it is what makes a decrypted message attributable: a
   # message decrypted by a session whose signing key you did not record
   # is a message you cannot say came from anyone.
-  column      :signing_key, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :signing_key, :blob, default: Sequel.lit("'{}'"), null: false
 
   # How the sender of this key was established -- SenderData is a
   # ladder (UnknownDevice -> DeviceInfo -> SenderUnverified ->
   # SenderVerified) and the type is stored alongside it because the
   # crypto store indexes on it when deciding what to re-check.
-  column      :sender_data, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :sender_data, :blob, default: Sequel.lit("'{}'"), null: false
   column      :sender_data_type, :integer
 
   # Whether this session reached the server-side key backup, and whether
@@ -114,23 +110,8 @@ create_table?(:matrix_megolm_inbound_sessions) do
   column      :imported, :boolean, default: false, null: false
   column      :forwarder_data, :blob
 
-  index %i[user_id room_id],
-    name: :index_matrix_megolm_inbound_sessions_on_user_id_and_room_id
-  index %i[user_id session_id],
-    unique: true,
-    name:   :index_matrix_megolm_inbound_sessions_on_user_id_and_session_id
-  index :user_id, name: :index_matrix_megolm_inbound_sessions_on_user_id
+  index :room_id, name: :index_matrix_megolm_inbound_sessions_on_room_id
+  index :session_id, unique: true, name: :index_matrix_megolm_inbound_sessions_on_session_id
+
 end
 
-# The same columns again, for a database that already has this table -- an
-# import of the Rails app's ten. create_table? above is a no-op there, so
-# without this not one of them would ever be created. See
-# Migrations.added_columns.
-added_columns(
-  [:signing_key, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-  [:sender_data, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-  [:sender_data_type, :integer, {}],
-  [:backed_up, :boolean, {default: false, null: false}],
-  [:imported, :boolean, {default: false, null: false}],
-  [:forwarder_data, :blob, {}],
-)

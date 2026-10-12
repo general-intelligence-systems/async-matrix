@@ -20,10 +20,10 @@
         '';
 
         # vodozemac carries a Rust extension, and its precompiled platform gems need no compiler.
-        # bundix writes one entry with no platform, so the gem it names and the hash it records come
-        # from different files: the name resolves to the source gem, which would want cargo, while
-        # the hash is the platform gem's. The platform belongs to the system being built for rather
-        # than to the lockfile, so it is chosen here.
+        # Gemfile.lock names every platform the gem ships, so bundix writes the one entry it always
+        # writes: no platform, and the source gem's hash, which would want cargo to build.
+        # The platform belongs to the system being built for rather than to the lockfile, so the
+        # entry is rewritten here into the platform gem for this system.
         # These are the hashes for the version Gemfile.lock resolves: a bump needs them recomputed.
         vodozemacPlatforms = {
           x86_64-linux = {
@@ -77,6 +77,9 @@
           ];
 
           shellHook = /* bash */ ''
+            # bundlerEnv installs the platform gem vodozemac, so forcing the ruby platform asks
+            # bundler for a gem which is not there.
+            export BUNDLE_FORCE_RUBY_PLATFORM=false
             export BUNDLE_GEMFILE="$PWD/Gemfile"
             export BUNDLE_FROZEN=false
 

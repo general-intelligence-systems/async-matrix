@@ -22,16 +22,16 @@ module Models
       def validate
         super
         validates_presence :room_id
-        validates_unique %i[user_id room_id]
+        validates_unique :room_id
       end
 
       # Our policy for a room, or the defaults. A room with no row is a room
       # nobody has set a policy for, which is not the same as a room whose
       # policy is permissive -- but it behaves the same, so there is no reason
       # to write a row to say so.
-      def self.for(user_id:, room_id:)
-        first(user_id: user_id, room_id: room_id) ||
-          new(user_id: user_id, room_id: room_id)
+      def self.for(room_id:)
+        first(room_id: room_id) ||
+          new(room_id: room_id)
       end
 
       def only_allow_trusted_devices? = !!only_allow_trusted_devices
@@ -53,7 +53,6 @@ __END__
 
 create_table?(:matrix_room_crypto_settings) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   column      :algorithm, TEXT
   column      :only_allow_trusted_devices, :boolean, default: false, null: false
@@ -62,7 +61,5 @@ create_table?(:matrix_room_crypto_settings) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id],
-    unique: true,
-    name:   :index_matrix_room_crypto_settings_on_user_id_and_room_id
+  index :room_id, unique: true, name: :index_matrix_room_crypto_settings_on_room_id
 end

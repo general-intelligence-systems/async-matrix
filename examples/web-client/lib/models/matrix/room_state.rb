@@ -30,7 +30,7 @@ module Models
       def validate
         super
         validates_presence %i[room_id event_type]
-        validates_unique %i[user_id room_id event_type state_key]
+        validates_unique %i[room_id event_type state_key]
       end
 
       dataset_module do
@@ -51,9 +51,8 @@ module Models
 
       # The content of one state event, or nil. Takes the place of the
       # matrix_rooms columns the projection used to fold state into.
-      def self.content_for(user_id:, room_id:, event_type:, state_key: "")
+      def self.content_for(room_id:, event_type:, state_key: "")
         first(
-          user_id:    user_id,
           room_id:    room_id,
           event_type: event_type,
           state_key:  state_key,
@@ -67,25 +66,24 @@ __END__
 
 create_table?(:matrix_room_state) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   column      :event_type, TEXT, null: false
   # "" is a real state key and the common one, so this is NOT NULL with
   # an empty default rather than nullable -- a nullable column here
   # would put the rows the unique index exists to deduplicate outside
-  # it, since Postgres treats NULLs as distinct.
+  # it, since SQLite treats NULLs as distinct.
   column      :state_key, TEXT, default: "", null: false
   column      :stripped, :boolean, default: false, null: false
   column      :event_id, TEXT
   column      :sender, TEXT
   column      :origin_server_ts, :bigint
-  column      :content, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :content, :blob, default: Sequel.lit("'{}'"), null: false
   column      :prev_content, :blob
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id event_type state_key],
+  index %i[room_id event_type state_key],
     unique: true,
-    name:   :index_matrix_room_state_on_user_id_and_room_id_and_type_and_key
-  index %i[user_id room_id], name: :index_matrix_room_state_on_user_id_and_room_id
+    name:   :index_matrix_room_state_on_room_id_and_event_type_and_state_key
+  index :room_id, name: :index_matrix_room_state_on_room_id
 end

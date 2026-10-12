@@ -27,7 +27,7 @@ module Models
         super
         validates_presence %i[room_id event_id]
         validates_includes STATUSES, :status
-        validates_unique %i[user_id room_id event_id]
+        validates_unique %i[room_id event_id]
       end
 
       dataset_module do
@@ -44,12 +44,12 @@ module Models
       # The thread root. `event_id` is the root rather than a reply -- see the
       # migration.
       def root
-        Event.first(user_id: user_id, event_id: event_id)
+        Event.first(event_id: event_id)
       end
 
       # Replies in this thread.
       def replies
-        Event.where(user_id: user_id, room_id: room_id).in_thread(event_id)
+        Event.where(room_id: room_id).in_thread(event_id)
       end
     end
   end
@@ -59,7 +59,6 @@ __END__
 
 create_table?(:matrix_thread_subscriptions) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   # The thread root.
   column      :event_id, TEXT, null: false
@@ -68,7 +67,7 @@ create_table?(:matrix_thread_subscriptions) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id event_id],
+  index %i[room_id event_id],
     unique: true,
-    name:   :index_matrix_thread_subscriptions_on_user_id_and_room_and_event
+    name:   :index_matrix_thread_subscriptions_on_room_id_and_event_id
 end

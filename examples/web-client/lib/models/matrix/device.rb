@@ -41,7 +41,7 @@ module Models
         super
         validates_presence %i[matrix_user_id device_id]
         validates_includes TRUST_STATES, :trust_state
-        validates_unique %i[user_id matrix_user_id device_id]
+        validates_unique %i[matrix_user_id device_id]
       end
 
       dataset_module do
@@ -74,7 +74,7 @@ module Models
       # Our own session with this device, if we have one. Keyed on the identity
       # key, which is all matrix_olm_sessions knows about a peer.
       def olm_sessions
-        OlmSession.where(user_id: user_id).with_peer(identity_key)
+        OlmSession.with_peer(identity_key)
       end
     end
   end
@@ -84,7 +84,6 @@ __END__
 
 create_table?(:matrix_devices) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   # The Matrix user this device belongs to -- @alice:example.org, not
   # the local account.
   column      :matrix_user_id, TEXT, null: false
@@ -93,9 +92,9 @@ create_table?(:matrix_devices) do
   # to open an Olm session, ed25519 to check a signature.
   column      :identity_key, TEXT
   column      :fingerprint, TEXT
-  column      :algorithms, :blob, default: Sequel.lit("jsonb('[]')"), null: false
-  column      :keys, :blob, default: Sequel.lit("jsonb('{}')"), null: false
-  column      :signatures, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :algorithms, :blob, default: Sequel.lit("'[]'"), null: false
+  column      :keys, :blob, default: Sequel.lit("'{}'"), null: false
+  column      :signatures, :blob, default: Sequel.lit("'{}'"), null: false
   column      :display_name, TEXT
   # LocalTrust: unset / verified / blacklisted / ignored.
   column      :trust_state, TEXT, default: "unset", null: false
@@ -107,10 +106,9 @@ create_table?(:matrix_devices) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id matrix_user_id device_id],
+  index %i[matrix_user_id device_id],
     unique: true,
-    name:   :index_matrix_devices_on_user_id_and_matrix_user_id_and_device
-  index %i[user_id matrix_user_id],
-    name: :index_matrix_devices_on_user_id_and_matrix_user_id
-  index %i[user_id identity_key], name: :index_matrix_devices_on_user_id_and_identity_key
+    name:   :index_matrix_devices_on_matrix_user_id_and_device_id
+  index :matrix_user_id, name: :index_matrix_devices_on_matrix_user_id
+  index :identity_key, name: :index_matrix_devices_on_identity_key
 end

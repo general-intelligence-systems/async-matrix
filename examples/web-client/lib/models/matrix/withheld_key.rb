@@ -38,7 +38,7 @@ module Models
         super
         validates_presence %i[room_id session_id]
         validates_includes CODES, :code
-        validates_unique %i[user_id session_id]
+        validates_unique :session_id
       end
 
       dataset_module do
@@ -57,7 +57,7 @@ module Models
 
       # The events this withholding accounts for.
       def events
-        Event.where(user_id: user_id, room_id: room_id, session_id: session_id)
+        Event.where(room_id: room_id, session_id: session_id)
       end
     end
   end
@@ -67,7 +67,6 @@ __END__
 
 create_table?(:matrix_withheld_keys) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   column      :session_id, TEXT, null: false
   column      :sender_key, TEXT
@@ -77,8 +76,6 @@ create_table?(:matrix_withheld_keys) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id session_id],
-    unique: true,
-    name:   :index_matrix_withheld_keys_on_user_id_and_session_id
-  index %i[user_id room_id], name: :index_matrix_withheld_keys_on_user_id_and_room_id
+  index :session_id, unique: true, name: :index_matrix_withheld_keys_on_session_id
+  index :room_id, name: :index_matrix_withheld_keys_on_room_id
 end

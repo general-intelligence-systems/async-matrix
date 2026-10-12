@@ -63,7 +63,7 @@
 # The empty state. Fractal shows this when no room is selected; there is no
 # redirect to the last room because /matrix has to stay a stable URL.
 get "/" do
-  render("matrix/index", roomCount: Models::Matrix::Room.where(user_id: matrix_user_id).count)
+  render("matrix/index", roomCount: Models::Matrix::Room.count)
 end
 
 __END__

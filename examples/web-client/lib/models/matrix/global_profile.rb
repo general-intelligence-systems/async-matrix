@@ -18,7 +18,7 @@ module Models
       def validate
         super
         validates_presence :matrix_user_id
-        validates_unique %i[user_id matrix_user_id]
+        validates_unique :matrix_user_id
       end
 
       # What the UI shows: the profile name when there is one, else the raw id.
@@ -43,14 +43,11 @@ __END__
 
 create_table?(:matrix_global_profiles) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :matrix_user_id, TEXT, null: false
   column      :display_name, TEXT
   column      :avatar_url, TEXT
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id matrix_user_id],
-    unique: true,
-    name:   :index_matrix_global_profiles_on_user_id_and_matrix_user_id
+  index :matrix_user_id, unique: true, name: :index_matrix_global_profiles_on_matrix_user_id
 end

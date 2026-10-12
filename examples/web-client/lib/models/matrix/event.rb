@@ -23,7 +23,7 @@ module Models
         super
         validates_presence :event_id
         validates_presence %i[room_id sender type]
-        validates_unique %i[user_id event_id]
+        validates_unique :event_id
       end
 
       dataset_module do
@@ -113,7 +113,7 @@ __END__
 
 create_table?(:matrix_events) do
   primary_key :id, type: :Bignum, serial: true
-  column      :content, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :content, :blob, default: Sequel.lit("'{}'"), null: false
   column      :created_at, TIMESTAMP, null: false
   column      :decryption_error, TEXT
   column      :edited_ts, :bigint
@@ -125,13 +125,9 @@ create_table?(:matrix_events) do
   column      :sender, TEXT, null: false
   column      :sender_avatar_url, TEXT
   column      :sender_display_name, TEXT
-  column      :thing_id, :bigint
   column      :thread_root_id, TEXT
   column      :type, TEXT, null: false
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
-
-  # ── Beyond the Rails schema ────────────────────────────────────────
 
   # STATE EVENTS BELONG IN THE TIMELINE TOO. matrix_room_state holds
   # CURRENT state -- one row per (room, type, state_key) -- but a state
@@ -168,56 +164,25 @@ create_table?(:matrix_events) do
   # undecryptable one -- which is also the only way a message that
   # failed to decrypt can be retried once the key shows up.
   column      :raw, :blob
-  column      :unsigned, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :unsigned, :blob, default: Sequel.lit("'{}'"), null: false
 
   # What the push rules decided for this event, evaluated once on the
   # way in. Per-event highlight is not derivable later: it depends on the
   # rules AS THEY WERE, plus the display name as it was.
-  column      :push_actions, :blob, default: Sequel.lit("jsonb('[]')"), null: false
+  column      :push_actions, :blob, default: Sequel.lit("'[]'"), null: false
 
   # Local echo. Set when we enqueued the send, cleared when the
   # homeserver echoes the event back with a real event_id.
   column      :transaction_id, TEXT
 
-  index :thing_id, name: :index_matrix_events_on_thing_id
-  index %i[user_id event_id],
-    unique: true,
-    name:   :index_matrix_events_on_user_id_and_event_id
+  index :event_id, unique: true, name: :index_matrix_events_on_event_id
   # The aggregation lookup: every reaction, edit and annotation of one
   # event, which is the query the timeline runs per row.
-  index %i[user_id room_id relates_to_id rel_type],
-    name: :index_matrix_events_on_user_id_and_room_id_and_relates_to_id
-  index %i[user_id room_id state_key],
-    name: :index_matrix_events_on_user_id_and_room_id_and_state_key
-  index %i[user_id room_id origin_server_ts],
-    name: :idx_on_user_id_room_id_origin_server_ts_d6ecf91668
-  index %i[user_id thread_root_id],
-    name: :index_matrix_events_on_user_id_and_thread_root_id
-  index :user_id, name: :index_matrix_events_on_user_id
+  index %i[room_id relates_to_id rel_type],
+    name:   :index_matrix_events_on_room_id_and_relates_to_id_and_rel_type
+  index %i[room_id state_key], name: :index_matrix_events_on_room_id_and_state_key
+  index %i[room_id origin_server_ts], name: :index_matrix_events_on_room_id_and_origin_server_ts
+  index :thread_root_id, name: :index_matrix_events_on_thread_root_id
+
 end
 
-# The same columns again, for a database that already has this table -- an
-# import of the Rails app's ten. create_table? above is a no-op there, so
-# without this not one of them would ever be created. See
-# Migrations.added_columns.
-added_columns(
-  [:state_key, TEXT, {}],
-  [:relates_to_id, TEXT, {}],
-  [:rel_type, TEXT, {}],
-  [:session_id, TEXT, {}],
-  [:raw, :blob, {}],
-  [:unsigned, :blob, {default: Sequel.lit("jsonb('{}')"), null: false}],
-  [:push_actions, :blob, {default: Sequel.lit("jsonb('[]')"), null: false}],
-  [:transaction_id, TEXT, {}],
-)
-
-added_indexes(
-  [
-    %i[user_id room_id relates_to_id rel_type],
-    :index_matrix_events_on_user_id_and_room_id_and_relates_to_id,
-  ],
-  [
-    %i[user_id room_id state_key],
-    :index_matrix_events_on_user_id_and_room_id_and_state_key,
-  ],
-)

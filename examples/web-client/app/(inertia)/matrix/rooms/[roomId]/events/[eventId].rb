@@ -88,7 +88,7 @@ get "/" do
   room = matrix_room!
 
   event = Models::Matrix::Event.first(
-    user_id: matrix_user_id, room_id: room[:room_id], event_id: params["eventId"].to_s,
+    room_id: room[:room_id], event_id: params["eventId"].to_s,
   ) || halt(404, "matrix: no such event\n")
 
   render(

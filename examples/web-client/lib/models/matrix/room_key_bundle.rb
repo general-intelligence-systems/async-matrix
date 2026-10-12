@@ -38,7 +38,7 @@ module Models
         super
         validates_presence :room_id
         validates_includes STATES, :state
-        validates_unique %i[user_id room_id sender_user_id]
+        validates_unique %i[room_id sender_user_id]
       end
 
       dataset_module do
@@ -64,7 +64,6 @@ __END__
 
 create_table?(:matrix_room_key_bundles) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   column      :sender_user_id, TEXT
   column      :state, TEXT, default: "pending", null: false
@@ -72,8 +71,8 @@ create_table?(:matrix_room_key_bundles) do
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id sender_user_id],
+  index %i[room_id sender_user_id],
     unique: true,
-    name:   :index_matrix_room_key_bundles_on_user_id_and_room_and_sender
-  index %i[user_id state], name: :index_matrix_room_key_bundles_on_user_id_and_state
+    name:   :index_matrix_room_key_bundles_on_room_id_and_sender_user_id
+  index :state, name: :index_matrix_room_key_bundles_on_state
 end

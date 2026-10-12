@@ -26,7 +26,7 @@ module Models
       def validate
         super
         validates_presence %i[room_id display_name]
-        validates_unique %i[user_id room_id display_name]
+        validates_unique %i[room_id display_name]
       end
 
       dataset_module do
@@ -49,11 +49,11 @@ module Models
 
       # How a room member should be labelled, counting the claims on their name.
       # The fallback is the raw id, which is never ambiguous.
-      def self.render(user_id:, room_id:, member_id:, display_name:)
+      def self.render(room_id:, member_id:, display_name:)
         if display_name.to_s.empty?
           member_id
         else
-          row = first(user_id: user_id, room_id: room_id, display_name: display_name)
+          row = first(room_id: room_id, display_name: display_name)
           row&.disambiguated(member_id) || display_name
         end
       end
@@ -65,14 +65,13 @@ __END__
 
 create_table?(:matrix_member_display_names) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   column      :display_name, TEXT, null: false
-  column      :member_ids, :blob, default: Sequel.lit("jsonb('[]')"), null: false
+  column      :member_ids, :blob, default: Sequel.lit("'[]'"), null: false
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id room_id display_name],
+  index %i[room_id display_name],
     unique: true,
-    name:   :index_matrix_member_display_names_on_user_id_and_room_and_name
+    name:   :index_matrix_member_display_names_on_room_id_and_display_name
 end

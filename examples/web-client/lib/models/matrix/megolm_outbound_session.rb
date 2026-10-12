@@ -31,7 +31,7 @@ module Models
         super
         validates_presence :room_id
         validates_presence %i[session_id pickle]
-        validates_unique %i[user_id room_id]
+        validates_unique :room_id
       end
 
       def session
@@ -78,10 +78,10 @@ module Models
       # set-plus-save_changes and save_changes is for persisted rows only, so a
       # row that does not exist yet has to be saved rather than updated. #save
       # returns the record either way.
-      def self.rotate!(user:, room_id:)
+      def self.rotate!(room_id:)
         group  = Async::Matrix::E2EE::GroupSession.new
-        record = first(user_id: user.id, room_id: room_id) ||
-          new(user_id: user.id, room_id: room_id)
+        record = first(room_id: room_id) ||
+          new(room_id: room_id)
 
         record.set(
           session_id:    group.session_id,
@@ -105,13 +105,10 @@ create_table?(:matrix_megolm_outbound_sessions) do
   column      :pickle, :text, null: false
   column      :room_id, TEXT, null: false
   column      :session_id, TEXT, null: false
-  column      :shared_with, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :shared_with, :blob, default: Sequel.lit("'{}'"), null: false
   column      :started_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
-  column      :user_id, :bigint, null: false
 
-  index %i[user_id room_id],
-    unique: true,
-    name:   :index_matrix_megolm_outbound_sessions_on_user_id_and_room_id
-  index :user_id, name: :index_matrix_megolm_outbound_sessions_on_user_id
+  index :room_id, unique: true, name: :index_matrix_megolm_outbound_sessions_on_room_id
+
 end

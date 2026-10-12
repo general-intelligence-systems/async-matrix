@@ -56,7 +56,6 @@ module Models
       # within a user, and matrix_devices holds everyone's.
       def sender(matrix_user_id)
         Device.first(
-          user_id:        user_id,
           matrix_user_id: matrix_user_id,
           device_id:      sender_device_id,
         )
@@ -69,13 +68,11 @@ __END__
 
 create_table?(:matrix_secrets_inbox) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :secret_name, TEXT, null: false
   column      :secret, :text, null: false
   column      :sender_device_id, TEXT
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id secret_name],
-    name: :index_matrix_secrets_inbox_on_user_id_and_secret_name
+  index :secret_name, name: :index_matrix_secrets_inbox_on_secret_name
 end

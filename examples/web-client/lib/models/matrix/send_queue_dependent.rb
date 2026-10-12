@@ -36,7 +36,7 @@ module Models
         super
         validates_presence %i[room_id parent_transaction_id own_transaction_id]
         validates_includes KINDS, :kind
-        validates_unique %i[user_id own_transaction_id]
+        validates_unique :own_transaction_id
       end
 
       dataset_module do
@@ -59,7 +59,6 @@ module Models
       # The queued send this one is parked against, while it is still queued.
       def parent
         SendQueue.first(
-          user_id:        user_id,
           room_id:        room_id,
           transaction_id: parent_transaction_id,
         )
@@ -72,7 +71,6 @@ __END__
 
 create_table?(:matrix_send_queue_dependents) do
   primary_key :id, type: :Bignum, serial: true
-  column      :user_id, :bigint, null: false
   column      :room_id, TEXT, null: false
   column      :parent_transaction_id, TEXT, null: false
   column      :own_transaction_id, TEXT, null: false
@@ -81,14 +79,13 @@ create_table?(:matrix_send_queue_dependents) do
   # "react" / "edit" / "redact" / "upload_file" -- what to do with the
   # parent once it exists.
   column      :kind, TEXT, null: false
-  column      :content, :blob, default: Sequel.lit("jsonb('{}')"), null: false
+  column      :content, :blob, default: Sequel.lit("'{}'"), null: false
   column      :enqueued_at, TIMESTAMP, null: false
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 
-  index %i[user_id own_transaction_id],
+  index :own_transaction_id,
     unique: true,
-    name:   :index_matrix_send_queue_dependents_on_user_id_and_own_txn_id
-  index %i[user_id parent_transaction_id],
-    name: :index_matrix_send_queue_dependents_on_user_id_and_parent_txn
+    name:   :index_matrix_send_queue_dependents_on_own_transaction_id
+  index :parent_transaction_id, name: :index_matrix_send_queue_dependents_on_parent_transaction_id
 end

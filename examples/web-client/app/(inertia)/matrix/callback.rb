@@ -60,7 +60,7 @@ get "/" do
     redirect("/matrix/login", 303)
   end
 
-  credential = Models::Matrix::Credential.first || Models::Matrix::Credential.new(user_id: 1)
+  credential = Models::Matrix::Credential.first || Models::Matrix::Credential.new
 
   credential.set(
     homeserver_url: MATRIX_HOMESERVER,

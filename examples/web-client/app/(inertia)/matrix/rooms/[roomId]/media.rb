@@ -201,7 +201,7 @@ get "/" do
   }.fetch(kind)
 
   items = Models::Matrix::Event
-    .where(user_id: matrix_user_id, room_id: room[:room_id], type: "m.room.message")
+    .where(room_id: room[:room_id], type: "m.room.message")
     .exclude(redacted: true)
     .reverse(:origin_server_ts)
     .limit(200)
