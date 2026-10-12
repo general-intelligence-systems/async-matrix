@@ -120,21 +120,34 @@
 # INSTALL, reui registry: @reui/data-grid
 #
 # The member list, one tab per MembershipListKind.
+
+MEMBERSHIPS = %w[join invite ban knock].freeze
+
 get "/" do
-  room = matrix_room!
-  membership = %w[join invite ban knock].include?(params["membership"]) ? params["membership"] : "join"
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+
+  if MEMBERSHIPS.include?(params["membership"])
+    membership = params["membership"]
+  else
+    membership = "join"
+  end
 
   render(
     "matrix/rooms/[roomId]/members",
-    roomId:     room[:room_id],
-    roomTitle:  matrix_room_title(room),
+    roomId:     room.room_id,
+    roomTitle:  room.title,
     membership: membership,
-    members:    matrix_members(room, membership: membership),
-    counts:     %w[join invite ban knock].to_h do |kind|
-      [kind, Models::Matrix::RoomMember.where(
-        room_id: room[:room_id], membership: kind,
-      ).count]
+    members:    room.members.where(membership: membership).order(:member_id).all.map do |member|
+      {
+        memberId:    member.member_id,
+        displayName: member.name,
+        avatarUrl:   member.avatar_url,
+        membership:  member.membership,
+        powerLevel:  member.power_level,
+        role:        member.role,
+      }
     end,
+    counts:     MEMBERSHIPS.to_h{|kind| [kind, room.members.where(membership: kind).count]},
   )
 end
 

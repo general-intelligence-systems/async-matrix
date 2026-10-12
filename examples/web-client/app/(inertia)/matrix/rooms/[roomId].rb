@@ -530,25 +530,49 @@
 # chosen by the room's category -- room-history, invite, or invite-request --
 # so a joined room, an invite and a knock are one route with three renderings
 # rather than three routes.
-get "/" do
-  room_id = params["roomId"].to_s
-  room = Models::Matrix::Room.first(room_id: room_id)
 
-  if room.nil?
-    halt(404, "matrix: no such room\n")
-  end
+get "/" do
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  me = Models::Matrix::Credential.first&.matrix_user_id.to_s
 
   render(
     "matrix/rooms/[roomId]",
-    room:   matrix_room_json(room).merge(
-      topic:       room[:topic],
-      memberCount: room[:joined_member_count].to_i,
-      invitedBy:   room[:invited_by],
-    ),
-    events: matrix_timeline(room),
+    room:   {
+      roomId:      room.room_id,
+      title:       room.title,
+      avatarUrl:   room.avatar_url,
+      topic:       room.topic,
+      encrypted:   room.encrypted,
+      direct:      room.direct,
+      membership:  room.membership,
+      memberCount: room.joined_member_count.to_i,
+      # Who invited us: the sender of our own m.room.member event, which is the
+      # only place an invite carries it.
+      invitedBy:   Models::Matrix::RoomState.first(
+        room_id: room.room_id, event_type: "m.room.member", state_key: me,
+      )&.sender,
+    },
+    events: room.events.main_timeline.chronological.limit(200).all.map{|event|
+      {
+        eventId:         event.event_id,
+        type:            event.type,
+        sender:          event.sender,
+        senderName:      event.sender_name,
+        senderAvatar:    event.sender_avatar_url,
+        body:            event.content["body"],
+        formatted:       event.formatted_body,
+        ts:              event.origin_server_ts.to_i,
+        edited:          event.edited?,
+        redacted:        event.redacted?,
+        decryptionError: event.decryption_error,
+        stateKey:        event.state_key,
+        replyToId:       event.reply_to_id,
+        reactions:       event.reactions(me),
+      }
+    },
     # Who we are, so the view can align our own messages to the end the way
     # Message's align="end" expects.
-    selfId: Models::Matrix::Credential.first&.matrix_user_id.to_s,
+    selfId: me,
   )
 end
 

@@ -10,9 +10,9 @@
 #
 # What comes back is trusted no further than the backup itself: a restored session carries no signature, so what it claims about who sent a message is only as good as whoever put it there. That is why `is_verified` is the server's first tie-break and why a restored key is imported as unverified here.
 #
-#   MATRIX_PASSPHRASE=correct-horse ruby examples/e2ee/restoring_from_backup.rb
+# The key can be given instead of the passphrase, as `MATRIX_BACKUP_KEY`, written the way the appendices represent it: `EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d`.
 #
-#   MATRIX_BACKUP_KEY='EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d'
+#   MATRIX_PASSPHRASE=correct-horse ruby examples/e2ee/restoring_from_backup.rb
 
 require_relative "../../lib/async/matrix"
 
@@ -69,47 +69,51 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
   end
 
   # Where the key came from decides nothing about how it is used, only how much the user had to do.
-  key = case {typed: TYPED, passphrase: PASSPHRASE, held: machine.secrets.held("m.megolm_backup.v1")}
-  # Typed in by hand, which is the representation in the appendices read backwards.
-  in {typed: String => typed}
-    case Async::Matrix::KeyRepresentation.decode(typed)
-    in nil
-      Console.error(self, "That is not a key: the header or the parity byte is wrong.")
+  obtained = lambda do
+    case {typed: TYPED, passphrase: PASSPHRASE, held: machine.secrets.held("m.megolm_backup.v1")}
+    # Typed in by hand, which is the representation in the appendices read backwards.
+    in {typed: String => typed}
+      case Async::Matrix::KeyRepresentation.decode(typed)
+      in nil
+        Console.error(self, "That is not a key: the header or the parity byte is wrong.")
+
+        nil
+      in String => bytes
+        Console.info(self, "Using the key the user typed.")
+
+        bytes
+      end
+
+    # Already in secret storage, which is where a client which set this up would have left it.
+    in {held: String => held}
+      Console.info(self, "Using the key from secret storage.")
+
+      held
+
+    # In storage but locked, so the passphrase opens it first.
+    in {passphrase: String => passphrase}
+      Console.info(self, "Opening secret storage with the passphrase.")
+
+      machine.secrets.unlock(passphrase)
+
+      machine.secrets.held("m.megolm_backup.v1")
+
+    # None of the three, so the last resort is one of our own devices sending it.
+    else
+      client.to_device.send_to_device("m.secret.request", machine.addressed(machine.devices.verified_of(me), {
+        action: "request",
+        name: "m.megolm_backup.v1",
+        request_id: SecureRandom.uuid,
+        requesting_device_id: machine.device_id,
+      }))
+
+      Console.warn(self, "Asked our other devices for the backup key.")
 
       nil
-    in String => bytes
-      Console.info(self, "Using the key the user typed.")
-
-      bytes
     end
-
-  # Already in secret storage, which is where a client which set this up would have left it.
-  in {held: String => held}
-    Console.info(self, "Using the key from secret storage.")
-
-    held
-
-  # In storage but locked, so the passphrase opens it first.
-  in {passphrase: String => passphrase}
-    Console.info(self, "Opening secret storage with the passphrase.")
-
-    machine.secrets.unlock(passphrase)
-
-    machine.secrets.held("m.megolm_backup.v1")
-
-  # None of the three, so the last resort is one of our own devices sending it.
-  else
-    client.to_device.send_to_device("m.secret.request", machine.addressed(machine.devices.verified_of(me), {
-      action: "request",
-      name: "m.megolm_backup.v1",
-      request_id: SecureRandom.uuid,
-      requesting_device_id: machine.device_id,
-    }))
-
-    Console.warn(self, "Asked our other devices for the backup key.")
-
-    nil
   end
+
+  key = obtained.call
 
   case key
   in nil

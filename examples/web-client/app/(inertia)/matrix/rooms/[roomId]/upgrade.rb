@@ -56,15 +56,16 @@
 #   version select  ->  ui/select
 #   consequences    ->  reui/alert
 #
+
 get "/" do
-  room = matrix_room!
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
 
   render(
     "matrix/rooms/[roomId]/upgrade",
-    roomId:    room[:room_id],
-    roomTitle: matrix_room_title(room),
-    version:   room[:room_version] || "unknown",
-    successor: room[:successor_room_id],
+    roomId:    room.room_id,
+    roomTitle: room.title,
+    version:   room.room_version || "unknown",
+    successor: room.successor_room_id,
   )
 end
 

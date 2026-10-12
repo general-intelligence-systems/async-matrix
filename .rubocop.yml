@@ -18,6 +18,9 @@ require:
 
 AllCops:
   DisabledByDefault: true
+  Exclude:
+    # Its own project, with its own bundle, its own copy of the cops, and its own .rubocop.yml.
+    - "examples/web-client/**/*"
 
 # Socketry specific rules:
 

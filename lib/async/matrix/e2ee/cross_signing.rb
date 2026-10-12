@@ -11,9 +11,9 @@ module Async
   module Matrix
     module E2EE
       # The three keys which make a user's identity, so that verifying a person once covers every device they have.
-      #
-      # The master key is the identity, the self signing key signs their own devices, and the user signing key signs other people's master keys.
       class CrossSigning
+        # The master key is the identity, the self signing key signs their own devices, and the user signing key signs other people's master keys.
+        #
         # What each key is for, which the server and every other client reads it by.
         USAGE = {master: "master", self_signing: "self_signing", user_signing: "user_signing"}.freeze
 

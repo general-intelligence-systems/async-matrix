@@ -142,7 +142,7 @@ module RuboCop
         def own_line?(node)
           line = processed_source.lines[node.location.start_line - 1].to_s
 
-          line[0...node.location.start_column].strip.empty?
+          line[0...self.prism_column(node)].strip.empty?
         end
 
         # The assignment prefix repeated in every branch — "x = ", "@y = ", "obj.z = ".
@@ -192,7 +192,7 @@ module RuboCop
         end
 
         def pushed_inside(node, rhs)
-          indent = " " * node.location.start_column
+          indent = " " * self.prism_column(node)
           target = self.target_source(node)
 
           if rhs.is_a?(::Prism::CaseNode)

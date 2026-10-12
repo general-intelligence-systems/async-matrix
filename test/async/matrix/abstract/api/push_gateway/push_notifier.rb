@@ -38,8 +38,16 @@ module Async
             module V1_14
             end
 
-            # No changes in v1.13.
+            # v1.13 added a format to a device's data.
             module V1_13
+              def self.included(base)
+                base.it "accepts a format on a device's data" do
+                  formatted = notification.merge(devices: [device.merge(data: {format: "event_id_only"})])
+
+                  expect(unauthenticated.push_notifier).to be(:device_data_accepts_format?)
+                  expect(unauthenticated.push_notifier.notify(formatted).rejected).to be(:include?, "a-push-key")
+                end
+              end
             end
 
             # No changes in v1.12.

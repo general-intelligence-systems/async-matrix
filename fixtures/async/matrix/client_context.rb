@@ -52,10 +52,6 @@ module Async
 
       # An authenticated client for a user of this name, registering the account where the rig needs asking.
       #
-      # A case which needs the homeserver to reject the token asks for one nothing can replace.
-      #
-      # `logged_in` asks for a refresh token from v1.3, and a homeserver may leave a refreshable access token working after the logout which revoked its refresh token, which leaves such a case with nothing to assert.
-      #
       # @parameter username [String] the localpart to be.
       # @parameter through [Client] the unauthenticated client to log in through.
       # @parameter refreshable [Boolean] whether the session may renew its own access token.
@@ -76,6 +72,9 @@ module Async
         if refreshable
           through.logged_in(username, Async::Matrix::TEST_PASSWORD)
         else
+          # A case which needs the homeserver to reject the token asks for one nothing can replace.
+          #
+          # `logged_in` asks for a refresh token from v1.3, and a homeserver may leave a refreshable access token working after the logout which revoked its refresh token, which leaves such a case with nothing to assert.
           login = through.login(username, Async::Matrix::TEST_PASSWORD)
 
           through.authenticated(login.access_token)

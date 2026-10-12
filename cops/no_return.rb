@@ -157,15 +157,12 @@ module RuboCop
         end
 
         def replaced_range(body, index)
-          first = body.body[index].location
-          last = body.body.last.location
-
-          ::Parser::Source::Range.new(processed_source.buffer, first.start_offset, last.end_offset)
+          self.prism_span(body.body[index].location, body.body.last.location)
         end
 
         def rewritten(body, index)
           if_node = body.body[index]
-          indent = " " * if_node.location.start_column
+          indent = " " * self.prism_column(if_node)
           guarded = self.returned_value(if_node)
           rest = body.body[(index + 1)..]
 
@@ -194,7 +191,7 @@ module RuboCop
         # Move a statement to a new indent.
         def reindent(node, indent)
           target = indent.length + 2
-          delta = target - node.location.start_column
+          delta = target - self.prism_column(node)
           lines = self.prism_source(node).lines
 
           rest = lines[1..].to_a.map{|line|

@@ -13,8 +13,7 @@ module Models
     #
     # An INBOX, not a store. Several devices may send the same secret and they
     # are not all necessarily trustworthy, so the rows accumulate and the
-    # consumer picks; matrix_credentials.recovery_key is where the accepted
-    # one ends up.
+    # consumer picks.
     class SecretsInbox < Sequel::Model(:matrix_secrets_inbox)
       # The secrets a device gossips, by their spec'd names. The three
       # cross-signing private keys and the key-backup decryption key, which
@@ -46,19 +45,6 @@ module Models
         # reason to prefer one sender over another should take them in.
         def newest_first = order(Sequel.desc(:created_at))
 
-        # Only what a device we have verified sent us. The caller supplies the
-        # device ids because trust lives in matrix_devices, not here.
-        def from_devices(device_ids) = where(sender_device_id: device_ids)
-      end
-
-      # The sending device, if it is one we know. Always one of OUR OWN, so the
-      # caller supplies which Matrix user that is -- a device id is unique only
-      # within a user, and matrix_devices holds everyone's.
-      def sender(matrix_user_id)
-        Device.first(
-          matrix_user_id: matrix_user_id,
-          device_id:      sender_device_id,
-        )
       end
     end
   end
@@ -70,7 +56,6 @@ create_table?(:matrix_secrets_inbox) do
   primary_key :id, type: :Bignum, serial: true
   column      :secret_name, TEXT, null: false
   column      :secret, :text, null: false
-  column      :sender_device_id, TEXT
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
 

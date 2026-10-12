@@ -33,8 +33,12 @@ module Async
           module V1_14
           end
 
-          # No changes in v1.13.
+          # v1.13 added a format to a device's data.
           module V1_13
+            # @returns [Boolean] whether the field is accepted.
+            def device_data_accepts_format?
+              true
+            end
           end
 
           # No changes in v1.12.
@@ -81,8 +85,12 @@ module Async
           module V1_2
           end
 
-          # No changes in v1.1.
+          # v1.1 has the notification, with no format.
           module V1_1
+            # @returns [Boolean] whether the field is accepted.
+            def device_data_accepts_format?
+              false
+            end
           end
         end
       end

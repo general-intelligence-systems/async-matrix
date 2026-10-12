@@ -146,12 +146,13 @@
 #   base-vega registry does not carry it; check the name before relying on it.
 #
 # The account. One device, so there is no session list -- see _layout.rb.
+
 get "/" do
   credential = Models::Matrix::Credential.first
-  state = Models::Matrix::DeviceState.current
-  profile = credential && DB[:matrix_global_profiles].first(
-    matrix_user_id: credential[:matrix_user_id],
-  )
+  # .first, not .current: current mints an Olm account when there is none,
+  # and rendering a settings page must not create a crypto identity.
+  state = Models::Matrix::DeviceState.first
+  profile = Models::Matrix::GlobalProfile.first(matrix_user_id: credential&.matrix_user_id)
 
   render(
     "matrix/settings",
@@ -159,13 +160,13 @@ get "/" do
       userId:      credential&.matrix_user_id,
       deviceId:    credential&.device_id,
       homeserver:  credential&.homeserver_url,
-      displayName: profile ? profile[:display_name] : nil,
-      avatarUrl:   profile ? profile[:avatar_url] : nil,
+      displayName: profile&.display_name,
+      avatarUrl:   profile&.avatar_url,
     },
-    device: {
-      syncing:       !state.nil? && !state[:sync_token].nil?,
-      keysPublished: state ? !!state[:keys_published] : false,
-      otkCount:      state ? state[:otk_count].to_i : 0,
+    device:  {
+      syncing:       !Models::Matrix::KV.sync_token.nil?,
+      keysPublished: state&.keys_published || false,
+      otkCount:      state&.otk_count.to_i,
     },
   )
 end

@@ -107,44 +107,39 @@
 #
 # One user, SESSION-SCOPED. Fractal opens this from six places with no room
 # argument, so the room is context (?room=) rather than part of the path.
+
 get "/" do
   user_id = params["userId"].to_s
-
-  profile = DB[:matrix_global_profiles].first(matrix_user_id: user_id)
-  devices = DB[:matrix_devices]
-    .where(matrix_user_id: user_id, deleted: false)
-    .order(:device_id)
-    .all
-  identity = DB[:matrix_user_identities].first(matrix_user_id: user_id)
-  ignored = Array(matrix_account_data("m.ignored_user_list")["ignored_users"].to_h.keys)
+  profile = Models::Matrix::GlobalProfile.first(matrix_user_id: user_id)
+  identity = Models::Matrix::UserIdentity.first(matrix_user_id: user_id)
+  ignored = Models::Matrix::AccountData
+    .content_for(event_type: Models::Matrix::AccountData::IGNORED_USERS).to_h
 
   # The rooms we share, which is the honest answer to "who is this".
-  shared = Models::Matrix::RoomMember
-    .where(member_id: user_id, membership: "join")
-    .select_map(:room_id)
+  shared = Models::Matrix::RoomMember.where(member_id: user_id, membership: "join")
 
   render(
     "matrix/users/[userId]",
-    userId:  user_id,
-    profile: {
-      displayName: profile ? profile[:display_name] : nil,
-      avatarUrl:   profile ? profile[:avatar_url] : nil,
+    userId:   user_id,
+    profile:  {
+      displayName: profile&.display_name,
+      avatarUrl:   profile&.avatar_url,
     },
-    verified: identity ? !!identity[:verified] : false,
-    ignored:  ignored.include?(user_id),
-    devices:  devices.map do |device|
+    verified: identity&.verified || false,
+    ignored:  ignored["ignored_users"].to_h.key?(user_id),
+    devices:  Models::Matrix::Device.of_user(user_id).live.order(:device_id).all.map do |device|
       {
-        deviceId:    device[:device_id],
-        displayName: device[:display_name],
-        identityKey: device[:identity_key],
-        fingerprint: device[:fingerprint],
-        trust:       device[:trust_state],
+        deviceId:    device.device_id,
+        displayName: device.display_name,
+        identityKey: device.identity_key,
+        fingerprint: device.fingerprint,
+        trust:       device.trust_state,
       }
     end,
-    rooms: Models::Matrix::Room
-      .where(room_id: shared)
+    rooms:    Models::Matrix::Room
+      .where(room_id: shared.select_map(:room_id))
       .all
-      .map { |room| { roomId: room[:room_id], title: matrix_room_title(room) } },
+      .map{|room| { roomId: room.room_id, title: room.title }},
   )
 end
 

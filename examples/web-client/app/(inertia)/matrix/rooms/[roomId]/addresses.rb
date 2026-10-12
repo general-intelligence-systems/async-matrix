@@ -67,16 +67,16 @@
 # INSTALL, reui registry: @reui/autocomplete
 #
 # The canonical alias and the published alt_aliases.
+
 get "/" do
-  room = matrix_room!
-  canonical = matrix_state(room, "m.room.canonical_alias")
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
 
   render(
     "matrix/rooms/[roomId]/addresses",
-    roomId:    room[:room_id],
-    roomTitle: matrix_room_title(room),
-    canonical: room[:canonical_alias] || canonical["alias"],
-    alt:       Array(room[:alt_aliases].to_a | Array(canonical["alt_aliases"])).compact.uniq,
+    roomId:    room.room_id,
+    roomTitle: room.title,
+    canonical: room.canonical_alias,
+    alt:       room.alt_aliases,
   )
 end
 

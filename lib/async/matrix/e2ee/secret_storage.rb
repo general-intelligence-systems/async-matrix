@@ -12,10 +12,10 @@ require_relative "../key_representation"
 module Async
   module Matrix
     module E2EE
-      # Secrets kept on the server, under a key the server never sees.
-      #
-      # This is where the cross signing keys and the backup key live, so that a new device can reach them.
+      # Secrets the server keeps but cannot read.
       module SecretStorage
+        # They are encrypted under a key the server never sees, and the cross signing keys and the backup key live here, so that a new device can reach them.
+
         # The only algorithm the specification defines.
         ALGORITHM = "m.secret_storage.v1.aes-hmac-sha2"
 
@@ -32,9 +32,9 @@ module Async
         ZERO_MESSAGE = ("\x00" * 32).b
 
         # The key secret storage is encrypted under.
-        #
-        # It never leaves the device: what goes to the server is what it encrypted, and a description which only says how to arrive at it again.
         class Key
+          # It never leaves the device: what goes to the server is what it encrypted, and a description which only says how to arrive at it again.
+
           # @returns [Key] a key of random bytes, which the user keeps.
           def self.generate
             self.new(SecureRandom.bytes(BYTES))
@@ -112,12 +112,11 @@ module Async
 
           # Whether this key is the one a description was written by.
           #
-          # The description carries the code over a known message, so a wrong passphrase is caught before anything is decrypted with it.
-          #
           # @parameter iv [String] the counter from the description.
           # @parameter mac [String] the code from the description.
           # @returns [Boolean] whether they match.
           def correct?(iv:, mac:)
+            # The description carries the code over a known message, so a wrong passphrase is caught before anything is decrypted with it.
             aes, key = self.derive("")
 
             ciphertext = self.cipher(:encrypt, aes, self.class.decode(iv), ZERO_MESSAGE)
@@ -128,12 +127,11 @@ module Async
 
           # What goes into account data to describe this key, so another device can arrive at it.
           #
-          # It carries no key material: a passphrase description says how to derive one, and the check says whether the answer was right.
-          #
           # @parameter name [String] what to call it to the user.
           # @parameter passphrase [Hash | nil] how it was derived, where it was.
           # @returns [Hash] the description.
           def description(name: nil, passphrase: nil)
+            # It carries no key material: a passphrase description says how to derive one, and the check says whether the answer was right.
             aes, key = self.derive("")
             iv = self.class.counter
 
@@ -159,10 +157,9 @@ module Async
 
           # Sixteen random bytes, with the top bit of the counter cleared.
           #
-          # The specification asks for that to work around implementations which disagree about where the counter wraps.
-          #
           # @returns [String] the counter block.
           def self.counter
+            # The specification asks for that to work around implementations which disagree about where the counter wraps.
             SecureRandom.bytes(16).tap do |iv|
               iv.setbyte(8, iv.getbyte(8) & 0x7f)
             end

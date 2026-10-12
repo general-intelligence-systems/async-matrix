@@ -269,7 +269,7 @@ services:
 
   sydent:
     profiles: [identity]
-    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sydent:latest
+    image: ${SYDENT_IMAGE:-matrixdotorg/sydent:latest}
     pull_policy: always
     # The same namespace as the homeserver, so that the name the homeserver calls itself resolves
     # to it from here. Its port is published by the homeserver, above.
@@ -293,7 +293,7 @@ services:
   # its own port, so it runs alongside whichever homeserver version is up.
   sygnal:
     profiles: [push-gateway]
-    image: ghcr.io/${IMAGE_OWNER:-n-at-han-k}/sygnal:latest
+    image: ${SYGNAL_IMAGE:-matrixdotorg/sygnal:latest}
     pull_policy: always
     environment:
       SYGNAL_CONF: /config/sygnal.yaml

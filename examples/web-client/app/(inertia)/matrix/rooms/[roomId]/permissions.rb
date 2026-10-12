@@ -278,36 +278,69 @@
 #
 # m.room.power_levels as an access matrix. The actions are the spec's, plus
 # whatever the room has put under `events`.
-get "/" do
-  room = matrix_room!
-  levels = room[:power_levels].to_h
-  events_default = (levels["events_default"] || 0).to_i
-  state_default = (levels["state_default"] || 50).to_i
 
-  actions = [
-    ["invite",        "Invite people",       (levels["invite"] || 0).to_i],
-    ["kick",          "Remove people",       (levels["kick"] || 50).to_i],
-    ["ban",           "Ban people",          (levels["ban"] || 50).to_i],
-    ["redact",        "Delete others' messages", (levels["redact"] || 50).to_i],
-    ["events_default", "Send messages",      events_default],
-    ["state_default", "Change settings",     state_default],
-    ["m.room.name",   "Change the name",     (levels.dig("events", "m.room.name") || state_default).to_i],
-    ["m.room.topic",  "Change the topic",    (levels.dig("events", "m.room.topic") || state_default).to_i],
-    ["m.room.avatar", "Change the avatar",   (levels.dig("events", "m.room.avatar") || state_default).to_i],
-    ["m.room.power_levels", "Change permissions", (levels.dig("events", "m.room.power_levels") || state_default).to_i],
-    ["m.room.tombstone", "Upgrade the room", (levels.dig("events", "m.room.tombstone") || 100).to_i],
-  ]
+# The actions the view draws a row for, and the spec's default when
+# m.room.power_levels names no level of its own. `nil` means it falls back to
+# state_default, which is itself one of the rows.
+ACTIONS = [
+  ["invite",              "Invite people",           0],
+  ["kick",                "Remove people",           50],
+  ["ban",                 "Ban people",              50],
+  ["redact",              "Delete others' messages", 50],
+  ["events_default",      "Send messages",           0],
+  ["state_default",       "Change settings",         50],
+  ["m.room.name",         "Change the name",         nil],
+  ["m.room.topic",        "Change the topic",        nil],
+  ["m.room.avatar",       "Change the avatar",       nil],
+  ["m.room.power_levels", "Change permissions",      nil],
+  ["m.room.tombstone",    "Upgrade the room",        100],
+].freeze
+
+# The actions the view draws a row for, and the spec's default when
+# m.room.power_levels names no level of its own. `nil` means it falls back to
+# state_default, which is itself one of the rows.
+ACTIONS = [
+  ["invite",              "Invite people",           0],
+  ["kick",                "Remove people",           50],
+  ["ban",                 "Ban people",              50],
+  ["redact",              "Delete others' messages", 50],
+  ["events_default",      "Send messages",           0],
+  ["state_default",       "Change settings",         50],
+  ["m.room.name",         "Change the name",         nil],
+  ["m.room.topic",        "Change the topic",        nil],
+  ["m.room.avatar",       "Change the avatar",       nil],
+  ["m.room.power_levels", "Change permissions",      nil],
+  ["m.room.tombstone",    "Upgrade the room",        100],
+].freeze
+
+get "/" do
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  levels = room.power_levels
+  state_default = (levels["state_default"] || 50).to_i
 
   render(
     "matrix/rooms/[roomId]/permissions",
-    roomId:    room[:room_id],
-    roomTitle: matrix_room_title(room),
-    actions:   actions.map { |key, label, level| { key: key, label: label, level: level } },
-    default:   (levels["users_default"] || 0).to_i,
+    roomId:     room.room_id,
+    roomTitle:  room.title,
+    actions:    ACTIONS.map do |key, label, default|
+      if default.nil?
+        level = levels.dig("events", key) || state_default
+      else
+        level = levels[key] || default
+      end
+
+      { key: key, label: label, level: level.to_i }
+    end,
+    default:    (levels["users_default"] || 0).to_i,
     # Anyone with an explicit entry, which is the list worth showing -- the
     # other members are all at users_default by definition.
-    privileged: (levels["users"] || {}).sort_by { |_id, level| -level.to_i }.map do |member_id, level|
-      { memberId: member_id, level: level.to_i, role: matrix_role(level.to_i), creator: member_id == room[:creator] }
+    privileged: (levels["users"] || {}).sort_by{|_id, level| -level.to_i}.map do |member_id, level|
+      {
+        memberId: member_id,
+        level:    level.to_i,
+        role:     Models::Matrix::RoomMember::ROLES.fetch(level.to_i, "Custom"),
+        creator:  member_id == room.creator,
+      }
     end,
   )
 end

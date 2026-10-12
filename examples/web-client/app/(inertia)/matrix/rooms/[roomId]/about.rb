@@ -150,28 +150,32 @@
 #
 # general_page + edit_details_subpage in one: the fields are editable in place
 # when our own power level allows it.
+
 get "/" do
-  room = matrix_room!
-  levels = room[:power_levels].to_h
-  mine = levels.dig("users", Models::Matrix::Credential.first&.matrix_user_id).to_i
-  state_default = (levels["state_default"] || 50).to_i
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  me = Models::Matrix::Credential.first&.matrix_user_id.to_s
 
   render(
     "matrix/rooms/[roomId]/about",
-    room: matrix_room_json(room).merge(
-      topic:        room[:topic],
-      canonicalAlias: room[:canonical_alias],
-      memberCount:  room[:joined_member_count].to_i,
-      version:      room[:room_version],
-      createdBy:    room[:creator],
-      predecessor:  room[:predecessor_room_id],
-      successor:    room[:successor_room_id],
-      tombstoned:   !!room[:tombstoned],
-    ),
-    can: {
-      name:   mine >= (levels.dig("events", "m.room.name") || state_default).to_i,
-      topic:  mine >= (levels.dig("events", "m.room.topic") || state_default).to_i,
-      avatar: mine >= (levels.dig("events", "m.room.avatar") || state_default).to_i,
+    room: {
+      roomId:         room.room_id,
+      title:          room.title,
+      avatarUrl:      room.avatar_url,
+      topic:          room.topic,
+      canonicalAlias: room.canonical_alias,
+      encrypted:      room.encrypted,
+      direct:         room.direct,
+      memberCount:    room.joined_member_count.to_i,
+      version:        room.room_version,
+      createdBy:      room.creator,
+      predecessor:    room.predecessor_room_id,
+      successor:      room.successor_room_id,
+      tombstoned:     room.tombstoned,
+    },
+    can:  {
+      name:   room.can_send_state?("m.room.name", me),
+      topic:  room.can_send_state?("m.room.topic", me),
+      avatar: room.can_send_state?("m.room.avatar", me),
     },
   )
 end

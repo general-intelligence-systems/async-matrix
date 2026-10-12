@@ -52,7 +52,9 @@ Sequel.extension :fiber_concurrency
 SESSIONS = File.expand_path(ENV.fetch("MATRIX_SESSIONS", "sessions"), Dir.pwd)
 SESSION  = ENV.fetch("MATRIX_SESSION", "default")
 
-FileUtils.mkdir_p(SESSIONS) unless File.directory?(SESSIONS)
+unless File.directory?(SESSIONS)
+  FileUtils.mkdir_p(SESSIONS)
+end
 
 DB = Sequel.connect(ENV.fetch("DATABASE_URL", "extralite://#{SESSIONS}/#{SESSION}.db"))
 

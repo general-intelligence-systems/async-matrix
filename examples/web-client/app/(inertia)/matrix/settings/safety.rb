@@ -90,13 +90,15 @@
 #
 # INSTALL, plain shadcn: radio-group
 #
+
 get "/" do
-  ignored = matrix_account_data("m.ignored_user_list")["ignored_users"].to_h.keys
-  previews = matrix_account_data("m.media_previews")
+  ignored = Models::Matrix::AccountData
+    .content_for(event_type: Models::Matrix::AccountData::IGNORED_USERS).to_h
+  previews = Models::Matrix::AccountData.content_for(event_type: "m.media_previews").to_h
 
   render(
     "matrix/settings/safety",
-    ignored:       ignored.sort,
+    ignored:       ignored["ignored_users"].to_h.keys.sort,
     mediaPreviews: previews["media_previews"] || "private",
     inviteAvatars: (previews["invite_avatars"] || "on") == "on",
   )

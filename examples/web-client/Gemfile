@@ -7,70 +7,33 @@ gem "ratalada-contrib", "~> 3.1.0"
 gem "ratalada-sinatra"
 
 gem "falcon"
-# WebSockets for the container shell (app/api/kube/shell.rb): xterm.js needs a
-# bidirectional channel, and falcon speaks this natively -- the logs stream is
-# one-way and stays SSE.
-gem "async-websocket"
-
-# Background jobs UI, mounted at /cosmo in server.rb; the worker itself is
-# ./cronjobs.
-gem "cosmonats"
-gem "inertia_rails", "~> 3.22"
 
 gem "sequel"
 # SQLite, not Postgres. extralite-bundle vendors its own SQLite, so JSONB (3.44+)
 # is there regardless of what the system library is, and it ships the Sequel
 # adapter itself -- `Sequel.connect("extralite://matrix.db")`.
 gem "extralite-bundle"
+
+# The Inertia page object in app/(inertia)/_layout.rb's HTML shell is dumped
+# with this.
+gem "multi_json"
+
 gem "vite_ruby"
-gem "dotenv"
+
+# lib/models/matrix/* is built on this: the pickled Olm/Megolm state in the
+# database is vodozemac state (Async::Matrix::E2EE::{Account,Session,
+# GroupSession,InboundGroupSession}), and the device talks the Client-Server API
+# through Async::Matrix::Client.
+gem "async-matrix", "~> 3.0", ">= 3.0.1"
 
 group :test, :development do
   gem "rubocop"
+  # .rubocop.yml names this plugin's cops, and cops/comment_structure.rb parses a comment the way
+  # decode does.
+  gem "rubocop-socketry"
+  gem "decode"
   gem "rspec"
   gem "capybara"
   gem "cuprite"
   gem "rack-test"
 end
-
-# The sync hook (app/sync/metacontroller.rb) builds its children with these.
-gem "kube_cluster", "~> 1.9.1"
-
-# lib/kube.rb and lib/operaton.rb parse every kubectl and engine response with it.
-gem "multi_json"
-
-# kube_cluster's HelmChart CRD parser (chart.rb) calls YAML.safe_load_stream,
-# added in Psych 5.3.0 -- config/crds.rb reads every chart's CRDs through it.
-# Pin it so the bundled psych provides the method even on a Ruby whose stdlib
-# Psych is older (built against the flake's libyaml). Same pin as ../Gemfile.
-gem "psych", "~> 5.3"
-
-# lib/mailers: the admin mailer-preview pages render through these.
-gem "hanami-mailer"
-gem "mail"
-
-# lib/operaton/relations.rb reads the engine through these.
-gem "rom"
-gem "rom-http"
-
-# lib/models/matrix/* and lib/matrix/device/* are built on this: the pickled
-# Olm/Megolm state in the DB is vodozemac state (Async::Matrix::E2EE::{Account,
-# Session,GroupSession,InboundGroupSession}), and the device talks the
-# Client-Server API through Async::Matrix::Client.
-gem "async-matrix", "~> 3.0", ">= 3.0.1"
-
-# ./cronjobs: the rufus scheduler and the cosmo worker, both run out of this
-# bundle by clan/shared/nathan/cronjobs.nix.
-gem "rufus-scheduler"
-# Human times for rufus. et-orbi (rufus's time layer) calls Chronic.parse the
-# moment the gem is loaded, which is what makes `at "Wed at 2pm"` resolve
-# forward instead of to the day before -- see cronjobs/config/rufus.rb.
-gem "chronic"
-gem "nats-pure"
-
-# cronjobs/lib/telemetry.rb -> SigNoz. Metrics is still a separate, pre-1.0
-# pair of gems upstream.
-gem "opentelemetry-sdk"
-gem "opentelemetry-exporter-otlp"
-gem "opentelemetry-metrics-sdk"
-gem "opentelemetry-exporter-otlp-metrics"

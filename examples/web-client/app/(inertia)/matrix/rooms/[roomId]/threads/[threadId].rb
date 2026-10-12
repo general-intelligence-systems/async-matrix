@@ -28,32 +28,37 @@
 #
 # One thread. Its own chunk list in the schema, so it paginates independently
 # of the main timeline -- same as the SDK's LinkedChunkId::Thread.
+
+# One event, shaped the way both the root and every reply are drawn.
+def thread_event_json(event)
+  {
+    eventId:      event.event_id,
+    sender:       event.sender,
+    senderName:   event.sender_name,
+    senderAvatar: event.sender_avatar_url,
+    body:         event.content["body"],
+    formatted:    event.formatted_body,
+    ts:           event.origin_server_ts.to_i,
+    edited:       event.edited?,
+    redacted:     event.redacted?,
+  }
+end
+
 get "/" do
-  room = matrix_room!
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
   thread_id = params["threadId"].to_s
-
-  root = Models::Matrix::Event.first(
-    room_id: room[:room_id], event_id: thread_id,
-  ) || halt(404, "matrix: no such thread\n")
-
-  replies = Models::Matrix::Event
-    .where(room_id: room[:room_id], thread_root_id: thread_id)
-    .exclude(type: "m.reaction")
-    .order(:origin_server_ts)
-    .all
-
-  subscription = DB[:matrix_thread_subscriptions].first(
-    room_id: room[:room_id], event_id: thread_id,
-  )
+  root = room.events.first(event_id: thread_id) || halt(404, "matrix: no such thread\n")
 
   render(
     "matrix/rooms/[roomId]/threads/[threadId]",
-    roomId:     room[:room_id],
-    roomTitle:  matrix_room_title(room),
-    threadId:   thread_id,
-    root:       matrix_event_json(root, []),
-    replies:    replies.map { |event| matrix_event_json(event, []) },
-    subscribed: subscription && subscription[:status] == "subscribed",
+    roomId:     room.room_id,
+    roomTitle:  room.title,
+    root:       thread_event_json(root),
+    replies:    room.events.in_thread(thread_id).chronological.all.map{|event|
+      thread_event_json(event)
+    },
+    subscribed: Models::Matrix::ThreadSubscription
+      .first(room_id: room.room_id, event_id: thread_id)&.subscribed? || false,
     selfId:     Models::Matrix::Credential.first&.matrix_user_id.to_s,
   )
 end

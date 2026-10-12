@@ -78,7 +78,6 @@ create_table?(:matrix_device_states) do
   column      :created_at, TIMESTAMP, null: false
   column      :keys_published, :boolean, default: false, null: false
   column      :otk_count, :integer, default: 0, null: false
-  column      :sync_token, TEXT
   column      :updated_at, TIMESTAMP, null: false
 
   # The rest of PickledAccount.

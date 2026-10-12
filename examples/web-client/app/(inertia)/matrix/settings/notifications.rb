@@ -54,24 +54,23 @@
 #
 # Push rules. The global setting and keywords are m.push_rules; the per-room
 # overrides are the cached notification_mode on each room.
+
 get "/" do
-  rules = matrix_account_data("m.push_rules")
-
-  keywords = Array(rules.dig("global", "content"))
-    .select { |rule| rule["enabled"] != false && rule["rule_id"] !~ /\A\./ }
-    .map { |rule| rule["pattern"] }
-    .compact
-
-  overrides = Models::Matrix::Room
-    .exclude(notification_mode: nil)
-    .all
-    .map { |room| { roomId: room[:room_id], title: matrix_room_title(room), mode: room[:notification_mode] } }
+  rules = Models::Matrix::AccountData
+    .content_for(event_type: Models::Matrix::AccountData::PUSH_RULES).to_h
 
   render(
     "matrix/settings/notifications",
     global:    "all",
-    keywords:  keywords,
-    overrides: overrides,
+    # The content rules a person added, as opposed to the server's own, which
+    # are the ones whose rule_id starts with a dot.
+    keywords:  Array(rules.dig("global", "content"))
+      .reject{|rule| rule["enabled"] == false || rule["rule_id"].to_s.start_with?(".")}
+      .filter_map{|rule| rule["pattern"]},
+    overrides: Models::Matrix::Room
+      .exclude(notification_mode: nil)
+      .all
+      .map{|room| { roomId: room.room_id, title: room.title, mode: room.notification_mode }},
   )
 end
 

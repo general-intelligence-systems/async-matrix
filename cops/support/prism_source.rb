@@ -7,7 +7,7 @@
 #
 # A cop which includes this does not use the `on_<type>` callbacks: those are driven by the parser gem tree, so a cop which reads a different tree walks it itself from `on_new_investigation`. What it gains is one parse of the file by the same Prism which runs the program, and a uniform walk over every node.
 #
-# Offences are still reported against `Parser::Source::Range`, because that is what RuboCop and its correctors take. A Prism location and a RuboCop buffer measure the same source in bytes from the same origin, so a range is built from the offsets directly.
+# Offences are still reported against `Parser::Source::Range`, because that is what RuboCop and its correctors take. THE TWO DO NOT MEASURE THE SAME WAY: a Prism location counts BYTES and a `Parser::Source::Range` counts CHARACTERS, so a range built from `start_offset` is correct only until the first multibyte character in the file and silently wrong after it. Prism gives both, and `prism_range` takes the character pair.
 #
 # Prism does not track parentage - a node does not name the node it is written inside - so the walk records the parent of each node as it descends.
 
@@ -113,12 +113,36 @@ module RuboCop
       # @parameter location [Prism::Location] where the offence is.
       # @returns [Parser::Source::Range] the same place, measured for RuboCop.
       def prism_range(location)
-        ::Parser::Source::Range.new(processed_source.buffer, location.start_offset, location.end_offset)
+        # CHARACTER OFFSETS, NOT `start_offset`. A `Parser::Source::Range` indexes the buffer by character and a Prism location counts bytes, so a range built from the byte pair lands further and further past where it should as the multibyte characters above it accumulate. A corrector handed such a range replaces the wrong text and writes a file which no longer parses.
+        ::Parser::Source::Range.new(
+          processed_source.buffer,
+          location.start_character_offset,
+          location.end_character_offset,
+        )
+      end
+
+      # One range reaching from the start of the first location to the end of the last, for an offence over a run of statements rather than a single node.
+      #
+      # @returns [Parser::Source::Range] the span.
+      def prism_span(first, last)
+        ::Parser::Source::Range.new(
+          processed_source.buffer,
+          first.start_character_offset,
+          last.end_character_offset,
+        )
       end
 
       # @returns [Parser::Source::Range] the whole of the given node.
       def prism_node_range(node)
         self.prism_range(node.location)
+      end
+
+      # The column a node starts at, counted the way a Ruby String is indexed.
+      #
+      # @returns [Integer] the character column.
+      def prism_column(node)
+        # `Prism::Location#start_column` counts bytes, so indexing a line from `processed_source.lines` with it cuts in the wrong place once anything above or before it on that line is multibyte.
+        node.location.start_character_column
       end
 
       # @returns [String] the source of the given node.

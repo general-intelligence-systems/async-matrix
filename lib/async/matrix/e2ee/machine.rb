@@ -37,6 +37,13 @@ module Async
         # The history visibilities which let a session be passed on to a later member.
         SHAREABLE = ["shared", "world_readable"].freeze
 
+        # Which part of the identity each of the three cross signing secrets carries.
+        CROSS_SIGNING = {
+          "m.cross_signing.master" => :master,
+          "m.cross_signing.self_signing" => :self_signing,
+          "m.cross_signing.user_signing" => :user_signing,
+        }.freeze
+
         # @parameter user_id [String] the user this device belongs to.
         # @parameter device_id [String] this device.
         # @parameter crypto [Crypto] the implementation to encrypt with.
@@ -138,19 +145,19 @@ module Async
         # @parameter secret [String] the private key, base64 encoded.
         # @returns [CrossSigning | nil] our identity, or nil where the name is not one of the three.
         def accept_cross_signing_secret(name, secret)
-          case name.to_s
-          in "m.cross_signing.master" then @identity[:master] = CrossSigning::Key.from_base64(secret)
-          in "m.cross_signing.self_signing" then @identity[:self_signing] = CrossSigning::Key.from_base64(secret)
-          in "m.cross_signing.user_signing" then @identity[:user_signing] = CrossSigning::Key.from_base64(secret)
-          else
+          part = CROSS_SIGNING[name.to_s]
+
+          if part.nil?
             Console.warn(self, "That is not a cross signing key.", name: name)
 
-            return nil
+            nil
+          else
+            @identity[part] = CrossSigning::Key.from_base64(secret)
+
+            Console.info(self, "Took on a cross signing key.", name: name)
+
+            @identity
           end
-
-          Console.info(self, "Took on a cross signing key.", name: name)
-
-          @identity
         end
 
         # Sign this device with our own self signing key, which is what makes it cross signed.
@@ -236,8 +243,6 @@ module Async
 
         # One session, as a backup wants it.
         #
-        # A restored session carries no signature, so what it claims about its sender is only as good as whoever put it there: that is why `is_verified` is what the sender's device was, not what the backup says.
-        #
         # @parameter session [Hash] the session, as {#sessions} answers it.
         # @returns [Hash] the fields a backup is written from.
         def export_for_backup(session)
@@ -256,6 +261,7 @@ module Async
             shared_history: session[:shared_history] || false,
             first_message_index: index,
             forwarded_count: (session[:forwarding_curve25519_key_chain] || []).size,
+            # A restored session carries no signature, so what it claims about its sender is only as good as whoever put it there: this is what the sender's device was, not what the backup says.
             is_verified: @devices.verified?(session[:sender], session[:device_id].to_s),
           }
         end
@@ -360,20 +366,18 @@ module Async
 
         # Whether a session for this room may be given to somebody who joins later.
         #
-        # True only while the history is visible to them, which is what the flag on a shared key reports.
-        #
         # @parameter room_id [String] the room.
         # @returns [Boolean] whether the history is shared.
         def shared_history?(room_id)
+          # True only while the history is visible to them, which is what the flag on a shared key reports.
           SHAREABLE.include?(@rooms.dig(room_id, :visibility))
         end
 
         # The rooms whose session has been used for too long, or for too many messages.
         #
-        # Neither is an event, so neither can be noticed by reading one: they are measured here instead.
-        #
         # @returns [Hash] why each room is due, by room ID.
         def rooms_due_for_rotation
+          # Neither is an event, so neither can be noticed by reading one: they are measured here instead.
           @rooms.each_with_object({}) do |(room_id, room), due|
             session = @crypto.session_for(room_id)
 
@@ -677,17 +681,34 @@ module Async
           case session
           in nil
             nil
-          in {message_index: Integer => index} if index >= room.fetch(:messages, DEFAULT_MESSAGES)
-            "it has carried #{index} messages"
+          in {message_index: Integer => index}
+            if index >= room.fetch(:messages, DEFAULT_MESSAGES)
+              "it has carried #{index} messages"
+            else
+              self.expired(room_id, room)
+            end
           else
-            started = @store.started(room_id)
+            self.expired(room_id, room)
+          end
+        end
 
-            case started
-            in Time => at if (Time.now - at) * 1000 >= room.fetch(:period, DEFAULT_PERIOD)
+        # Why the room's session is too old to go on using, if it is.
+        #
+        # @parameter room_id [String] the room.
+        # @parameter room [Hash] what its state said.
+        # @returns [String | nil] the reason, or nil while it may still be used.
+        def expired(room_id, room)
+          started = @store.started(room_id)
+
+          case started
+          in Time => at
+            if (Time.now - at) * 1000 >= room.fetch(:period, DEFAULT_PERIOD)
               "it has been in use since #{at}"
             else
               nil
             end
+          else
+            nil
           end
         end
 

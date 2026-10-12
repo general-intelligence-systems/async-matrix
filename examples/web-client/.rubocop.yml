@@ -1,0 +1,173 @@
+# This example is its own project, with its own bundle and its own cops, so it lints itself: the
+# gem's run ignores this directory.
+plugins:
+  - rubocop-socketry
+
+require:
+  - ./cops/begin_block_assignment.rb
+  - ./cops/no_conditional_assignment.rb
+  - ./cops/no_modifier_if.rb
+  - ./cops/no_return.rb
+  - ./cops/use_tap.rb
+  - ./cops/comment_structure.rb
+
+AllCops:
+  DisabledByDefault: true
+  Exclude:
+    - "node_modules/**/*"
+    - "frontend/**/*"
+    - "vendor/**/*"
+
+# Socketry specific rules:
+
+# Indenting blank lines means trailing whitespace once indentation is spaces rather than tabs:
+Layout/ConsistentBlankLineIndentation:
+  Enabled: false
+
+Layout/BlockDelimiterSpacing:
+  Enabled: true
+
+Style/GlobalExceptionVariables:
+  Enabled: true
+
+# General Layout rules:
+
+Layout/IndentationStyle:
+  Enabled: true
+  EnforcedStyle: spaces
+
+Layout/InitialIndentation:
+  Enabled: true
+
+Layout/IndentationWidth:
+  Enabled: true
+  Width: 2
+
+Layout/IndentationConsistency:
+  Enabled: true
+  EnforcedStyle: normal
+
+Layout/BlockAlignment:
+  Enabled: true
+
+Layout/EndAlignment:
+  Enabled: true
+  EnforcedStyleAlignWith: start_of_line
+
+Layout/BeginEndAlignment:
+  Enabled: true
+  EnforcedStyleAlignWith: start_of_line
+
+Layout/RescueEnsureAlignment:
+  Enabled: true
+
+Layout/ElseAlignment:
+  Enabled: true
+
+Layout/DefEndAlignment:
+  Enabled: true
+
+Layout/CaseIndentation:
+  Enabled: true
+  EnforcedStyle: end
+
+Layout/CommentIndentation:
+  Enabled: true
+
+Layout/FirstHashElementIndentation:
+  Enabled: true
+  EnforcedStyle: consistent
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: true
+
+Layout/EmptyLinesAroundModuleBody:
+  Enabled: true
+
+Layout/EmptyLineAfterMagicComment:
+   Enabled: true
+
+Layout/SpaceInsideBlockBraces:
+  Enabled: true
+  EnforcedStyle: no_space
+  SpaceBeforeBlockParameters: false
+
+Layout/SpaceAroundBlockParameters:
+  Enabled: true
+  EnforcedStyleInsidePipes: no_space
+
+Layout/FirstArrayElementIndentation:
+  Enabled: true
+  EnforcedStyle: consistent
+
+Layout/ArrayAlignment:
+  Enabled: true
+  EnforcedStyle: with_fixed_indentation
+
+Layout/FirstArgumentIndentation:
+  Enabled: true
+  EnforcedStyle: consistent
+
+Layout/ArgumentAlignment:
+  Enabled: true
+  EnforcedStyle: with_fixed_indentation
+
+Layout/ClosingParenthesisIndentation:
+  Enabled: true
+
+Layout/TrailingWhitespace:
+  Enabled: true
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+Style/StringLiterals:
+  Enabled: true
+  EnforcedStyle: double_quotes
+
+# House style, shared with the gem.
+
+# Bans assigning a `begin...end` expression; the assignment goes inside the block.
+Local/BeginBlockAssignment:
+  Enabled: true
+
+# Bans assigning an `if` / `case` expression; assign inside each branch instead.
+Local/NoConditionalAssignment:
+  Enabled: true
+
+# Bans modifier `if` / `unless`, so a guard cannot hide off the right edge of a long line.
+Local/NoModifierIf:
+  Enabled: true
+
+# Bans `return`. The method's last expression is its return value, and guards are structural.
+Local/NoReturn:
+  Enabled: true
+
+# Requires `tap` where a method assigns a local on its first line and returns it on its last.
+Local/UseTap:
+  Enabled: true
+
+# How a comment is built: one paragraph per line, and a summary no longer than the code it
+# describes earns. The measurements are the gem's.
+Local/CommentStructure:
+  Enabled: true
+
+  MaximumWords: 30
+  BaseWords: 10
+  WordsPerLine: 3
+  ModuleWords: 10
+
+  Wrapping:
+    Enabled: true
+    Exclude:
+      - "bin/*"
+
+  Length:
+    Enabled: true
+    Exclude:
+      - "bin/*"
+
+  # Annotations document an interface a caller reaches for. The models and endpoints here are
+  # called by the framework, so the prose stands on its own.
+  Annotations:
+    Enabled: false

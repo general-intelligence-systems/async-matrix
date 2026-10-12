@@ -7,7 +7,7 @@
 # NOT IMPLEMENTED.
 #
 # The room's threads. NO FRACTAL EQUIVALENT: it has no thread support at all,
-# so this is ours. Reads matrix_events.thread_root_id and
+# so this is ours. Reads matrix_events.rel_type and
 # matrix_thread_subscriptions.
 # ── No Fractal widget tree ─────────────────────────────────────────────────
 #
@@ -25,34 +25,39 @@
 #   participants             ->  stacked ui/avatar
 #
 # Threads. No Fractal equivalent -- it has no thread UI -- so this is ours,
-# built on matrix_events.thread_root_id and matrix_thread_subscriptions.
+# built on matrix_events.rel_type and matrix_thread_subscriptions.
+
 get "/" do
-  room = matrix_room!
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
 
-  roots = Models::Matrix::Event
-    .where(room_id: room[:room_id])
-    .exclude(thread_root_id: nil)
-    .group_and_count(:thread_root_id)
-    .to_h { |row| [row[:thread_root_id], row[:count]] }
-
-  subscribed = DB[:matrix_thread_subscriptions]
-    .where(room_id: room[:room_id], status: "subscribed")
-    .select_map(:event_id)
-
-  threads = Models::Matrix::Event
-    .where(room_id: room[:room_id], event_id: roots.keys)
-    .all
-    .map do |event|
-      matrix_event_json(event, []).merge(
-        replyCount: roots[event[:event_id]].to_i,
-        subscribed: subscribed.include?(event[:event_id]),
-      )
-    end
-    .sort_by { |thread| -thread[:ts] }
+  subscribed = Models::Matrix::ThreadSubscription
+    .in_room(room.room_id).subscribed.select_map(:event_id)
 
   render(
     "matrix/rooms/[roomId]/threads",
-    roomId: room[:room_id], roomTitle: matrix_room_title(room), threads: threads,
+    roomId:    room.room_id,
+    roomTitle: room.title,
+    # filter_map rather than map: a summary whose root event has not arrived
+    # yet has nothing to draw, and the thread list is not the place to find out.
+    threads:   Models::Matrix::ThreadSummary
+      .in_room(room.room_id)
+      .by_latest_reply
+      .all
+      .filter_map do |summary|
+        root = summary.root
+
+        if root
+          {
+            eventId:      summary.event_id,
+            senderName:   root.sender_name,
+            senderAvatar: root.sender_avatar_url,
+            body:         root.content["body"],
+            ts:           root.origin_server_ts.to_i,
+            replyCount:   summary.reply_count.to_i,
+            subscribed:   subscribed.include?(summary.event_id),
+          }
+        end
+      end,
   )
 end
 

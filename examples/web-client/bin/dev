@@ -1,7 +1,53 @@
 #!/usr/bin/env bash
 
-#bin/kill-dev
+# DEV(1)                             General Commands Manual                          DEV(1)
+#
+# NAME
+#      bin/dev — run the app and the asset server together
+#
+# SYNOPSIS
+#      bin/dev [process ...]
+#
+# DESCRIPTION
+#      Starts every process in Procfile.dev under overmind, in the foreground, and stops them
+#      all on Ctrl-C.
+#
+#      There are two, and the app needs both: `web` is the Falcon server out of server.rb, and
+#      `vite` is the asset server the page's script tags point at. Running `web` alone serves a
+#      page whose assets 404.
+#
+#      Overmind's default is wanted here and --any-can-die is not: a dev server which has
+#      quietly crashed while the other one carries on looks like the app is up and
+#      misbehaving, rather than down. One dying stops both.
+#
+#      Naming processes runs only those, which is how to take one of them over: `bin/dev vite`
+#      in one terminal and `bin/serve` in another, under whatever debugger wanted.
+#
+# FILES
+#      Procfile.dev
+#              The processes, one per line.
+#
+# ENVIRONMENT
+#      MATRIX_SESSION
+#              Which session database under sessions/ to open. See config/sequel.rb.
+#
+# EXAMPLES
+#      Both processes:
+#
+#            bin/dev
+#
+#      The asset server only, to run the app under a debugger beside it:
+#
+#            bin/dev vite
+#
+# SEE ALSO
+#      overmind(1), bin/serve, bin/vite
+#
+# async-matrix                          October 12, 2026                              DEV(1)
 
-#OVERMIND_PROCFILE=Procfile.dev overmind start --daemonize --any-can-die --auto-restart web,vite "$@"
+set -o errexit
+set -o nounset
 
-exec echo "DO NOT RUN bin/dev there are systemd processes!!!!!! for bin/serve and bin/vite"
+cd "$(dirname "$0")/.."
+
+exec overmind start --procfile Procfile.dev "$@"

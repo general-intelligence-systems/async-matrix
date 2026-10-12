@@ -11,6 +11,8 @@ DO NOT consider whether rubocop cops are intended... ABIDE by them as holey scri
 
 The schemas are generated. Never edit a `.yaml` under a `schemas/` directory, and never run `bin/update-spec`, `bin/update-event-spec`, `bin/generate-spec-deltas` or `bin/generate-event-spec-deltas`. They are the input you read, not output you produce.
 
+`context/` is generated too. Never edit a file there: edit the page under `docs/content/docs` which it comes from, and run `bin/update-context`.
+
 ## Essential reading: async-rest
 
 This library is a client built on [async-rest](https://github.com/socketry/async-rest), and it does not reinvent any of it. Study that gem and its readme before writing code here — most confusion about this repo is really unfamiliarity with async-rest.
@@ -114,6 +116,8 @@ test/async/matrix/abstract/api/<api>/  test cases, layered by version the same w
 test/operations/<api>.rb             the structural test: a method per operation the schema names
 cops/                                the project's own rubocop cops
 data/matrix-spec-v1.N/               the spec, one submodule per version
+docs/content/docs/                   the documentation site, and the source of `context/`
+context/                             the agent context this gem ships, generated from it
 ```
 
 The five APIs are `client_server`, `server_server`, `identity`, `push_gateway`, `application_service`. The spec spells them with hyphens; Ruby with underscores. Scripts take whichever the man page says.
@@ -191,6 +195,8 @@ Comments: one line per paragraph, never wrapped, and short. See `cops/comment_st
 Every `bin/` script carries a man page at the top, kept current with the script. Read it before using it, rather than guessing options or trusting what is written here.
 
 `bin/test` brings a homeserver up in Docker to test against, so a run costs a container start. Its man page explains how to narrow a run and how to keep the homeserver alive between runs, which is what you want while iterating.
+
+`bin/update-context` writes `context/`, which is the agent context this gem ships: the [agent context specification](https://github.com/socketry/agent-context) says a gem provides markdown in a `context/` directory at its root, and an agent working on a project which depends on this one installs it into that project's `.agents/context/async-matrix/`. The pages under `docs/content/docs` are the source, so a change to the documentation is what changes the context; `bin/update-context --check` says whether what is committed still matches.
 
 ## The encryption binding
 

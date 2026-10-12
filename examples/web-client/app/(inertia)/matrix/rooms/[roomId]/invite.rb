@@ -87,18 +87,16 @@
 #
 # Invite people TO this room. Not the invite you received -- that is a
 # rendering of rooms/[roomId].rb.
+
 get "/" do
-  room = matrix_room!
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
 
   render(
     "matrix/rooms/[roomId]/invite",
-    roomId:    room[:room_id],
-    roomTitle: matrix_room_title(room),
+    roomId:    room.room_id,
+    roomTitle: room.title,
     # Already in the room, so the view can mark them rather than offer them.
-    existing:  Models::Matrix::RoomMember
-      .where(room_id: room[:room_id])
-      .exclude(membership: %w[leave ban])
-      .select_map(:member_id),
+    existing:  room.members.exclude(membership: %w[leave ban]).select_map(:member_id),
   )
 end
 

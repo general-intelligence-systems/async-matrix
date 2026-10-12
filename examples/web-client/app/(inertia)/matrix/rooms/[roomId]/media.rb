@@ -190,41 +190,51 @@
 #   The audio player. Fractal has a real one (waveform, scrub); the catalog has none.
 #
 # The history viewer: everything in this room that carries a file.
+
+# The three tabs, and the msgtypes behind each.
+MSGTYPES = {
+  "media" => %w[m.image m.video],
+  "files" => %w[m.file],
+  "audio" => %w[m.audio],
+}.freeze
+
+# The three tabs, and the msgtypes behind each.
+MSGTYPES = {
+  "media" => %w[m.image m.video],
+  "files" => %w[m.file],
+  "audio" => %w[m.audio],
+}.freeze
+
 get "/" do
-  room = matrix_room!
-  kind = %w[media files audio].include?(params["kind"]) ? params["kind"] : "media"
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
 
-  msgtypes = {
-    "media" => %w[m.image m.video],
-    "files" => %w[m.file],
-    "audio" => %w[m.audio],
-  }.fetch(kind)
+  if MSGTYPES.key?(params["kind"])
+    kind = params["kind"]
+  else
+    kind = "media"
+  end
 
-  items = Models::Matrix::Event
-    .where(room_id: room[:room_id], type: "m.room.message")
-    .exclude(redacted: true)
+  items = room.events
+    .where(type: "m.room.message", redacted: false)
     .reverse(:origin_server_ts)
     .limit(200)
     .all
-    .select { |event| msgtypes.include?(event[:content].to_h["msgtype"]) }
+    .select{|event| MSGTYPES.fetch(kind).include?(event.content["msgtype"])}
     .map do |event|
-      content = event[:content].to_h
-      info = content["info"].to_h
-
       {
-        eventId:  event[:event_id],
-        body:     content["body"],
-        msgtype:  content["msgtype"],
-        sender:   event[:sender_display_name].to_s.empty? ? event[:sender] : event[:sender_display_name],
-        ts:       event[:origin_server_ts].to_i,
-        size:     info["size"],
-        mimetype: info["mimetype"],
+        eventId:  event.event_id,
+        body:     event.content["body"],
+        msgtype:  event.content["msgtype"],
+        sender:   event.sender_name,
+        ts:       event.origin_server_ts.to_i,
+        size:     event.content.dig("info", "size"),
+        mimetype: event.content.dig("info", "mimetype"),
       }
     end
 
   render(
     "matrix/rooms/[roomId]/media",
-    roomId: room[:room_id], roomTitle: matrix_room_title(room), kind: kind, items: items,
+    roomId: room.room_id, roomTitle: room.title, kind: kind, items: items,
   )
 end
 

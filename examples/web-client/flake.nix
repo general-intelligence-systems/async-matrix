@@ -5,10 +5,8 @@
     utils.url = "github:numtide/flake-utils";
     mine.url = "github:n-at-han-k/flake.nix";
     mine.inputs.nixpkgs.follows = "nixpkgs";
-    krew-nix.url = "github:n-at-han-k/krew.nix";
-    krew-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
-  outputs = { self, nixpkgs, utils, mine, krew-nix }:
+  outputs = { self, nixpkgs, utils, mine }:
     (utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -62,11 +60,6 @@
           buildInputs = with pkgs; [
             gems
             gems.wrappedRuby
-            kubectl
-            kubernetes-helm
-            krew-nix.packages.${system}.passman
-            krew-nix.packages.${system}.rbac-tool
-            krew-nix.packages.${system}.popeye
           ];
         };
       }));

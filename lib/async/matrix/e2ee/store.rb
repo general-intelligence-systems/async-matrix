@@ -24,13 +24,12 @@ module Async
 
         # Remember a session another device shared.
         #
-        # Whatever else is known about it is kept too, since a backup or an export carries more than the key.
-        #
         # @parameter room_id [String] the room the session is for.
         # @parameter session_id [String] the ID of the session.
         # @parameter sender [String | nil] the user who shared it.
         # @parameter rest [Hash] what else is known: whether it was imported, what index it begins at.
         def remember(room_id, session_id:, sender:, **rest)
+          # Whatever else is known about it is kept too, since a backup or an export carries more than the key.
           @sessions[[room_id, session_id]] = {sender: sender, at: Time.now, **rest}
         end
 

@@ -42,8 +42,9 @@ header:
         - ".gemspec"
       filenames:
         - "Gemfile"
-            - "generate-event-spec-deltas"
+        - "generate-event-spec-deltas"
         - "generate-spec-deltas"
+        - "update-context"
         - "update-event-spec"
         - "update-spec"
       comment_style_id: Hashtag

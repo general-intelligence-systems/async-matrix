@@ -193,11 +193,56 @@
 #
 # INSTALL, plain shadcn: command, collapsible
 #
-helpers do
-end
+
+# Fractal's SidebarSectionName, in its order, with the dataset that selects each
+# one. Its first two -- verification-request and invite-request -- have no table
+# to come from and no section until there is, so five of the seven are here.
+#
+# `normal` is the default section: joined, and neither tagged. The partition is
+# total, so a room appears in exactly one.
+SECTIONS = [
+  ["invited",      "Invites",      ->(rooms){rooms.where(membership: "invite")}],
+  ["favorite",     "Favourites",   ->(rooms){rooms.joined.where(favourite: true)}],
+  ["normal",       "Rooms",        ->(rooms){
+    rooms.joined.where(favourite: false, low_priority: false)
+  }],
+  ["low-priority", "Low priority", ->(rooms){rooms.joined.where(low_priority: true)}],
+  ["left",         "Left",         ->(rooms){rooms.where(membership: "leave")}],
+].freeze
 
 share do
-  { matrix: { sections: matrix_sidebar_sections } }
+  sections = SECTIONS.map do |key, title, select|
+    rooms = select.call(Models::Matrix::Room.dataset).by_activity.all
+
+    {
+      key:      key,
+      title:    title,
+      rooms:    rooms.map do |room|
+        {
+          roomId:        room.room_id,
+          title:         room.title,
+          avatarUrl:     room.avatar_url,
+          topic:         room.topic,
+          preview:       room.preview,
+          previewSender: room.preview_sender,
+          unread:        room.num_unread.to_i,
+          highlight:     room.num_mentions.to_i,
+          markedUnread:  room.marked_unread,
+          direct:        room.direct,
+          encrypted:     room.encrypted,
+          membership:    room.membership,
+          lastActivity:  room.last_activity_at,
+        }
+      end,
+      # The badge on the section header, which is the sum of its rooms rather
+      # than a count of them.
+      unread:   rooms.sum{|room| room.num_unread.to_i},
+      # Left is the one section nobody wants open by default.
+      expanded: key != "left",
+    }
+  end
+
+  { matrix: { sections: sections.reject{|section| section[:rooms].empty?} } }
 end
 
 __END__

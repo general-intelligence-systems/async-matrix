@@ -84,20 +84,33 @@
 #
 # One event: the permalink target and the view-source screen. Only possible
 # because matrix_events.raw keeps the envelope the projection used to discard.
-get "/" do
-  room = matrix_room!
 
-  event = Models::Matrix::Event.first(
-    room_id: room[:room_id], event_id: params["eventId"].to_s,
-  ) || halt(404, "matrix: no such event\n")
+get "/" do
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  event = room.events.first(event_id: params["eventId"].to_s) ||
+    halt(404, "matrix: no such event\n")
 
   render(
     "matrix/rooms/[roomId]/events/[eventId]",
-    roomId:    room[:room_id],
-    roomTitle: matrix_room_title(room),
-    event:     matrix_event_json(event, []),
-    source:    MultiJson.dump(event[:raw] || event[:content], pretty: true),
-    unsigned:  MultiJson.dump(event[:unsigned] || {}, pretty: true),
+    roomId:    room.room_id,
+    roomTitle: room.title,
+    event:     {
+      eventId:         event.event_id,
+      type:            event.type,
+      sender:          event.sender,
+      senderName:      event.sender_name,
+      senderAvatar:    event.sender_avatar_url,
+      body:            event.content["body"],
+      ts:              event.origin_server_ts.to_i,
+      edited:          event.edited?,
+      redacted:        event.redacted?,
+      decryptionError: event.decryption_error,
+      stateKey:        event.state_key,
+    },
+    # View source, which is the whole point of this page: `raw` is the event as
+    # it arrived, and `content` is only its decrypted inside.
+    source:    MultiJson.dump(event.raw || event.content, pretty: true),
+    unsigned:  MultiJson.dump(event.unsigned, pretty: true),
   )
 end
 

@@ -69,11 +69,6 @@ module Models
       def dependents
         SendQueueDependent.where(parent_transaction_id: transaction_id)
       end
-
-      # The local echo in matrix_events, if sync has not replaced it yet.
-      def local_echo
-        Event.first(transaction_id: transaction_id)
-      end
     end
   end
 end

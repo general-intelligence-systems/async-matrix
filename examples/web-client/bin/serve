@@ -1,3 +1,40 @@
 #!/usr/bin/env bash
 
-bin/bundle exec ruby server.rb
+# SERVE(1)                           General Commands Manual                        SERVE(1)
+#
+# NAME
+#      bin/serve — run the app
+#
+# SYNOPSIS
+#      bin/serve
+#
+# DESCRIPTION
+#      Runs server.rb under Falcon, in the foreground.
+#
+#      This serves the pages and nothing else: the script tags in the HTML shell point at the
+#      asset server, which is bin/vite. Use bin/dev to run both.
+#
+#      Booting connects to a session database and creates the matrix_* tables if they are
+#      missing, which config/sequel.rb does on the way in.
+#
+# ENVIRONMENT
+#      MATRIX_SESSION
+#              Which session database under sessions/ to open, "default" when unset.
+#
+#      MATRIX_SESSIONS
+#              The directory those databases live in, "sessions" when unset.
+#
+#      DATABASE_URL
+#              Overrides both, with a Sequel connection string.
+#
+# SEE ALSO
+#      bin/dev, bin/vite, config/sequel.rb
+#
+# async-matrix                          October 12, 2026                            SERVE(1)
+
+set -o errexit
+set -o nounset
+
+cd "$(dirname "$0")/.."
+
+exec bundle exec ruby server.rb

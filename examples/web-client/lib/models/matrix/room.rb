@@ -22,9 +22,8 @@ module Models
       extend Typecasting
 
       jsonb(
-        :children, :pinned, :power_levels, :alt_aliases,
-        :join_rule_allow, :encryption, :heroes, :tags,
-        :retention, :member_hints, :rtc_members,
+        :pinned, :alt_aliases, :join_rule_allow, :encryption,
+        :heroes, :latest_event, :retention, :member_hints, :rtc_members,
       )
 
       def validate
@@ -40,6 +39,19 @@ module Models
         def by_activity = order(Sequel.lit("last_activity_at DESC NULLS LAST"))
       end
 
+      # What the sidebar and every page header label this room. `display_name` is
+      # the SDK's cached RoomDisplayName -- the computed one, which for a room
+      # with no m.room.name is built from its heroes; `name` is the literal
+      # m.room.name. Falling back through both to the id means a header is never
+      # blank.
+      def title
+        display_name || name || canonical_alias || room_id
+      end
+
+      # The sidebar's one-line preview, out of RoomInfo.latest_event_value.
+      def preview        = latest_event&.dig("content", "body")
+      def preview_sender = latest_event&.dig("sender")
+
       def events
         Event.where(room_id: room_id)
       end
@@ -48,9 +60,15 @@ module Models
         RoomMember.where(room_id: room_id)
       end
 
+      # m.room.power_levels, which is a state event like any other -- the SDK
+      # keeps only `max_power_level` on the room itself, so this reads the event
+      # rather than a denormalized copy of it.
+      def power_levels
+        RoomState.content_for(room_id: room_id, event_type: "m.room.power_levels") || {}
+      end
+
       # Power level required for +action+ ("kick", "ban", "invite", "redact"), or the
-      # events_default / state_default fallback the spec defines. Mirrors what the
-      # client derives for ChatPermissions, kept here for server-side checks.
+      # events_default / state_default fallback the spec defines.
       def power_level_for(action, default: 50)
         power_levels[action.to_s] || default
       end
@@ -58,6 +76,27 @@ module Models
       # A member's effective power level: their explicit entry, else users_default.
       def power_level_of(member_id)
         power_levels.dig("users", member_id) || power_levels["users_default"] || 0
+      end
+
+      # Whether +member_id+ outranks the bar for sending one kind of state event.
+      # The spec's fallback for a state event nobody named is state_default.
+      def can_send_state?(event_type, member_id)
+        bar = power_levels.dig("events", event_type) ||
+          power_levels["state_default"] ||
+          50
+        power_level_of(member_id).to_i >= bar.to_i
+      end
+
+      # m.tag, which is room account data. `favourite` and `low_priority` are the
+      # only two the room itself carries, because they are the only two the SDK's
+      # RoomNotableTags has.
+      def tags
+        AccountData.content_for(room_id: room_id, event_type: AccountData::TAG)&.fetch("tags", {}) || {}
+      end
+
+      # m.space.child, one state event per child.
+      def children
+        RoomState.in_room(room_id).of_type("m.space.child").select_map(:state_key)
       end
     end
   end
@@ -68,18 +107,19 @@ __END__
 create_table?(:matrix_rooms) do
   primary_key :id, type: :Bignum, serial: true
   column      :avatar_url, TEXT
-  column      :children, :blob, default: Sequel.lit("'[]'"), null: false
   column      :created_at, TIMESTAMP, null: false
   column      :direct, :boolean, default: false, null: false
   column      :encrypted, :boolean, default: false, null: false
   column      :highlight_count, :integer, default: 0, null: false
   column      :last_activity_at, :bigint
   column      :membership, TEXT, default: "join", null: false
+  # BaseRoomInfo.max_power_level. NOT the m.room.power_levels content, which is
+  # a state event and lives in matrix_room_state like every other one; this is
+  # the single number the SDK keeps on the room, for deciding at a glance
+  # whether anyone outranks us.
+  column      :max_power_level, :integer, default: 0, null: false
   column      :name, TEXT
   column      :pinned, :blob, default: Sequel.lit("'[]'"), null: false
-  column      :power_levels, :blob, default: Sequel.lit("'{}'"), null: false
-  column      :preview, :text
-  column      :preview_sender, TEXT
   column      :room_id, TEXT, null: false
   column      :space, :boolean, default: false, null: false
   column      :topic, :text
@@ -130,6 +170,13 @@ create_table?(:matrix_rooms) do
   # megolm session is stale.
   column      :encryption, :blob, default: Sequel.lit("'{}'"), null: false
 
+  # RoomInfo.latest_event_value, which is what the sidebar renders as a room's
+  # one-line preview. NOT a `preview` string and a `preview_sender`: those were
+  # a lossy projection of this, and the thing being projected is a whole event
+  # whose kind matters -- it can be remote, a local echo still sending, or one
+  # that could not be sent at all, and the sidebar shows those differently.
+  column      :latest_event, :blob
+
   # RoomSummary: who the homeserver nominates to name the room, and the
   # counts it reports. The counts are NOT a count of matrix_room_members
   # -- that table holds the members we have synced, which for a large
@@ -150,7 +197,6 @@ create_table?(:matrix_rooms) do
   # per-tag `order` the sections sort by.
   column      :favourite, :boolean, default: false, null: false
   column      :low_priority, :boolean, default: false, null: false
-  column      :tags, :blob, default: Sequel.lit("'{}'"), null: false
 
   # Manually marked unread, and which account-data event said so -- the
   # spec'd m.marked_unread and the older com.famedly.marked_unread are
@@ -188,10 +234,6 @@ create_table?(:matrix_rooms) do
   column      :members_synced, :boolean, default: false, null: false
   column      :encryption_state_synced, :boolean, default: false, null: false
 
-  # Who invited us. Only set while membership is "invite", and not
-  # derivable afterwards -- the stripped invite state is the only place
-  # it appears, and it is gone once the invite is accepted.
-  column      :invited_by, TEXT
 
   # Whether this room's keys have all been pulled from the server-side
   # backup, so restore can resume rather than restart.

@@ -68,11 +68,11 @@ module RuboCop
         def own_line?(node)
           line = processed_source.lines[node.location.start_line - 1].to_s
 
-          line[0...node.location.start_column].strip.empty?
+          line[0...self.prism_column(node)].strip.empty?
         end
 
         def block_form(node)
-          indent = " " * node.location.start_column
+          indent = " " * self.prism_column(node)
           body = node.statements
 
           "#{self.keyword(node)} #{self.prism_source(node.predicate)}\n" \
@@ -83,7 +83,7 @@ module RuboCop
         # Move the body to a new indent.
         def reindent(node, indent)
           target = indent.length + 2
-          delta = target - node.location.start_column
+          delta = target - self.prism_column(node)
           lines = self.prism_source(node).lines
 
           rest = lines[1..].to_a.map{|line|

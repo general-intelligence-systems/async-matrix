@@ -43,8 +43,15 @@ module Models
       dataset_module do
         def in_room(room_id) = where(room_id: room_id)
 
-        # The thread list's order: whichever thread was last replied to.
-        def by_latest_reply = order(Sequel.lit("latest_reply_ts DESC NULLS LAST"))
+        # The thread list's order. ThreadInfo carries the latest reply's id but no
+        # timestamp, so the ordering comes from the reply event itself.
+        def by_latest_reply
+          order(Sequel.lit(<<~SQL))
+            (SELECT origin_server_ts FROM matrix_events
+              WHERE matrix_events.event_id = matrix_thread_summaries.latest_reply_id)
+            DESC NULLS LAST
+          SQL
+        end
       end
 
       # The thread root.
@@ -80,7 +87,6 @@ create_table?(:matrix_thread_summaries) do
   column      :info, :blob, default: Sequel.lit("'{}'"), null: false
   # Hoisted out of `info` because the thread list sorts and counts on them.
   column      :latest_reply_id, TEXT
-  column      :latest_reply_ts, :bigint
   column      :reply_count, :integer, default: 0, null: false
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false
@@ -88,6 +94,4 @@ create_table?(:matrix_thread_summaries) do
   index %i[room_id event_id],
     unique: true,
     name:   :index_matrix_thread_summaries_on_room_id_and_event_id
-  index %i[room_id latest_reply_ts],
-    name: :index_matrix_thread_summaries_on_room_id_and_latest_reply_ts
 end

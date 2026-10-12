@@ -86,18 +86,18 @@
 #
 # join_rule + history_visibility + guest_access. Three state events, three
 # cards -- Fractal pushes three subpages for the same thing.
+
 get "/" do
-  room = matrix_room!
-  join = matrix_state(room, "m.room.join_rules")
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
 
   render(
     "matrix/rooms/[roomId]/access",
-    roomId:    room[:room_id],
-    roomTitle: matrix_room_title(room),
-    joinRule:  room[:join_rule] || join["join_rule"] || "invite",
-    allow:     Array(join["allow"]).map { |entry| entry["room_id"] }.compact,
-    history:   room[:history_visibility] || "shared",
-    guests:    (room[:guest_access] || "forbidden") == "can_join",
+    roomId:    room.room_id,
+    roomTitle: room.title,
+    joinRule:  room.join_rule || "invite",
+    allow:     room.join_rule_allow.map{|entry| entry["room_id"]}.compact,
+    history:   room.history_visibility || "shared",
+    guests:    room.guest_access == "can_join",
   )
 end
 

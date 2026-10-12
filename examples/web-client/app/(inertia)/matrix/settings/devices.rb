@@ -76,24 +76,26 @@
 #   bulk sign-out           ->  ui/alert-dialog, since it needs UIA re-auth
 #   verified / unverified   ->  ui/badge + reui/alert when unverified sessions exist
 #
+
 get "/" do
   credential = Models::Matrix::Credential.first
-
-  devices = credential ? DB[:matrix_devices].where(
-    matrix_user_id: credential[:matrix_user_id], deleted: false,
-  ).order(Sequel.desc(:first_seen_at)).all : []
 
   render(
     "matrix/settings/devices",
     current: credential&.device_id,
-    devices: devices.map do |device|
-      {
-        deviceId:    device[:device_id],
-        displayName: device[:display_name],
-        trust:       device[:trust_state],
-        firstSeen:   device[:first_seen_at],
-      }
-    end,
+    devices: Models::Matrix::Device
+      .of_user(credential&.matrix_user_id)
+      .live
+      .reverse(:first_seen_at)
+      .all
+      .map do |device|
+        {
+          deviceId:    device.device_id,
+          displayName: device.display_name,
+          trust:       device.trust_state,
+          firstSeen:   device.first_seen_at,
+        }
+      end,
   )
 end
 

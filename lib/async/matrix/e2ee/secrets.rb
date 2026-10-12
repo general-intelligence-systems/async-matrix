@@ -10,9 +10,9 @@ require_relative "secret_storage"
 module Async
   module Matrix
     module E2EE
-      # The private keys a device holds, and what it would write them to the server as.
+      # The private keys a device holds, and what it writes them to the server as.
       #
-      # It makes no request: a caller hands it the account data, and it answers with what to send.
+      # It makes no request: a caller hands it account data and gets what to send.
       class Secrets
         def initialize
           # The secrets this device has opened, which never leave it in the clear.
@@ -74,16 +74,16 @@ module Async
         # @returns [Boolean] whether it is the right one.
         def opened(key)
           case @description
-          in {iv: String => iv, mac: String => mac} unless key.correct?(iv: iv, mac: mac)
-            Console.warn(self, "That key does not open this storage.", key_id: @key_id)
+          in {iv: String => iv, mac: String => mac}
+            if key.correct?(iv: iv, mac: mac)
+              self.unlocked(key)
+            else
+              Console.warn(self, "That key does not open this storage.", key_id: @key_id)
 
-            false
+              false
+            end
           else
-            @key = key
-
-            self.read_sealed
-
-            true
+            self.unlocked(key)
           end
         end
 
@@ -136,9 +136,13 @@ module Async
         # @returns [String | nil] the secret, or nil where it is not there or does not read.
         def load(name)
           case {open: self.open?, sealed: (@sealed || {})[name]}
-          in {open: true, sealed: Hash => encrypted} if encrypted.key?(@key_id.to_sym)
-            @key.decrypt(name, encrypted[@key_id.to_sym]).tap do |secret|
-              self.accept(name, secret)
+          in {open: true, sealed: Hash => encrypted}
+            if encrypted.key?(@key_id.to_sym)
+              @key.decrypt(name, encrypted[@key_id.to_sym]).tap do |secret|
+                self.accept(name, secret)
+              end
+            else
+              @held[name]
             end
           else
             @held[name]
@@ -161,14 +165,14 @@ module Async
 
         # Whether this is an answer to something we asked, over a channel which proves who sent it.
         #
-        # A secret arriving unbidden is somebody trying their luck, so it is never taken.
-        #
         # @parameter request_id [String] the ID the answer carries.
         # @parameter over [Async::Matrix::Events::Envelope | nil] the event it arrived in.
         # @returns [Boolean] whether to believe it.
         def asked?(request_id, over: nil)
           case {asked: @asked.key?(request_id), over: over}
           # Nothing asked for this, so whoever sent it was not answering us.
+          #
+          # A secret arriving unbidden is somebody trying their luck, so it is never taken.
           in {asked: false}
             false
 
@@ -208,7 +212,21 @@ module Async
 
         private
 
+        # Hold on to the key which opened this storage, and read what was sealed under it.
+        #
+        # @parameter key [SecretStorage::Key] the key.
+        # @returns [Boolean] true, which is what opening it answers.
+        def unlocked(key)
+          @key = key
+
+          self.read_sealed
+
+          true
+        end
+
         # Read everything which was sealed under this storage, now that there is a key for it.
+        #
+        # @returns [Hash] what was sealed, which is what reading it through answers.
         def read_sealed
           (@sealed || {}).each_key do |name|
             self.load(name)

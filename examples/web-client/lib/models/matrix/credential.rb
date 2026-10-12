@@ -47,9 +47,6 @@ module Models
 
         enc.column :access_token
         enc.column :refresh_token
-        # The 4S recovery key (see the migration): cross-signing + key-backup unlock,
-        # shared across the user's clients so none of them ever prompt for it.
-        enc.column :recovery_key
       end
 
       def validate
@@ -104,10 +101,12 @@ create_table?(:matrix_credentials) do
   column      :access_token, :text
   column      :created_at, TIMESTAMP, null: false
   column      :device_id, TEXT, null: false
+  # The OAuth client id this session registered as, which Fractal keeps in the
+  # same keyring item as the rest of these.
+  column      :client_id, TEXT
   column      :expires_at, :bigint
   column      :homeserver_url, TEXT, null: false
   column      :matrix_user_id, TEXT
-  column      :recovery_key, :text
   column      :refresh_token, :text
   column      :updated_at, TIMESTAMP, null: false
 

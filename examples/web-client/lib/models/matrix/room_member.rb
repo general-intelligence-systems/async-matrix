@@ -24,6 +24,10 @@ module Models
         def joined = where(membership: "join")
       end
 
+      # The three named rungs, and what anything else is called. Fractal's
+      # permissions view draws exactly these.
+      ROLES = { 100 => "Admin", 50 => "Moderator", 0 => "Default" }.freeze
+
       # What the UI shows: the display name when the room has one, else the raw id.
       def name
         if display_name.to_s.empty?
@@ -31,6 +35,19 @@ module Models
         else
           display_name
         end
+      end
+
+      # This member's effective power level. NOT a column: it comes from the
+      # room's m.room.power_levels, which is one state event rather than a
+      # number copied onto every member row.
+      def power_level
+        room&.power_level_of(member_id).to_i
+      end
+
+      def role = ROLES.fetch(power_level, "Custom")
+
+      def room
+        Room.first(room_id: room_id)
       end
     end
   end
@@ -45,7 +62,6 @@ create_table?(:matrix_room_members) do
   column      :display_name, TEXT
   column      :member_id, TEXT, null: false
   column      :membership, TEXT, default: "join", null: false
-  column      :power_level, :integer, default: 0, null: false
   column      :room_id, TEXT, null: false
   column      :updated_at, TIMESTAMP, null: false
 

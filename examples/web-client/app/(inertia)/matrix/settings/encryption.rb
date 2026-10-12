@@ -8,7 +8,7 @@
 #
 # Cross-signing and recovery: SessionSecurity's crypto_identity_state,
 # verification_state and recovery_state, over matrix_user_identities and
-# matrix_credentials.recovery_key.
+# matrix_secrets_inbox.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
 # COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
@@ -272,29 +272,28 @@
 # INSTALL, NOT IN EITHER REGISTRY -- reui lists file-upload on its components page but the
 #   base-vega registry does not carry it; check the name before relying on it.
 #
+
 get "/" do
   credential = Models::Matrix::Credential.first
-  identity = credential && DB[:matrix_user_identities].first(
-    matrix_user_id: credential[:matrix_user_id],
-  )
-
-  own_devices = credential ? DB[:matrix_devices].where(
-    matrix_user_id: credential[:matrix_user_id], deleted: false,
-  ).all : []
+  identity = Models::Matrix::UserIdentity.first(matrix_user_id: credential&.matrix_user_id)
+  own_devices = Models::Matrix::Device.of_user(credential&.matrix_user_id).live
 
   render(
     "matrix/settings/encryption",
     crossSigning: {
       present:  !identity.nil?,
-      master:   identity ? !identity[:master_key].nil? : false,
-      verified: identity ? !!identity[:verified] : false,
+      master:   identity&.cross_signed? || false,
+      verified: identity&.verified || false,
     },
-    recovery: { configured: !credential&.recovery_key.to_s.empty? },
+    recovery:     {
+      configured: Models::Matrix::SecretsInbox
+        .named(Models::Matrix::SecretsInbox::MEGOLM_BACKUP).any?,
+    },
     # Unverified sessions are the thing worth shouting about: each one can read
     # everything sent to this account.
-    unverified: own_devices.count { |device| device[:trust_state] != "verified" },
-    backedUp: DB[:matrix_megolm_inbound_sessions].where(backed_up: true).count,
-    total:    DB[:matrix_megolm_inbound_sessions].count,
+    unverified:   own_devices.exclude(trust_state: Models::Matrix::Device::VERIFIED).count,
+    backedUp:     Models::Matrix::MegolmInboundSession.where(backed_up: true).count,
+    total:        Models::Matrix::MegolmInboundSession.count,
   )
 end
 

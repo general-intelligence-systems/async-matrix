@@ -67,7 +67,7 @@ module RuboCop
                     corrector.replace(self.prism_range(comment.location), expected)
                   else
                     keyword = node.module_keyword_loc
-                    indentation = " " * keyword.start_column
+                    indentation = " " * keyword.start_character_column
 
                     corrector.insert_before(self.prism_range(keyword), "#{expected}\n#{indentation}")
                   end

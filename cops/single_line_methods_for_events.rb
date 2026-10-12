@@ -118,7 +118,8 @@ module RuboCop
         def signature_source(node)
           source = processed_source.buffer.source
 
-          source[node.location.start_offset...self.signature_end(node)]
+          # byteslice, because every offset here is one of Prism's and those count bytes, where `String#[]` counts characters.
+          source.byteslice(node.location.start_offset...self.signature_end(node))
         end
 
         def signature_end(node)

@@ -62,64 +62,71 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
 
   version = absent.call{client.key_backup.get_room_keys_version_current}
 
-  backup = case version
-  # One already exists, and writing to it means first establishing that it is ours.
-  in {algorithm: ALGORITHM, version: String => id, auth_data: {public_key: String => public_key} => auth_data}
-    # The private half is the strongest answer: a key which derives this public one is this backup's key.
-    held = machine.secrets.held("m.megolm_backup.v1")
+  # Which backup the room keys go to: an existing one shown to be ours, or one made now.
+  established = lambda do |current|
+    case current
+    # One already exists, and writing to it means first establishing that it is ours.
+    in {algorithm: ALGORITHM, version: String => id, auth_data: {public_key: String => public_key} => auth_data}
+      # The private half is the strongest answer: a key which derives this public one is this backup's key.
+      held = machine.secrets.held("m.megolm_backup.v1")
 
-    case held
-    in String => private_key
-      case Async::Matrix::E2EE::Backup.from_private_key(private_key)
-      in Async::Matrix::E2EE::Backup => derived if derived.public_key == public_key
-        Console.info(self, "We hold the key for this backup.", version: id)
+      case held
+      in String => private_key
+        case Async::Matrix::E2EE::Backup.from_private_key(private_key)
+        in Async::Matrix::E2EE::Backup => derived
+          if derived.public_key == public_key
+            Console.info(self, "We hold the key for this backup.", version: id)
 
-        derived
-      in Async::Matrix::E2EE::Backup
-        Console.error(self, "We hold a backup key, but not this backup's.", version: id)
+            derived
+          else
+            Console.error(self, "We hold a backup key, but not this backup's.", version: id)
 
-        nil
+            nil
+          end
+        end
+
+      # Otherwise it is the signature which says so, by the master key or by a device we have verified.
+      in nil
+        signed = machine.verify_signatures(auth_data, by: machine.own_master_key) ||
+          machine.verify_signatures(auth_data, by: machine.devices.verified_of(me))
+
+        case signed
+        in true
+          Console.info(self, "This backup is signed by us, so it can be written to.", version: id)
+
+          Async::Matrix::E2EE::Backup.from_public_key(public_key, version: id)
+        in false
+          Console.error(self, "Nothing says this backup is ours, so it is left alone.", version: id)
+
+          nil
+        end
       end
 
-    # Otherwise it is the signature which says so, by the master key or by a device we have verified.
+    # None yet, so one is made, signed as ours, and its key put where another device can reach it.
     in nil
-      signed = machine.verify_signatures(auth_data, by: machine.own_master_key) ||
-        machine.verify_signatures(auth_data, by: machine.devices.verified_of(me))
+      made = Async::Matrix::E2EE::Backup.generate
 
-      case signed
-      in true
-        Console.info(self, "This backup is signed by us, so it can be written to.", version: id)
+      created = client.key_backup.post_room_keys_version(
+        algorithm: ALGORITHM,
+        auth_data: machine.sign_as_own(made.auth_data),
+      )
 
-        Async::Matrix::E2EE::Backup.from_public_key(public_key, version: id)
-      in false
-        Console.error(self, "Nothing says this backup is ours, so it is left alone.", version: id)
-
-        nil
+      machine.secrets.store("m.megolm_backup.v1" => made.private_key).each do |type, content|
+        client.account_data.set_account_data(me, type, content)
       end
+
+      Console.info(self, "Made a backup.", version: created.version, public_key: made.public_key)
+
+      made.at(created.version)
+
+    in {algorithm: String => algorithm}
+      Console.error(self, "The backup uses an algorithm we do not implement.", algorithm: algorithm)
+
+      nil
     end
-
-  # None yet, so one is made, signed as ours, and its key put where another device can reach it.
-  in nil
-    made = Async::Matrix::E2EE::Backup.generate
-
-    created = client.key_backup.post_room_keys_version(
-      algorithm: ALGORITHM,
-      auth_data: machine.sign_as_own(made.auth_data),
-    )
-
-    machine.secrets.store("m.megolm_backup.v1" => made.private_key).each do |type, content|
-      client.account_data.set_account_data(me, type, content)
-    end
-
-    Console.info(self, "Made a backup.", version: created.version, public_key: made.public_key)
-
-    made.at(created.version)
-
-  in {algorithm: String => algorithm}
-    Console.error(self, "The backup uses an algorithm we do not implement.", algorithm: algorithm)
-
-    nil
   end
+
+  backup = established.call(version)
 
   case backup
   in nil

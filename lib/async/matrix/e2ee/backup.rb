@@ -160,8 +160,6 @@ module Async
 
         # The code over the ciphertext authenticates nothing, which is libolm's bug and the specification's warning.
         #
-        # So a message which fails it was written to another key, rather than tampered with. See MSC4048 for the version which fixes it.
-        #
         # @parameter session_data [Hash] the three parts the server holds.
         # @returns [String | nil] the plaintext, or nil when this is not the key it was written to.
         def opened(session_data)
@@ -171,6 +169,7 @@ module Async
             self.class.unpadded(session_data[:ephemeral]),
           )
         rescue RuntimeError
+          # A message which fails the code was written to another key, rather than tampered with. See MSC4048 for the version which fixes it.
           nil
         end
       end

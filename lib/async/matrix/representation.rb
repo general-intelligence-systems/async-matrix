@@ -16,11 +16,10 @@ module Async
 
       # What a pattern reads, which is the document the homeserver answered with.
       #
-      # So a response is matched where it arrives, rather than having to be taken apart first. `[]` cannot do this, because `async-rest` already uses it to derive a sub-resource.
-      #
       # @parameter keys [Array(Symbol) | nil] the names a pattern asked for.
       # @returns [Hash] the value.
       def deconstruct_keys(keys)
+        # So a response is matched where it arrives, rather than having to be taken apart first. `[]` cannot do this, because `async-rest` already uses it to derive a sub-resource.
         case self.value
         in Hash => value
           value

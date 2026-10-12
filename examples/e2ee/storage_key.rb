@@ -12,9 +12,9 @@
 #
 # Those two properties are optional, and where they are absent the key MUST be assumed valid.
 #
-#   MATRIX_PASSPHRASE=correct-horse ruby examples/e2ee/storage_key.rb
+# A key the user already has is given as `MATRIX_KEY`, written the way the appendices represent it: `EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d`.
 #
-#   MATRIX_KEY='EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d'
+#   MATRIX_PASSPHRASE=correct-horse ruby examples/e2ee/storage_key.rb
 
 require_relative "../../lib/async/matrix"
 
@@ -47,13 +47,13 @@ Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |
   )
 
   # Which key the account's storage is already encrypted under, if it has one at all.
-  existing = begin
-    client.account_data.get_account_data(me, "m.secret_storage.default_key")
+  begin
+    existing = client.account_data.get_account_data(me, "m.secret_storage.default_key")
   rescue Async::Matrix::RequestError => error
     # Absent account data is an error rather than an empty answer, so "no storage yet" arrives this way.
     case error.errcode
     in "M_NOT_FOUND"
-      nil
+      existing = nil
     end
   end
 

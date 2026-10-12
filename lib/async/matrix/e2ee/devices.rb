@@ -194,8 +194,6 @@ module Async
 
         # Whether this device carries a signature by its owner's self signing key.
         #
-        # The signature is checked where there is something to check it with, because its presence alone says only that somebody wrote one.
-        #
         # @parameter user_id [String] the user.
         # @parameter value [Hash] the device keys the homeserver answered with.
         # @returns [Boolean] whether it is cross signed.
@@ -203,6 +201,7 @@ module Async
           signing = @identities.dig(user_id, :self_signing)
           signature = value.dig(:signatures, user_id.to_sym, :"ed25519:#{signing}")
 
+          # The signature is checked where there is something to check it with, because its presence alone says only that somebody wrote one.
           case {signing: signing, signature: signature, crypto: @crypto}
           in {signing: String, signature: String => claimed, crypto: Crypto => crypto}
             crypto.verify(value.reject{|name, _| name == :signatures}, key: signing, signature: claimed)

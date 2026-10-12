@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+# RUBOCOP(1)                         General Commands Manual                       RUBOCOP(1)
+#
+# NAME
+#      bin/rubocop — lint this example
+#
+# SYNOPSIS
+#      bin/rubocop [--autocorrect] [path ...]
+#
+# DESCRIPTION
+#      Runs RuboCop over this project, out of this project's own bundle.
+#
+#      The configuration is this project's own, and so are the cops under cops/, copied from the
+#      gem so that this project stands on its own.
+#
+#      The gem's .rubocop.yml excludes this directory, and RuboCop reads AllCops/Exclude from the
+#      configuration above whichever one it is using, so --ignore-parent-exclusion is what stops
+#      that exclusion from emptying this run.
+#
+#      The cache is off because the cops read files which are not part of RuboCop's cache key.
+#
+#      Arguments are passed to RuboCop, so anything it takes works here.
+#
+# FILES
+#      .rubocop.yml
+#              Which cops are enabled, and where each applies.
+#
+#      cops/   The cops this project carries, which the configuration loads by path.
+#
+# EXIT STATUS
+#      The bin/rubocop utility exits 0 on success, and >0 if an error occurs.
+#
+# EXAMPLES
+#      Report every offence:
+#
+#            bin/rubocop
+#
+#      Correct what can be corrected:
+#
+#            bin/rubocop --autocorrect
+#
+#      Lint one directory:
+#
+#            bin/rubocop lib/models
+#
+# SEE ALSO
+#      rubocop(1)
+#
+# async-matrix                          October 12, 2026                           RUBOCOP(1)
+
+set -o errexit
+set -o nounset
+
+cd "$(dirname "$0")/.."
+
+bundle exec rubocop --cache false --ignore-parent-exclusion "$@"

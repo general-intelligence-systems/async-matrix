@@ -27,9 +27,11 @@ Gem::Specification.new do |spec|
   #
   # This gem is pure Ruby: the vodozemac binding it used to carry is the `vodozemac` gem, which ships precompiled per platform, so nothing here is built at install time.
   #
+  # `context` is the agent context specification (https://github.com/socketry/agent-context): an AI agent working on a project which depends on this gem installs these files into its own `.agents/context/async-matrix/`, so they have to reach it through the gem. bin/update-context generates them from docs/content/docs.
+  #
   # LICENSE and NOTICE ship because the Apache License asks for both: section 4(a) wants every recipient given a copy of the licence, and 4(d) wants the attribution notices carried along with it.
   spec.files = Dir.glob(
-    ["{lib}/**/*", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md"],
+    ["{context,lib}/**/*", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md"],
     File::FNM_DOTMATCH,
     base: __dir__,
   )

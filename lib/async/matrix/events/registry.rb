@@ -78,17 +78,20 @@ module Async
 
         # The framing an event actually arrived in, which may be richer than its type declares.
         #
-        # `m.room.encrypted` travels both as a to-device event and as a room event, so its schema frames it as the lesser of the two. What it arrived as is what decides, or a timeline event would answer nothing about the room it is in.
-        #
         # @parameter declared [Class] the framing the type declares.
         # @parameter value [Hash] the event.
         # @returns [Class] the framing to read it as.
         def framed(declared, value)
-          case value
-          in {state_key: String} if declared == Envelope
-            StateEvent
-          in {event_id: String} if declared == Envelope
-            RoomEvent
+          # `m.room.encrypted` travels both as a to-device event and as a room event, so its schema frames it as the lesser of the two. What it arrived as is what decides, or a timeline event would answer nothing about the room it is in.
+          if declared == Envelope
+            case value
+            in {state_key: String}
+              StateEvent
+            in {event_id: String}
+              RoomEvent
+            else
+              declared
+            end
           else
             declared
           end

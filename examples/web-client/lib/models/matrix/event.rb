@@ -19,6 +19,17 @@ module Models
       # msgtypes whose content carries a file. m.sticker is its own event type.
       MEDIA_MSGTYPES = %w[m.image m.video m.audio m.file].freeze
 
+      # The rel_types `rel_type` carries, which is the whole of what this table
+      # knows about relations -- the SDK indexes exactly these two columns.
+      THREAD     = "m.thread"
+      REPLACE    = "m.replace"
+      ANNOTATION = "m.annotation"
+      REFERENCE  = "m.reference"
+
+      # The relations that are folded into their target rather than rendered in
+      # their own right. m.reference is not one: a reference is its own message.
+      AGGREGATIONS = [THREAD, REPLACE, ANNOTATION].freeze
+
       def validate
         super
         validates_presence :event_id
@@ -31,9 +42,27 @@ module Models
         def chronological    = order(:origin_server_ts)
         def undecryptable    = exclude(decryption_error: nil)
 
-        # Thread replies hang off a root; the main timeline excludes them.
-        def in_thread(root_id) = where(thread_root_id: root_id)
-        def main_timeline      = where(thread_root_id: nil)
+        # A thread reply is an event whose relation is m.thread, which is what
+        # `relates_to_id` and `rel_type` already say. There is no thread_root_id
+        # column because the SDK's events table has no such field -- the
+        # relation IS the thread, and matrix_timeline_chunks is where a thread
+        # gets a timeline of its own.
+        def in_thread(root_id) = where(relates_to_id: root_id, rel_type: THREAD)
+
+        # The room's own timeline: no thread replies, and no aggregations.
+        #
+        # A REACTION AND AN EDIT ARE NOT TIMELINE ROWS. They are folded into the
+        # event they relate to -- #reactions and #edited? are how -- so a
+        # timeline that also listed them would show each one twice, once as
+        # itself and once on its target.
+        #
+        # It has to say "or null" out loud. `rel_type` is null on every event
+        # that is not a relation at all, and `rel_type NOT IN (...)` is NULL
+        # rather than true for those -- so a plain exclude() would hide the
+        # entire timeline, which is the one thing this exists to show.
+        def main_timeline
+          where(rel_type: nil).or(Sequel.~(rel_type: AGGREGATIONS))
+        end
       end
 
       def media_event?
@@ -49,6 +78,54 @@ module Models
       end
 
       def redacted? = !!redacted
+
+      # Edited if anything relates to it with m.replace. There is no edited_ts
+      # column: an edit is its own event, and the relation is what says so.
+      def edited?
+        self.class.where(relates_to_id: event_id, rel_type: REPLACE).any?
+      end
+
+      # m.in_reply_to, which lives inside the relation rather than beside it --
+      # a reply is not one of the rel_types.
+      def reply_to_id = content.dig("m.relates_to", "m.in_reply_to", "event_id")
+
+      def formatted_body = presence(content["formatted_body"])
+
+      # Who sent it, as the room knows them. The member row carries the
+      # per-room display name and avatar; the global profile is the fallback for
+      # somebody who has since left.
+      def sender_member
+        RoomMember.first(room_id: room_id, member_id: sender)
+      end
+
+      def sender_profile
+        GlobalProfile.first(matrix_user_id: sender)
+      end
+
+      def sender_name
+        sender_member&.name || sender_profile&.display_name || sender
+      end
+
+      def sender_avatar_url
+        sender_member&.avatar_url || sender_profile&.avatar_url
+      end
+
+      # Reactions to this event, one row per distinct key, with whether
+      # +member_id+ is among the people who sent it.
+      def reactions(member_id = nil)
+        self.class
+          .where(relates_to_id: event_id, rel_type: ANNOTATION)
+          .all
+          .group_by{|event| event.content.dig("m.relates_to", "key")}
+          .reject{|key, _| key.nil?}
+          .map do |key, events|
+            {
+              key:   key,
+              count: events.size,
+              mine:  events.any?{|event| event.sender == member_id},
+            }
+          end
+      end
 
       def media_mxc              = presence(content["url"])
       def thumbnail_mxc          = presence(content.dig("info", "thumbnail_url"))
@@ -116,16 +193,11 @@ create_table?(:matrix_events) do
   column      :content, :blob, default: Sequel.lit("'{}'"), null: false
   column      :created_at, TIMESTAMP, null: false
   column      :decryption_error, TEXT
-  column      :edited_ts, :bigint
   column      :event_id, TEXT, null: false
   column      :origin_server_ts, :bigint, null: false
   column      :redacted, :boolean, default: false, null: false
-  column      :reply_to_id, TEXT
   column      :room_id, TEXT, null: false
   column      :sender, TEXT, null: false
-  column      :sender_avatar_url, TEXT
-  column      :sender_display_name, TEXT
-  column      :thread_root_id, TEXT
   column      :type, TEXT, null: false
   column      :updated_at, TIMESTAMP, null: false
 
@@ -171,9 +243,6 @@ create_table?(:matrix_events) do
   # rules AS THEY WERE, plus the display name as it was.
   column      :push_actions, :blob, default: Sequel.lit("'[]'"), null: false
 
-  # Local echo. Set when we enqueued the send, cleared when the
-  # homeserver echoes the event back with a real event_id.
-  column      :transaction_id, TEXT
 
   index :event_id, unique: true, name: :index_matrix_events_on_event_id
   # The aggregation lookup: every reaction, edit and annotation of one
@@ -182,7 +251,6 @@ create_table?(:matrix_events) do
     name:   :index_matrix_events_on_room_id_and_relates_to_id_and_rel_type
   index %i[room_id state_key], name: :index_matrix_events_on_room_id_and_state_key
   index %i[room_id origin_server_ts], name: :index_matrix_events_on_room_id_and_origin_server_ts
-  index :thread_root_id, name: :index_matrix_events_on_thread_root_id
 
 end
 

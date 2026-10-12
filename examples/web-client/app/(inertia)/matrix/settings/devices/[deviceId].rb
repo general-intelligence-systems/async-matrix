@@ -53,26 +53,23 @@
 #   sign out              ->  ui/alert-dialog
 #   verify                ->  ui/button -> /matrix/verification/:flowId
 #
+
 get "/" do
   credential = Models::Matrix::Credential.first
-  device_id = params["deviceId"].to_s
-
-  device = credential && DB[:matrix_devices].first(
-    matrix_user_id: credential[:matrix_user_id], device_id: device_id,
-  )
-
-  device || halt(404, "matrix: no such device\n")
+  device = Models::Matrix::Device.first(
+    matrix_user_id: credential&.matrix_user_id, device_id: params["deviceId"].to_s,
+  ) || halt(404, "matrix: no such device\n")
 
   render(
     "matrix/settings/devices/[deviceId]",
-    current: credential[:device_id] == device_id,
-    device: {
-      deviceId:    device[:device_id],
-      displayName: device[:display_name],
-      identityKey: device[:identity_key],
-      fingerprint: device[:fingerprint],
-      trust:       device[:trust_state],
-      firstSeen:   device[:first_seen_at],
+    current: credential.device_id == device.device_id,
+    device:  {
+      deviceId:    device.device_id,
+      displayName: device.display_name,
+      identityKey: device.identity_key,
+      fingerprint: device.fingerprint,
+      trust:       device.trust_state,
+      firstSeen:   device.first_seen_at,
     },
   )
 end
