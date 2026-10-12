@@ -1,11 +1,14 @@
 # Git hooks (managed by lefthook). Install with `bundle exec lefthook install`.
 #
-# pre-commit: scan for secrets (trufflehog) and run the suite (bin/test). Both are wrapped in
-# `nix develop --command` because the hook fires outside the flake devshell, so trufflehog /
-# bundler / sus wouldn't otherwise be on PATH.
+# pre-commit: scan for secrets (trufflehog), check the licence notice every Ruby file opens with
+# (bin/license), and run the suite (bin/test). All are wrapped in `nix develop --command` because
+# the hook fires outside the flake devshell, so trufflehog / license-eye / bundler / sus wouldn't
+# otherwise be on PATH.
 pre-commit:
   commands:
     secrets:
       run: nix develop --command trufflehog git file://. --since-commit HEAD --only-verified --fail
+    license:
+      run: nix develop --command bin/license
     tests:
       run: nix develop --command bin/test --core

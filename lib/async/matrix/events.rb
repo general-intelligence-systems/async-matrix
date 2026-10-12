@@ -79,6 +79,7 @@ require_relative "events/space_parent"
 require_relative "events/sticker"
 require_relative "events/tag"
 require_relative "events/typing"
+require_relative "events/undecryptable"
 
 module Async
   module Matrix

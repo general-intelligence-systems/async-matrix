@@ -46,15 +46,15 @@ describe Async::Matrix::E2EE::Crypto do
 
   # Nothing reaches the homeserver, because the keys to publish cannot be produced in the first place.
   it "stops a machine before it can publish anything" do
-    bare_machine = Async::Matrix::E2EE::Machine.new(client, crypto: bare)
+    bare_machine = self.machine_for(client, crypto: bare)
 
-    expect{bare_machine.publish!}.to raise_exception(NotImplementedError)
+    expect{publish(bare_machine)}.to raise_exception(NotImplementedError)
     expect(client.keys.query_keys({user_id => []}).devices_of(user_id)).to be(:empty?)
   end
 
   # The machine is written against this class, so an implementation which satisfies it satisfies the machine.
   it "declares exactly what an implementation must provide" do
     expect(crypto).to be_a(subject)
-    expect(machine.publish!.count("signed_curve25519")).to be == crypto.one_time_key_target
+    expect(publish(machine).count("signed_curve25519")).to be == crypto.one_time_key_target
   end
 end

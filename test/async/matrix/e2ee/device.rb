@@ -12,7 +12,8 @@ describe Async::Matrix::E2EE::Device do
 
   # The other user's device, exactly as `POST /keys/query` answered with it.
   let(:device) do
-    other_machine.publish!
+    publish(other_machine, as: other)
+    self.accept_devices([other_user_id])
 
     machine.devices.of(other_user_id).first
   end
@@ -30,6 +31,8 @@ describe Async::Matrix::E2EE::Device do
     end
 
     it "answers nothing for a device which published no keys" do
+      self.accept_devices([other_user_id])
+
       bare = machine.devices.of(other_user_id)
 
       expect(bare).to be(:empty?)
@@ -38,8 +41,9 @@ describe Async::Matrix::E2EE::Device do
 
   with "#display_name" do
     it "reads the name its owner gave it" do
-      other_machine.publish!
+      publish(other_machine, as: other)
       other.devices.update_device(other_device_id, display_name: "Other's phone")
+      self.accept_devices([other_user_id])
 
       expect(machine.devices.of(other_user_id).first.display_name).to be == "Other's phone"
     end

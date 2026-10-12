@@ -12,25 +12,25 @@ members, sending events, paging through a timeline, and running a sync loop.
 require "async/matrix"
 
 Async::Matrix::Client.open("http://localhost:7300") do |unauthenticated|
-	client = unauthenticated.logged_in("alice", "password")
-	
-	room = client.create_room(name: "Hello", topic: "Built with async-rest")
-	room.send_message("Hello, World!")
-	
-	client.get_joined_rooms.each do |room|
-		puts "#{room.id}: #{room.state.name}"
-	end
-	
-	# Sync is a long poll: each batch continues from the one before it.
-	sync = client.sync(timeout: 0)
-	
-	while true
-		sync = sync.following(timeout: 30_000)
-		
-		sync.each_message do |room_id, sender, body, event|
-			puts "#{room_id} #{sender}: #{body}"
-		end
-	end
+  client = unauthenticated.logged_in("alice", "password")
+
+  room = client.create_room(name: "Hello", topic: "Built with async-rest")
+  room.send_message("Hello, World!")
+
+  client.get_joined_rooms.each do |room|
+    puts "#{room.id}: #{room.state.name}"
+  end
+
+  # Sync is a long poll: each batch continues from the one before it.
+  sync = client.sync(timeout: 0)
+
+  while true
+    sync = sync.following(timeout: 30_000)
+
+    sync.each_message do |room_id, sender, body, event|
+      puts "#{room_id} #{sender}: #{body}"
+    end
+  end
 end
 ```
 
@@ -72,13 +72,13 @@ require "async/matrix"
 key = Async::Matrix::ServerKey.load("/etc/synapse/signing.key")
 
 Async::Matrix::ServerServer::Server.open("https://matrix.example.com") do |unsigned|
-	server = unsigned.signed_as("example.com", key, "matrix.example.com")
-	
-	puts unsigned.server_version.get_version.name
-	puts server.query.query_profile("@alice:matrix.example.com").displayname
-	
-	# A join is a template to sign and send back:
-	template = server.joins_v1.make_join(room_id, "@bob:example.com", versions: ["11"])
+  server = unsigned.signed_as("example.com", key, "matrix.example.com")
+
+  puts unsigned.server_version.get_version.name
+  puts server.query.query_profile("@alice:matrix.example.com").displayname
+
+  # A join is a template to sign and send back:
+  template = server.joins_v1.make_join(room_id, "@bob:example.com", versions: ["11"])
 end
 ```
 
@@ -136,29 +136,29 @@ require "async/matrix"
 require "console"
 
 Async::Matrix::ClientServer::Client[Async::Matrix::LATEST].open(HOMESERVER) do |unauthenticated|
-	client = unauthenticated.logged_in(USER, PASSWORD)
-	
-	# The machine is told who it is, because finding out is a request and it makes none.
-	owner = client.get_token_owner
-	
-	machine = Async::Matrix::E2EE::Machine.new(
-		user_id: owner.user_id,
-		device_id: owner.device_id,
-		crypto: Async::Matrix::E2EE::Plaintext.new,
-	)
-	
-	# The keys other devices will open an Olm session with.
-	machine.crypto.generate_one_time_keys(machine.crypto.one_time_key_target)
-	
-	uploaded = client.keys.upload_keys(
-		device_keys: machine.device_keys,
-		one_time_keys: machine.signed_one_time_keys,
-	)
-	
-	# Forget the private halves which are now published, so none is ever offered twice.
-	machine.crypto.published_one_time_keys!
-	
-	Console.info(self, "Published keys.", counts: uploaded.one_time_key_counts)
+  client = unauthenticated.logged_in(USER, PASSWORD)
+
+  # The machine is told who it is, because finding out is a request and it makes none.
+  owner = client.get_token_owner
+
+  machine = Async::Matrix::E2EE::Machine.new(
+    user_id: owner.user_id,
+    device_id: owner.device_id,
+    crypto: Async::Matrix::E2EE::Plaintext.new,
+  )
+
+  # The keys other devices will open an Olm session with.
+  machine.crypto.generate_one_time_keys(machine.crypto.one_time_key_target)
+
+  uploaded = client.keys.upload_keys(
+    device_keys: machine.device_keys,
+    one_time_keys: machine.signed_one_time_keys,
+  )
+
+  # Forget the private halves which are now published, so none is ever offered twice.
+  machine.crypto.published_one_time_keys!
+
+  Console.info(self, "Published keys.", counts: uploaded.one_time_key_counts)
 end
 ```
 
@@ -168,54 +168,54 @@ time key for each device there is no Olm session with yet, and then the session 
 ``` ruby
 # Share the room's current Megolm session with every device which should hold it.
 share = lambda do |room_id, rotate: false|
-	user_ids = client.room(room_id).get_joined_members_by_room.user_ids
-	queried = client.keys.query_keys(user_ids.to_h{|user_id| [user_id, []]})
-	
-	# Only cross signed devices are given the session. The rest are told why they were not, which is what lets them explain themselves to their user.
-	recipients, refused = machine.recipients(queried).partition(&:cross_signed?)
-	
-	# A device we have never spoken to needs a one time key before it can be addressed at all.
-	wanted = machine.without_sessions(recipients)
-	
-	unless wanted.empty?
-		machine.accept_claimed_keys(client.keys.claim_keys(wanted))
-	end
-	
-	session = machine.session_for(room_id, rotate: rotate)
-	
-	room_key = {
-		algorithm: Async::Matrix::E2EE::Machine::MEGOLM,
-		room_id: room_id,
-		session_id: session[:session_id],
-		session_key: session[:session_key],
-		# Says the session may be passed on to members who join later, which is true only while the room's history is visible to them.
-		shared_history: machine.shared_history?(room_id),
-	}
-	
-	# The key travels Olm encrypted, so what is sent is an `m.room.encrypted` rather than an `m.room_key`.
-	messages = recipients.group_by(&:user_id).transform_values do |devices|
-		devices.to_h{|device| [device.device_id, machine.encrypt_to_device(device, "m.room_key", room_key)]}
-	end
-	
-	client.to_device.send_to_device("m.room.encrypted", messages)
-	
-	unless refused.empty?
-		withheld = refused.group_by(&:user_id).transform_values do |devices|
-			devices.to_h do |device|
-				[device.device_id, {
-					algorithm: Async::Matrix::E2EE::Machine::MEGOLM,
-					room_id: room_id,
-					session_id: session[:session_id],
-					sender_key: machine.crypto.identity_keys[:curve25519],
-					code: "m.unverified",
-					reason: "This device is not cross signed.",
-				}]
-			end
-		end
-		
-		# A withheld report is sent in the clear, since the point of it is that there is no session to send it over.
-		client.to_device.send_to_device("m.room_key.withheld", withheld)
-	end
+  user_ids = client.room(room_id).get_joined_members_by_room.user_ids
+  queried = client.keys.query_keys(user_ids.to_h{|user_id| [user_id, []]})
+
+  # Only cross signed devices are given the session. The rest are told why they were not, which is what lets them explain themselves to their user.
+  recipients, refused = machine.recipients(queried).partition(&:cross_signed?)
+
+  # A device we have never spoken to needs a one time key before it can be addressed at all.
+  wanted = machine.without_sessions(recipients)
+
+  unless wanted.empty?
+    machine.accept_claimed_keys(client.keys.claim_keys(wanted))
+  end
+
+  session = machine.session_for(room_id, rotate: rotate)
+
+  room_key = {
+    algorithm: Async::Matrix::E2EE::Machine::MEGOLM,
+    room_id: room_id,
+    session_id: session[:session_id],
+    session_key: session[:session_key],
+    # Says the session may be passed on to members who join later, which is true only while the room's history is visible to them.
+    shared_history: machine.shared_history?(room_id),
+  }
+
+  # The key travels Olm encrypted, so what is sent is an `m.room.encrypted` rather than an `m.room_key`.
+  messages = recipients.group_by(&:user_id).transform_values do |devices|
+    devices.to_h{|device| [device.device_id, machine.encrypt_to_device(device, "m.room_key", room_key)]}
+  end
+
+  client.to_device.send_to_device("m.room.encrypted", messages)
+
+  unless refused.empty?
+    withheld = refused.group_by(&:user_id).transform_values do |devices|
+      devices.to_h do |device|
+        [device.device_id, {
+          algorithm: Async::Matrix::E2EE::Machine::MEGOLM,
+          room_id: room_id,
+          session_id: session[:session_id],
+          sender_key: machine.crypto.identity_keys[:curve25519],
+          code: "m.unverified",
+          reason: "This device is not cross signed.",
+        }]
+      end
+    end
+
+    # A withheld report is sent in the clear, since the point of it is that there is no session to send it over.
+    client.to_device.send_to_device("m.room_key.withheld", withheld)
+  end
 end
 ```
 
@@ -233,142 +233,142 @@ shared = Set.new
 sync = client.sync(timeout: 0)
 
 sync.each(retries: 3) do |batch|
-	# The batch says how many one time keys the server still holds. The machine decides whether that is too few; the client does the uploading.
-	if machine.one_time_keys_low?(batch.one_time_keys_count)
-		machine.crypto.generate_one_time_keys(machine.crypto.one_time_key_target)
-		client.keys.upload_keys(one_time_keys: machine.signed_one_time_keys)
-		machine.crypto.published_one_time_keys!
-	end
-	
-	# Whoever changed their devices or cross signing keys must be looked up again before anything is encrypted to them.
-	unless batch.changed_devices.empty?
-		machine.accept_queried_keys(client.keys.query_keys(batch.changed_devices.to_h{|user_id| [user_id, []]}))
-	end
-	
-	machine.forget(batch.left_devices)
-	
-	# Every event this device can read. To-device messages are handled first, so a key which arrives in this batch releases the messages which were waiting for it, including ones from earlier batches.
-	machine.each_event(batch) do |event|
-		case event
-		# Our own message, which comes back in sync like anybody else's.
-		in {sender: ^me, content: Async::Matrix::Events::Message}
-			# Don't reply to ourselves, or we will talk forever.
-		
-		# A message we could read. `session_id` is carried only by an event which arrived encrypted, so this arm says "encrypted" without having to ask, and must come before the cleartext one.
-		in {room_id:, sender:, session_id:, content: Async::Matrix::Events::TextMessage(body:)}
-			unless shared.include?(room_id)
-				share.call(room_id)
-				shared.add(room_id)
-			end
-			
-			reply = Async::Matrix::Events::TextMessage.build(body: "You said: #{body}")
-			content = machine.encrypt(room_id, reply)
-			
-			client.room(room_id).send_message(content.type, content.to_h)
-		
-		# The same message, sent in the clear into a room we are encrypting.
-		in {sender:, content: Async::Matrix::Events::TextMessage(body:)}
-			Console.warn(self, "A message arrived unencrypted.", sender: sender, body: body)
-		
-		# The key has not arrived. The event is kept, and comes back through this loop when it does.
-		in {content: Async::Matrix::Events::Deferred(session_id:)}
-			Console.info(self, "Waiting for a session.", session_id: session_id)
-		
-		# A device deliberately did not share, and said why. `m.unverified` resolves when it is verified; the others do not.
-		in {sender:, content: Async::Matrix::Events::Withheld(code: "m.unverified")}
-			Console.warn(self, "A device will not share until it is verified.", sender: sender)
-		
-		# No Olm session could be established, so this one report explains every message that device sent before it. The answer is a session of our own, and an `m.dummy` over it to say so.
-		in {sender:, content: Async::Matrix::Events::Withheld(code: "m.no_olm")}
-			device = machine.device_of(sender, event.content[:sender_key])
-			
-			machine.accept_claimed_keys(client.keys.claim_keys(machine.without_sessions([device])))
-			client.to_device.send_to_device("m.room.encrypted", {
-				sender => {device.device_id => machine.encrypt_to_device(device, "m.dummy", {})},
-			})
-		
-		in {sender:, content: Async::Matrix::Events::Withheld(code:, reason:)}
-			Console.warn(self, "A session was withheld.", sender: sender, code: code, reason: reason)
-		
-		# The key arrived and the message still did not read, which is a fault rather than a wait.
-		in {content: Async::Matrix::Events::Undecryptable(session_id:)}
-			Console.error(self, "Could not read an event.", session_id: session_id)
-		
-		# The room turned encrypted, so a session is wanted before anything is sent into it.
-		in {room_id:, content: Async::Matrix::Events::RoomEncryption(algorithm:)}
-			share.call(room_id)
-			shared.add(room_id)
-		
-		# Somebody left, so the session they hold must not encrypt anything further. Since v1.19 an invited user counts too, because history sharing may have given them the keys.
-		in {room_id:, content: Async::Matrix::Events::RoomMember(membership: "leave" | "ban")}
-			share.call(room_id, rotate: true)
-		
-		# Invited to a room, so join it. The keys for its history may already be waiting in a bundle.
-		in {room_id:, state_key: ^me, content: Async::Matrix::Events::RoomMember(membership: "invite")}
-			client.join_room(room_id)
-		
-		# Another of our own devices is missing a session we hold, and only this user's verified devices are answered.
-		in {sender: ^me, content: Async::Matrix::Events::RoomKeyRequest(action: "request")}
-			if forwarded = machine.forwardable(event)
-				client.to_device.send_to_device("m.room.encrypted", forwarded)
-			end
-		
-		in {content: Async::Matrix::Events::RoomKeyRequest(action: "request_cancellation", request_id:)}
-			Console.debug(self, "A key request was cancelled.", request_id: request_id)
-		
-		# A session arrived, which the machine has accepted and used to release whatever was waiting. Those released events come through this same loop.
-		in {sender:, content: Async::Matrix::Events::RoomKey(room_id:, session_id:)}
-			Console.debug(self, "Accepted a session.", sender: sender, room_id: room_id, session_id: session_id)
-		
-		in {sender:, content: Async::Matrix::Events::ForwardedRoomKey(forwarding_curve25519_key_chain:)}
-			Console.debug(self, "Accepted a forwarded session.", sender: sender, hops: forwarding_curve25519_key_chain.size)
-		
-		# A bundle of history for a room we were invited to. It is a file to fetch, which is done on accepting the invite rather than now, so that nobody can make us download what we never asked for.
-		in {sender:, content: Async::Matrix::Events::RoomKeyBundle(room_id:)}
-			Console.info(self, "Keys for a room's history are waiting.", sender: sender, room_id: room_id)
-		
-		# A device announced a replacement Olm session, having found the old one corrupt.
-		in {sender:, content: Async::Matrix::Events::Dummy}
-			Console.debug(self, "A device replaced its session.", sender: sender)
-		
-		# One of our own devices asked for a secret: a cross signing key, or the backup decryption key.
-		in {sender: ^me, content: Async::Matrix::Events::SecretRequest(action: "request", name:)}
-			Console.info(self, "A device asked for a secret.", name: name)
-		
-		in {sender: ^me, content: Async::Matrix::Events::SecretSend(request_id:)}
-			Console.info(self, "A secret arrived.", request_id: request_id)
-		
-		# A verification is a handshake, and it is driven the same way as everything else here: the machine does the cryptography, the client sends the result.
-		in {sender:, content: Async::Matrix::Events::KeyVerificationRequest(from_device:, transaction_id:, methods:)} if methods.include?("m.sas.v1")
-			ready = {methods: ["m.sas.v1"], from_device: machine.device_id, transaction_id: transaction_id}
-			
-			client.to_device.send_to_device("m.key.verification.ready", {sender => {from_device => ready}})
-		
-		# The other side chose SAS, so the accept narrows their offer to what we will use: decimal, since MSC4405 deprecated emoji.
-		in {sender:, content: Async::Matrix::Events::KeyVerificationStartSasV1(from_device:, transaction_id:) => start}
-			sas = Async::Matrix::E2EE::Sas.new
-			
-			accept = {
-				transaction_id: transaction_id,
-				key_agreement_protocol: "curve25519-hkdf-sha256",
-				hash: "sha256",
-				message_authentication_code: "hkdf-hmac-sha256.v2",
-				short_authentication_string: start.agreed,
-				commitment: machine.commitment(sas, start),
-			}
-			
-			client.to_device.send_to_device("m.key.verification.accept", {sender => {from_device => accept}})
-		
-		in {sender:, content: Async::Matrix::Events::KeyVerificationCancel(code:)}
-			Console.warn(self, "A verification was cancelled.", sender: sender, code: code)
-		
-		in {sender:, content: Async::Matrix::Events::KeyVerificationDone}
-			Console.info(self, "A device is now verified.", sender: sender)
-		
-		else
-			Console.debug(self, "Ignoring an event we do not handle.", type: event.type)
-		end
-	end
+  # The batch says how many one time keys the server still holds. The machine decides whether that is too few; the client does the uploading.
+  if machine.one_time_keys_low?(batch.one_time_keys_count)
+    machine.crypto.generate_one_time_keys(machine.crypto.one_time_key_target)
+    client.keys.upload_keys(one_time_keys: machine.signed_one_time_keys)
+    machine.crypto.published_one_time_keys!
+  end
+
+  # Whoever changed their devices or cross signing keys must be looked up again before anything is encrypted to them.
+  unless batch.changed_devices.empty?
+    machine.accept_queried_keys(client.keys.query_keys(batch.changed_devices.to_h{|user_id| [user_id, []]}))
+  end
+
+  machine.forget(batch.left_devices)
+
+  # Every event this device can read. To-device messages are handled first, so a key which arrives in this batch releases the messages which were waiting for it, including ones from earlier batches.
+  machine.each_event(batch) do |event|
+    case event
+    # Our own message, which comes back in sync like anybody else's.
+    in {sender: ^me, content: Async::Matrix::Events::Message}
+      # Don't reply to ourselves, or we will talk forever.
+
+    # A message we could read. `session_id` is carried only by an event which arrived encrypted, so this arm says "encrypted" without having to ask, and must come before the cleartext one.
+    in {room_id:, sender:, session_id:, content: Async::Matrix::Events::TextMessage(body:)}
+      unless shared.include?(room_id)
+        share.call(room_id)
+        shared.add(room_id)
+      end
+
+      reply = Async::Matrix::Events::TextMessage.build(body: "You said: #{body}")
+      content = machine.encrypt(room_id, reply)
+
+      client.room(room_id).send_message(content.type, content.to_h)
+
+    # The same message, sent in the clear into a room we are encrypting.
+    in {sender:, content: Async::Matrix::Events::TextMessage(body:)}
+      Console.warn(self, "A message arrived unencrypted.", sender: sender, body: body)
+
+    # The key has not arrived. The event is kept, and comes back through this loop when it does.
+    in {content: Async::Matrix::Events::Deferred(session_id:)}
+      Console.info(self, "Waiting for a session.", session_id: session_id)
+
+    # A device deliberately did not share, and said why. `m.unverified` resolves when it is verified; the others do not.
+    in {sender:, content: Async::Matrix::Events::Withheld(code: "m.unverified")}
+      Console.warn(self, "A device will not share until it is verified.", sender: sender)
+
+    # No Olm session could be established, so this one report explains every message that device sent before it. The answer is a session of our own, and an `m.dummy` over it to say so.
+    in {sender:, content: Async::Matrix::Events::Withheld(code: "m.no_olm")}
+      device = machine.device_of(sender, event.content[:sender_key])
+
+      machine.accept_claimed_keys(client.keys.claim_keys(machine.without_sessions([device])))
+      client.to_device.send_to_device("m.room.encrypted", {
+        sender => {device.device_id => machine.encrypt_to_device(device, "m.dummy", {})},
+      })
+
+    in {sender:, content: Async::Matrix::Events::Withheld(code:, reason:)}
+      Console.warn(self, "A session was withheld.", sender: sender, code: code, reason: reason)
+
+    # The key arrived and the message still did not read, which is a fault rather than a wait.
+    in {content: Async::Matrix::Events::Undecryptable(session_id:)}
+      Console.error(self, "Could not read an event.", session_id: session_id)
+
+    # The room turned encrypted, so a session is wanted before anything is sent into it.
+    in {room_id:, content: Async::Matrix::Events::RoomEncryption(algorithm:)}
+      share.call(room_id)
+      shared.add(room_id)
+
+    # Somebody left, so the session they hold must not encrypt anything further. Since v1.19 an invited user counts too, because history sharing may have given them the keys.
+    in {room_id:, content: Async::Matrix::Events::RoomMember(membership: "leave" | "ban")}
+      share.call(room_id, rotate: true)
+
+    # Invited to a room, so join it. The keys for its history may already be waiting in a bundle.
+    in {room_id:, state_key: ^me, content: Async::Matrix::Events::RoomMember(membership: "invite")}
+      client.join_room(room_id)
+
+    # Another of our own devices is missing a session we hold, and only this user's verified devices are answered.
+    in {sender: ^me, content: Async::Matrix::Events::RoomKeyRequest(action: "request")}
+      if forwarded = machine.forwardable(event)
+        client.to_device.send_to_device("m.room.encrypted", forwarded)
+      end
+
+    in {content: Async::Matrix::Events::RoomKeyRequest(action: "request_cancellation", request_id:)}
+      Console.debug(self, "A key request was cancelled.", request_id: request_id)
+
+    # A session arrived, which the machine has accepted and used to release whatever was waiting. Those released events come through this same loop.
+    in {sender:, content: Async::Matrix::Events::RoomKey(room_id:, session_id:)}
+      Console.debug(self, "Accepted a session.", sender: sender, room_id: room_id, session_id: session_id)
+
+    in {sender:, content: Async::Matrix::Events::ForwardedRoomKey(forwarding_curve25519_key_chain:)}
+      Console.debug(self, "Accepted a forwarded session.", sender: sender, hops: forwarding_curve25519_key_chain.size)
+
+    # A bundle of history for a room we were invited to. It is a file to fetch, which is done on accepting the invite rather than now, so that nobody can make us download what we never asked for.
+    in {sender:, content: Async::Matrix::Events::RoomKeyBundle(room_id:)}
+      Console.info(self, "Keys for a room's history are waiting.", sender: sender, room_id: room_id)
+
+    # A device announced a replacement Olm session, having found the old one corrupt.
+    in {sender:, content: Async::Matrix::Events::Dummy}
+      Console.debug(self, "A device replaced its session.", sender: sender)
+
+    # One of our own devices asked for a secret: a cross signing key, or the backup decryption key.
+    in {sender: ^me, content: Async::Matrix::Events::SecretRequest(action: "request", name:)}
+      Console.info(self, "A device asked for a secret.", name: name)
+
+    in {sender: ^me, content: Async::Matrix::Events::SecretSend(request_id:)}
+      Console.info(self, "A secret arrived.", request_id: request_id)
+
+    # A verification is a handshake, and it is driven the same way as everything else here: the machine does the cryptography, the client sends the result.
+    in {sender:, content: Async::Matrix::Events::KeyVerificationRequest(from_device:, transaction_id:, methods:)} if methods.include?("m.sas.v1")
+      ready = {methods: ["m.sas.v1"], from_device: machine.device_id, transaction_id: transaction_id}
+
+      client.to_device.send_to_device("m.key.verification.ready", {sender => {from_device => ready}})
+
+    # The other side chose SAS, so the accept narrows their offer to what we will use: decimal, since MSC4405 deprecated emoji.
+    in {sender:, content: Async::Matrix::Events::KeyVerificationStartSasV1(from_device:, transaction_id:) => start}
+      sas = Async::Matrix::E2EE::Sas.new
+
+      accept = {
+        transaction_id: transaction_id,
+        key_agreement_protocol: "curve25519-hkdf-sha256",
+        hash: "sha256",
+        message_authentication_code: "hkdf-hmac-sha256.v2",
+        short_authentication_string: start.agreed,
+        commitment: machine.commitment(sas, start),
+      }
+
+      client.to_device.send_to_device("m.key.verification.accept", {sender => {from_device => accept}})
+
+    in {sender:, content: Async::Matrix::Events::KeyVerificationCancel(code:)}
+      Console.warn(self, "A verification was cancelled.", sender: sender, code: code)
+
+    in {sender:, content: Async::Matrix::Events::KeyVerificationDone}
+      Console.info(self, "A device is now verified.", sender: sender)
+
+    else
+      Console.debug(self, "Ignoring an event we do not handle.", type: event.type)
+    end
+  end
 end
 ```
 

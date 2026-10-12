@@ -1,0 +1,60 @@
+name: Lint
+
+# RuboCop with the cops this project carries, and the licence notice every Ruby file opens with.
+#
+# Two jobs rather than two steps of one, so a failure reads as `cops` or as `headers` rather than
+# as one job which could be either.
+#
+# Ruby 4 for the cops, and the whole bundle: the cops are a Gemfile group of their own because
+# ast-crispr-ruby-prism requires Ruby 4, so this is the one workflow which does not set
+# BUNDLE_WITHOUT. See the Gemfile.
+#
+# The notice is checked by Apache SkyWalking Eyes, which reads .licenserc.yaml - the same file
+# bin/license(1) reads locally, so the contract is declared in one place. The action builds the
+# tool with Go rather than taking it from the flake devShell, which is why this runs the action
+# rather than bin/license: nothing else in CI needs Nix.
+
+on:
+  push:
+    branches:
+      - async-rest
+  pull_request:
+    branches:
+      - async-rest
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  cops:
+    name: cops
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "4.0"
+        bundler-cache: true
+
+    - name: Run bin/rubocop
+      run: bin/rubocop
+
+  headers:
+    name: headers
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+
+    # .licenserc.yaml is the default configuration path, and is the file bin/license(1) reads too.
+    # comment: never is set there, so the token is only read, never written back as a review.
+    - uses: apache/skywalking-eyes/header@v0.9.0
+      with:
+        mode: check

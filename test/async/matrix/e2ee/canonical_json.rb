@@ -314,7 +314,7 @@ describe Async::Matrix::E2EE::CanonicalJSON do
 
     # The device keys as the homeserver answers with them, which is the object a signature is checked over.
     let(:answered) do
-      machine.publish!
+      publish(machine)
 
       client.keys.query_keys({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
     end

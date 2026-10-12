@@ -10,16 +10,14 @@ require_relative "device"
 module Async
   module Matrix
     module E2EE
-      # Which devices each user has, kept current from sync.
+      # Which devices each user has.
       #
-      # A batch says whose device list changed, not what it changed to, so a user is queried when next wanted.
+      # It makes no request: a batch says whose list changed, a caller queries them, and what the homeserver answered is handed back here.
       class Devices
-        # @parameter client [Async::Matrix::ClientServer::Client] an authenticated client.
-        def initialize(client)
-          @client = client
-
+        def initialize
           @devices = {}
           @stale = {}
+          @tracking = {}
         end
 
         # @attribute [Hash] the devices of each user, by user ID and then device ID.
@@ -41,14 +39,20 @@ module Async
           left.each do |user_id|
             @devices.delete(user_id.to_s)
             @stale.delete(user_id.to_s)
+            @tracking.delete(user_id.to_s)
           end
         end
 
-        # Note everything a sync batch said about device lists.
+        # Take on what a device list query answered.
         #
-        # @parameter sync [Async::Matrix::ClientServer::Sync] the batch.
-        def receive(sync)
-          self.invalidate(changed: sync.changed_devices, left: sync.left_devices)
+        # @parameter queried [Async::Matrix::ClientServer::QueriedKeys] what the homeserver said.
+        # @returns [Hash] the devices of each user it named.
+        def accept(queried)
+          queried.device_keys.each_key do |user_id|
+            self.accept_user(user_id.to_s, queried)
+          end
+
+          @devices
         end
 
         # @parameter user_id [String] the user to ask about.
@@ -57,60 +61,86 @@ module Async
           @stale.key?(user_id.to_s) or !@devices.key?(user_id.to_s)
         end
 
-        # The devices of the given users, querying the ones which are stale.
+        # Follow this user's devices from now on, because we share an encrypted room with them.
         #
-        # @parameter user_ids [Array(String)] the users to ask about.
-        # @returns [Hash] the devices, by user ID and then device ID.
-        def for(user_ids)
-          wanted = user_ids.map(&:to_s)
-          missing = wanted.select{|user_id| self.stale?(user_id)}
+        # @parameter user_id [String] the user to follow.
+        def track(user_id)
+          @tracking[user_id.to_s] = true
+          @stale[user_id.to_s] = true
+        end
 
-          unless missing.empty?
-            self.query(missing)
-          end
+        # @returns [Array(String)] the users whose devices are followed.
+        def tracking
+          @tracking.keys
+        end
 
-          wanted.each_with_object({}) do |user_id, found|
-            found[user_id] = @devices[user_id] || {}
-          end
+        # @returns [Array(String)] the users whose devices should be queried again.
+        def querying
+          @stale.keys
         end
 
         # @parameter user_id [String] the user to ask about.
-        # @returns [Array(Device)] their devices.
+        # @returns [Array(Device)] their devices, as last answered.
         def of(user_id)
-          self.for([user_id]).fetch(user_id.to_s, {}).values
+          (@devices[user_id.to_s] || {}).values
         end
 
-        # Ask the homeserver for these users' devices, whether or not they are stale.
+        # @parameter user_id [String] the user to ask about.
+        # @parameter device_id [String] the device.
+        # @returns [Device | nil] that device, if it is known.
+        def [](user_id, device_id)
+          (@devices[user_id.to_s] || {})[device_id.to_s]
+        end
+
+        # The device which holds a given identity key, which is how an Olm message names its sender.
         #
-        # @parameter user_ids [Array(String)] the users to query.
-        # @returns [Hash] the devices, by user ID and then device ID.
-        def query(user_ids)
-          queried = @client.keys.query_keys(user_ids.each_with_object({}){|user_id, asked| asked[user_id] = []})
-
-          Console.debug(self, "Queried device lists.", user_ids: user_ids, failures: queried.failures.keys)
-
-          user_ids.each do |user_id|
-            @devices[user_id.to_s] = queried.devices_of(user_id).each_with_object({}) do |(device_id, value), devices|
-              devices[device_id.to_s] = Device.new(user_id.to_s, device_id.to_s, value)
-            end
-
-            @stale.delete(user_id.to_s)
-
-            Console.debug(self, "Read the devices of a user.", user_id: user_id, device_ids: @devices[user_id.to_s].keys)
-          end
-
-          @devices
+        # @parameter user_id [String] the user it claims to be from.
+        # @parameter curve25519 [String] the identity key it was encrypted with.
+        # @returns [Device | nil] the device, if that user has one with that key.
+        def by_curve25519(user_id, curve25519)
+          self.of(user_id).find{|device| device.curve25519 == curve25519}
         end
 
-        # Every device of every user which is known, except this device.
+        # @parameter user_id [String] the user to ask about.
+        # @parameter device_id [String] the device.
+        # @returns [Boolean] whether that device is verified.
+        def verified?(user_id, device_id)
+          device = self[user_id, device_id]
+
+          !device.nil? && device.verified?
+        end
+
+        # @parameter user_id [String] the user to ask about.
+        # @returns [Array(Device)] their verified devices.
+        def verified_of(user_id)
+          self.of(user_id).select(&:verified?)
+        end
+
+        # Every device of every user named, except this device.
         #
         # @parameter user_ids [Array(String)] the users to include.
         # @parameter except [String | nil] a device of our own to leave out.
         # @returns [Array(Device)] the devices.
         def recipients(user_ids, except: nil)
-          self.for(user_ids).each_value.flat_map(&:values).reject do |device|
+          user_ids.flat_map{|user_id| self.of(user_id)}.reject do |device|
             device.device_id == except or device.blocked?
           end
+        end
+
+        private
+
+        # Take on one user's devices, which replaces whatever was held for them.
+        #
+        # @parameter user_id [String] the user.
+        # @parameter queried [Async::Matrix::ClientServer::QueriedKeys] what the homeserver said.
+        def accept_user(user_id, queried)
+          @devices[user_id] = queried.devices_of(user_id).each_with_object({}) do |(device_id, value), devices|
+            devices[device_id.to_s] = Device.new(user_id, device_id.to_s, value)
+          end
+
+          @stale.delete(user_id)
+
+          Console.debug(self, "Read the devices of a user.", user_id: user_id, device_ids: @devices[user_id].keys)
         end
       end
     end

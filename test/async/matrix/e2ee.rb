@@ -19,8 +19,8 @@ describe Async::Matrix::E2EE do
 
   # Requiring this one file is all a client needs to encrypt, which is what it is for.
   it "is all a client needs to publish its keys to a homeserver" do
-    machine = Async::Matrix::E2EE::Machine.new(client)
+    machine = self.machine_for(client)
 
-    expect(machine.publish!.count("signed_curve25519")).to be > 0
+    expect(publish(machine).count("signed_curve25519")).to be > 0
   end
 end

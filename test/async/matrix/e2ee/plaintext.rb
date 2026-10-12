@@ -18,7 +18,7 @@ describe Async::Matrix::E2EE::Plaintext do
 
     # They are this device's identity, so they are the keys the homeserver answers with ever after.
     it "answers the same keys the homeserver was given" do
-      machine.publish!
+      publish(machine)
 
       published = client.keys.query_keys({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
 

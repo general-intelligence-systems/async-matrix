@@ -30,7 +30,7 @@ describe Async::Matrix::E2EE::Store do
   with "#remember" do
     it "holds a session which really arrived over to_device" do
       room = prepared
-      session = other_machine.share(room.id, [user_id])
+      session = share(other_machine, room.id, [user_id], as: other)
 
       receive_device_message(machine, client)
 
@@ -41,7 +41,7 @@ describe Async::Matrix::E2EE::Store do
     # A session ID is unique to the device which made it, not to the room, so both are needed to tell one from another.
     it "does not hold that session for another room" do
       room = prepared
-      session = other_machine.share(room.id, [user_id])
+      session = share(other_machine, room.id, [user_id], as: other)
 
       receive_device_message(machine, client)
 
@@ -49,7 +49,7 @@ describe Async::Matrix::E2EE::Store do
     end
 
     it "holds nothing before anything has been shared" do
-      machine.receive(current_sync)
+      receive_into(machine, current_sync)
 
       expect(store.sessions).to be(:empty?)
     end
@@ -82,7 +82,7 @@ describe Async::Matrix::E2EE::Store do
     # A key can arrive after the events it unlocks, so an event which cannot be read is kept rather than lost.
     it "keeps an event whose key has not arrived" do
       room = prepared
-      other_machine.share(room.id, [])
+      share(other_machine, room.id, [], as: other)
 
       machine.decrypt(encrypted_in(room), room_id: room.id)
 
@@ -91,7 +91,7 @@ describe Async::Matrix::E2EE::Store do
 
     it "releases it once, because it is read when the key arrives" do
       room = prepared
-      session = other_machine.share(room.id, [])
+      session = share(other_machine, room.id, [], as: other)
 
       machine.decrypt(encrypted_in(room), room_id: room.id)
 

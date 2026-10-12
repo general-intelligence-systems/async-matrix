@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+# LICENSE(1)                         General Commands Manual                       LICENSE(1)
+#
+# NAME
+#      bin/license — check the licence notice every Ruby file opens with
+#
+# SYNOPSIS
+#      bin/license [check|fix]
+#
+# DESCRIPTION
+#      Runs Apache SkyWalking Eyes over the project.  With check, which is the default, it
+#      reports every Ruby file whose opening notice is missing or does not match.  With fix,
+#      it writes the notice into a file which has none.
+#
+#      .licenserc.yaml is what it reads: the notice itself, the pattern which decides what
+#      counts as having one already, and which files are expected to carry it.  Ruby carries
+#      it; the shell scripts here, the generated schemas and the specification submodules
+#      under data/ do not.
+#
+#      Prefer check.  fix inserts the notice above `# frozen_string_literal: true` rather
+#      than below it, which is not where the other files carry it, so a new file is better
+#      served by copying a neighbour.  check accepts either order.
+#
+#      license-eye is Go rather than Ruby, so it comes from the flake devshell rather than
+#      from the bundle.  This re-enters the devshell when it is not already on PATH, which is
+#      what lets the git hook run it.
+#
+# FILES
+#      .licenserc.yaml
+#              The notice, the pattern, and which files are expected to carry it.
+#
+#      flake.nix
+#              Where license-eye comes from: the skywalking-eyes entry in the devshell.
+#
+# EXIT STATUS
+#      The bin/license utility exits 0 on success, and >0 if an error occurs.  A file without
+#      the notice is an error, which is what makes it usable from a hook or a workflow.
+#
+# EXAMPLES
+#      Report every file which is missing the notice:
+#
+#            bin/license
+#
+#      Write it into the files which have none:
+#
+#            bin/license fix
+#
+# SEE ALSO
+#      bin/rubocop(1), license-eye(1)
+#
+# async-matrix                       October 12, 2026                              LICENSE(1)
+
+set -o errexit
+set -o nounset
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+action="${1:-check}"
+
+# The hook fires outside the flake devshell, so re-enter it when license-eye is not already on
+# PATH. Inside the shell it is, and the extra evaluation is skipped.
+if command -v license-eye > /dev/null 2>&1; then
+	license-eye header "$action"
+else
+	nix develop --command license-eye header "$action"
+fi

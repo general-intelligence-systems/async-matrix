@@ -37,22 +37,21 @@ describe Async::Matrix::E2EE::Machine do
 
   with "#publish!" do
     it "uploads a batch of one time keys, and the server says how many it holds" do
-      uploaded = machine.publish!
+      uploaded = publish(machine)
 
       expect(uploaded.count("signed_curve25519")).to be == crypto.one_time_key_target
-      expect(machine.counts[:signed_curve25519]).to be == crypto.one_time_key_target
     end
 
     # What the server answers with is the whole point of publishing, so it is read rather than counted here.
     it "adds to the keys the server already held" do
-      machine.publish!
-      uploaded = machine.publish!
+      publish(machine)
+      uploaded = publish(machine)
 
       expect(uploaded.count("signed_curve25519")).to be == crypto.one_time_key_target * 2
     end
 
     it "publishes the device keys, which the server then answers queries with" do
-      machine.publish!
+      publish(machine)
 
       published = client.keys.query_keys({user_id => []}).devices_of(user_id)[machine.device_id.to_sym]
 
@@ -62,47 +61,47 @@ describe Async::Matrix::E2EE::Machine do
 
     # A key published twice would be claimed twice, and both sessions built on it would be readable by whoever claimed it second.
     it "does not publish the same one time keys again" do
-      machine.publish!
+      publish(machine)
       first = client.keys.claim_keys({user_id => {machine.device_id => "signed_curve25519"}})
 
-      machine.publish!
+      publish(machine)
       second = client.keys.claim_keys({user_id => {machine.device_id => "signed_curve25519"}})
 
       expect(first.one_time_keys[user_id.to_sym]).not.to be == second.one_time_keys[user_id.to_sym]
     end
   end
 
-  with "#top_up!" do
-    it "publishes nothing when the server holds enough" do
-      machine.publish!
-      machine.receive(current_sync)
+  with "#one_time_keys_low?" do
+    # The batch says what the server holds, so the decision is made from that rather than from anything remembered.
+    it "says nothing is wanted when the server holds enough" do
+      publish(machine)
 
-      expect(machine).not.to be(:one_time_keys_low?)
-      expect(machine.top_up!).to be == false
+      expect(machine.one_time_keys_low?(current_sync.one_time_keys_count)).to be == false
     end
 
     # A server which has never been given any is as low as a server which has run out.
-    it "publishes when the server has never been given any" do
-      expect(machine).to be(:one_time_keys_low?)
-      expect(machine.top_up!).to be == true
-      expect(machine.counts[:signed_curve25519]).to be == crypto.one_time_key_target
+    it "says more are wanted when the server has none" do
+      expect(machine.one_time_keys_low?({})).to be == true
+    end
+
+    it "says more are wanted below half of what it wants held" do
+      expect(machine.one_time_keys_low?({signed_curve25519: crypto.one_time_key_target / 4})).to be == true
+      expect(machine.one_time_keys_low?({signed_curve25519: crypto.one_time_key_target})).to be == false
     end
   end
 
-  with "#receive" do
+  with "#receive_device_event" do
     it "reads how many one time keys the server reports holding" do
-      machine.publish!
+      publish(machine)
 
-      machine.receive(current_sync)
-
-      expect(machine.counts[:signed_curve25519]).to be == crypto.one_time_key_target
+      expect(current_sync.one_time_keys_count[:signed_curve25519]).to be == crypto.one_time_key_target
     end
 
     it "accepts a session which really arrived over to_device" do
       room = shared_room
-      other_machine.publish!
+      publish(other_machine, as: other)
 
-      session = machine.share(room.id, [other_user_id])
+      session = share(machine, room.id, [other_user_id])
 
       receive_device_message(other_machine, other)
 
@@ -138,12 +137,14 @@ describe Async::Matrix::E2EE::Machine do
 
     it "types each device message the server delivered" do
       room = shared_room
-      other_machine.publish!
+      publish(other_machine, as: other)
 
-      session = machine.share(room.id, [other_user_id])
+      session = share(machine, room.id, [other_user_id])
 
       sync = sync_until(other){|batch| !batch.to_device.empty?}
-      typed = other_machine.each_device_event(sync)
+
+      # The type on the wire says only that it is encrypted, so reading it is what says what it carried.
+      typed = other_machine.each_event(sync).to_a
 
       expect(typed.first.content).to be_a(Async::Matrix::Events::RoomKey)
       expect(typed.first.content.session_id).to be == session[:session_id]
@@ -188,9 +189,9 @@ describe Async::Matrix::E2EE::Machine do
     # The whole flow, through the homeserver: share the key, send the event, and read it as the other user.
     it "reads a message the other user sent into a room" do
       room = shared_room
-      machine.publish!
+      publish(machine)
 
-      session = other_machine.share(room.id, [user_id])
+      session = share(other_machine, room.id, [user_id], as: other)
       content = other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello"))
       other_room(room).send_message(content.type, content.to_h)
 
@@ -220,7 +221,7 @@ describe Async::Matrix::E2EE::Machine do
     # A client which fell over on an event it cannot read would be stopped by one missing key.
     it "keeps an event whose session has not arrived, rather than failing" do
       room = shared_room
-      other_machine.share(room.id, [])
+      share(other_machine, room.id, [], as: other)
       content = other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "hello"))
       other_room(room).send_message(content.type, content.to_h)
 
@@ -233,18 +234,19 @@ describe Async::Matrix::E2EE::Machine do
 
     it "reads the events which were waiting, once the key arrives" do
       room = shared_room
-      session = other_machine.share(room.id, [])
+      session = share(other_machine, room.id, [], as: other)
       content = other_machine.encrypt(room.id, Async::Matrix::Events::TextMessage.build(body: "late"))
       other_room(room).send_message(content.type, content.to_h)
 
       sync = sync_until(client){|batch| batch.each_event.any?{|event| event.type == "m.room.encrypted"}}
       machine.decrypt(sync.each_event.find{|event| event.type == "m.room.encrypted"}, room_id: room.id)
 
-      machine.publish!
-      other_machine.share(room.id, [user_id])
-      receive_device_message(machine, client)
+      publish(machine)
+      share(other_machine, room.id, [user_id], as: other)
 
-      released = machine.release(room.id, session[:session_id])
+      # Accepting the session is what releases them, so what it answers is what was waiting.
+      batch = sync_until(client){|sync| !sync.to_device.empty?}
+      released = receive_into(machine, batch)
 
       expect(released.size).to be == 1
       expect(released.first.content.body).to be == "late"
@@ -255,32 +257,37 @@ describe Async::Matrix::E2EE::Machine do
   with "#share" do
     it "sends the session key to every device the other user has" do
       room = shared_room
-      other_machine.publish!
+      publish(other_machine, as: other)
 
-      session = machine.share(room.id, [other_user_id])
+      session = share(machine, room.id, [other_user_id])
       sync = sync_until(other){|batch| !batch.to_device.empty?}
       delivered = sync.to_device.first
 
-      expect(delivered[:type]).to be == "m.room_key"
+      # A room key travels over Olm, so what the server delivered is an `m.room.encrypted`.
+      expect(delivered[:type]).to be == "m.room.encrypted"
       expect(delivered[:sender]).to be == user_id
-      expect(delivered[:content][:session_id]).to be == session[:session_id]
-      expect(delivered[:content][:room_id]).to be == room.id
+      expect(delivered[:content][:algorithm]).to be == Async::Matrix::E2EE::Machine::OLM
+
+      read = other_machine.each_event(sync).find{|event| event.content.is_a?(Async::Matrix::Events::RoomKey)}
+
+      expect(read.content.session_id).to be == session[:session_id]
+      expect(read.content.room_id).to be == room.id
     end
 
     # There is nothing to send if nobody else has a device, and an empty request would be refused.
     it "sends nothing when the other user has published no device" do
       room = shared_room
 
-      machine.share(room.id, [other_user_id])
+      share(machine, room.id, [other_user_id])
 
       expect(sync_until(other, attempts: 1, timeout: 200){|batch| !batch.to_device.empty?}).to be_nil
     end
 
     it "does not send the key to this device" do
       room = shared_room
-      machine.publish!
+      publish(machine)
 
-      machine.share(room.id, [user_id])
+      share(machine, room.id, [user_id])
 
       expect(sync_until(client, attempts: 1, timeout: 200){|batch| !batch.to_device.empty?}).to be_nil
     end
