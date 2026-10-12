@@ -24,22 +24,23 @@
         # from different files: the name resolves to the source gem, which would want cargo, while
         # the hash is the platform gem's. The platform belongs to the system being built for rather
         # than to the lockfile, so it is chosen here.
+        # These are the hashes for the version Gemfile.lock resolves: a bump needs them recomputed.
         vodozemacPlatforms = {
           x86_64-linux = {
             platform = "x86_64-linux";
-            sha256 = "04zhxk8kbsimh70yy5yssyyj3bq6267dv8c7j6gdl8f9jnhby7w4";
+            sha256 = "17sv2ccpbgxn7ymj6yf2kgc5z6f6j2rqfi4ivkxijzdkpsmksjzj";
           };
           aarch64-linux = {
             platform = "aarch64-linux";
-            sha256 = "1m28m8wh3wb00a95w7al8la8apkbqg1v52palw0czincgpabi0gi";
+            sha256 = "0c471xf3p8k6ylzi1jh2cfzfrwvr1bhf8pgfriavj9h9nrybyvd8";
           };
           x86_64-darwin = {
             platform = "x86_64-darwin";
-            sha256 = "0fggkv23lr2d0rkqz01736k8bja0nqh9gvvxagdlhcncyxk58sh3";
+            sha256 = "1kl0np4lkcngwpw3j87b0c7mp6krwq8cs4q20xsj60ckqbjvjcj7";
           };
           aarch64-darwin = {
             platform = "arm64-darwin";
-            sha256 = "10rxr1zfjs0gdjghvgish8wjd3aa4k4bmhdvi6hd5sljz28dx23i";
+            sha256 = "03qdp7dzmbpgmcds5w42vbd4n0hfqijync4bm8g6d7f9w3y639p1";
           };
         };
 

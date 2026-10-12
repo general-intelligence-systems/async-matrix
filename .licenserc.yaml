@@ -25,7 +25,6 @@ header:
     - "benchmark/**/*.rb"
     - "bin/generate-event-spec-deltas"
     - "bin/generate-spec-deltas"
-    - "bin/release-gem"
     - "bin/update-event-spec"
     - "bin/update-spec"
     - "config/**/*.rb"
@@ -45,7 +44,6 @@ header:
         - "Gemfile"
             - "generate-event-spec-deltas"
         - "generate-spec-deltas"
-        - "release-gem"
         - "update-event-spec"
         - "update-spec"
       comment_style_id: Hashtag

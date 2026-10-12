@@ -122,7 +122,7 @@ GEM
     unicode-display_width (3.3.0)
       unicode-emoji (~> 4.3)
     unicode-emoji (4.3.0)
-    vodozemac (0.1.0-x86_64-linux)
+    vodozemac (0.1.1-x86_64-linux)
       gem_kit (~> 0.2)
 
 PLATFORMS
@@ -199,7 +199,7 @@ CHECKSUMS
   tsort (0.2.0) sha256=9650a793f6859a43b6641671278f79cfead60ac714148aabe4e3f0060480089f
   unicode-display_width (3.3.0) sha256=4b7aa66a4b11db50f6f7e98411215cd0dd10eaecb665d36eec5bcacb3fa0b613
   unicode-emoji (4.3.0) sha256=11c02fa73290378c066bb0562cd4c87d8e1b706fbbe0059ca12746a4244de8ce
-  vodozemac (0.1.0-x86_64-linux) sha256=841fbfa095c921da9e9187a1dd8e1106af21bdd7da17efc18135ea35d1ecf013
+  vodozemac (0.1.1-x86_64-linux) sha256=f24b3dabbeb37d19fbdc914487b390c6995fd89bc27923ab3fb6bf7519135b9f
 
 BUNDLED WITH
    2.7.2

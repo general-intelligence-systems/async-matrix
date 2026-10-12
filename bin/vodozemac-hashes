@@ -1,0 +1,153 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Released under the Apache License, Version 2.0.
+# Copyright, 2026, by General Intelligence Systems.
+
+# VODOZEMAC-HASHES(1)                General Commands Manual            VODOZEMAC-HASHES(1)
+#
+# NAME
+#      bin/vodozemac-hashes — rewrite the vodozemac platform hashes in flake.nix
+#
+# SYNOPSIS
+#      bin/vodozemac-hashes [--check] [version]
+#
+# DESCRIPTION
+#      The vodozemac gem carries a Rust extension, and its precompiled platform gems need no
+#      compiler.  bundix writes one entry with no platform, so the gem that entry names and
+#      the hash it records come from different files: the name resolves to the source gem,
+#      which would want cargo, while the hash is a platform gem's.  flake.nix therefore
+#      chooses the platform for the system being built for, and pins its hash.
+#
+#      Those hashes belong to one version of the gem, so a bump leaves every one of them
+#      wrong.  This fetches the right ones and writes them back.
+#
+#      The version comes from Gemfile.lock unless one is given, so the usual order is to
+#      relock first and run this after.  The platforms come from flake.nix itself, so adding
+#      one there is enough for it to be fetched here.
+#
+#      With --check nothing is written: it reports which hashes are wrong and exits non-zero
+#      if any are, which is what a workflow wants.
+#
+# ENVIRONMENT
+#      Requires nix-prefetch-url(1), which the devshell provides.
+#
+# FILES
+#      flake.nix
+#              The vodozemacPlatforms block this rewrites.
+#
+#      Gemfile.lock
+#              Where the version comes from when none is given.
+#
+# EXIT STATUS
+#      The bin/vodozemac-hashes utility exits 0 on success, and >0 if an error occurs.  With
+#      --check it exits non-zero when a hash is out of date.
+#
+# EXAMPLES
+#      Update every hash to the version the lockfile resolves:
+#
+#            bin/vodozemac-hashes
+#
+#      Update to a version before relocking onto it:
+#
+#            bin/vodozemac-hashes 0.2.0
+#
+#      Report a stale pin without writing:
+#
+#            bin/vodozemac-hashes --check
+#
+# SEE ALSO
+#      bin/test(1), bundix(1), nix-prefetch-url(1), AGENTS.md "The encryption binding"
+#
+# async-matrix                          October 12, 2026                VODOZEMAC-HASHES(1)
+
+require "open3"
+
+GEM = "vodozemac"
+FLAKE = "flake.nix"
+LOCKFILE = "Gemfile.lock"
+
+# The platform and the hash beside it, as the flake writes them. Keyed on the platform, because
+# that is what names the gem to download; the nix system above it is not part of the URL.
+ENTRY = /platform = "(?<platform>[^"]+)";\s*\n(?<indent>\s*)sha256 = "(?<sha256>[^"]*)";/
+
+check = ARGV.delete("--check")
+wanted = ARGV.shift
+
+unless File.exist?(FLAKE)
+  abort "ERROR: run this from the repository root: no #{FLAKE} here."
+end
+
+flake = File.read(FLAKE)
+
+# The lockfile names the platform gem it resolved, as `vodozemac (0.1.1-x86_64-linux)`, so the
+# version is what precedes the platform. A source gem has no platform and is just the version.
+unless wanted
+  unless File.exist?(LOCKFILE)
+    abort "ERROR: no #{LOCKFILE} to read the version from, so pass one."
+  end
+
+  resolved = File.read(LOCKFILE)[/^\s+#{GEM} \((?<version>\d+\.\d+\.\d+)/, "version"]
+
+  unless resolved
+    abort "ERROR: #{LOCKFILE} does not resolve #{GEM}, so pass a version."
+  end
+
+  wanted = resolved
+end
+
+platforms = flake.to_enum(:scan, ENTRY).map{Regexp.last_match[:platform]}
+
+if platforms.empty?
+  abort "ERROR: #{FLAKE} has no vodozemacPlatforms block to rewrite."
+end
+
+puts "#{GEM} #{wanted}, #{platforms.size} platforms from #{FLAKE}"
+
+# The hash of each platform gem, by platform. A platform which was never published is fatal rather
+# than skipped: the flake would throw for that system anyway, and silently leaving a stale hash in
+# place is how a pin goes wrong without saying so.
+fetched = platforms.to_h do |platform|
+  url = "https://rubygems.org/downloads/#{GEM}-#{wanted}-#{platform}.gem"
+
+  print "  #{platform} "
+
+  output, status = Open3.capture2e("nix-prefetch-url", "--type", "sha256", url)
+
+  unless status.success?
+    puts "failed"
+
+    abort "ERROR: could not fetch #{url}\n#{output}"
+  end
+
+  hash = output.lines.map(&:strip).reject(&:empty?).last
+
+  puts hash
+
+  [platform, hash]
+end
+
+stale = []
+
+rewritten = flake.gsub(ENTRY) do
+  match = Regexp.last_match
+  hash = fetched.fetch(match[:platform])
+
+  unless match[:sha256] == hash
+    stale << match[:platform]
+  end
+
+  "platform = \"#{match[:platform]}\";\n#{match[:indent]}sha256 = \"#{hash}\";"
+end
+
+if stale.empty?
+  puts "\nEvery hash already matches #{GEM} #{wanted}."
+elsif check
+  puts "\nStale for #{GEM} #{wanted}: #{stale.join(', ')}"
+
+  abort "ERROR: #{FLAKE} is out of date. Run bin/vodozemac-hashes to fix it."
+else
+  File.write(FLAKE, rewritten)
+
+  puts "\nWrote #{stale.size} of #{platforms.size} hashes to #{FLAKE}: #{stale.join(', ')}"
+end

@@ -408,11 +408,14 @@ schemas together, so the flow can be read beside the code: start with
 `content/client-server-api/modules/end_to_end_encryption.md`, and `content/olm-megolm/` for the two
 ratchets themselves.
 
-{Async::Matrix::E2EE::Plaintext} is the only {Async::Matrix::E2EE::Crypto} the library ships. It
-reverses rather than encrypts, and says so in every message it writes, so that this loop can be
-driven end to end before a binding exists. `ext/async_matrix_e2ee` is the Rust crate
+{Async::Matrix::E2EE::Olm} is the {Async::Matrix::E2EE::Crypto} which encrypts, over the
+[`vodozemac`](https://github.com/n-at-han-k/vodozemac-rb) gem — Ruby bindings
 ([magnus](https://github.com/matsadler/magnus) over
-[vodozemac](https://github.com/matrix-org/vodozemac)) a real one will be built on.
+[vodozemac](https://github.com/matrix-org/vodozemac)) which were extracted from this project and
+ship precompiled per platform, so installing this gem builds nothing.
+{Async::Matrix::E2EE::Plaintext} satisfies the same interface without encrypting — it reverses
+rather than encrypts, and says so in every message it writes — so that this loop can be driven end
+to end where the real thing is not wanted.
 
 ## Documentation
 

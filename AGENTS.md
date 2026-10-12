@@ -192,26 +192,38 @@ Every `bin/` script carries a man page at the top, kept current with the script.
 
 `bin/test` brings a homeserver up in Docker to test against, so a run costs a container start. Its man page explains how to narrow a run and how to keep the homeserver alive between runs, which is what you want while iterating.
 
-## The native extension
+## The encryption binding
 
-`ext/async_matrix_e2ee` is a Rust crate (magnus over [vodozemac](https://github.com/matrix-org/vodozemac)) which `rake compile` builds into `lib/async/matrix/async_matrix_e2ee.so`. `Cargo.toml` at the repository root is the workspace, because rb_sys runs `cargo metadata` from there.
+**This gem is pure Ruby.** The Rust crate it used to carry as `ext/async_matrix_e2ee` is now the [`vodozemac`](https://github.com/n-at-han-k/vodozemac-rb) gem, which ships precompiled per platform, so nothing here builds at install time.
 
-**Nothing under `lib/` loads it.** `E2EE::Crypto` is the interface encryption is written against, and `E2EE::Plaintext` is the only implementation the library ships. The crate is the binding a real implementation will be built on, and the toolchain is kept wired up so that the release already ships precompiled gems on the day one is.
+That gem is bindings and nothing else: `Vodozemac::Account`, `Session`, `GroupSession`, `InboundGroupSession`, `Sas`, the ed25519 and curve25519 key types, and `PkEncryption`. A Matrix concept does not belong in it.
 
-The `.so` is deliberately not in `spec.files`: see the `reject` in the gemspec. The *source* gem compiles its own at install time, and rake-compiler puts the right object into each precompiled platform gem itself.
+Three things here drive it:
+
+| Here | Over |
+| --- | --- |
+| `E2EE::Olm` | the Olm and Megolm sessions, and the policy around them |
+| `E2EE::Backup` | `PkEncryption`, which is what `m.megolm_backup.v1.curve25519-aes-sha2` is |
+| `E2EE::CrossSigning::Key` | `Ed25519SecretKey` |
+
+`E2EE::Crypto` is the interface encryption is written against, and `E2EE::Plaintext` satisfies it without encrypting, so a flow can be driven where the real thing is not wanted.
+
+`E2EE::SecretStorage` stays on OpenSSL: `m.secret_storage` is AES-CTR and HMAC, which vodozemac keeps behind `hazmat`.
+
+A key crossing into the binding is unpadded base64, and the binding refuses padding rather than ignoring it — hence the `unpadded` helpers.
 
 ## Release
 
 ```bash
 gem kit bump [major|minor|patch]  # version.rb via the .erb, then relock
 gem kit changelog --write         # draft this version's entry
-bin/release-gem                   # build + push, source gem AND platform gems
+gem kit release                   # build + push, one gem
 ```
 
 `gem kit bump` renders `lib/async/matrix/version.rb` from `version.rb.erb`, blocks a bump onto a due deprecation deadline, and relocks with `BUNDLE_FROZEN=false` (bare `bundle install` inherits the devshell's frozen store Gemfile and fails).
 
-`bin/release-gem` is **not** superseded by `gem kit release`, which does one `gem build` + one `gem push` and has no notion of per-platform gems. This gem has a native extension, so publishing only the source gem would put a Rust toolchain back in every user's install path. `bin/release-gem` builds the source gem locally and downloads the precompiled platform gems from the latest green `cross-compile.yml` run, so **push to async-rest and let that workflow finish before releasing**.
+`gem kit release` is enough now that this gem is pure Ruby: one `gem build`, one `gem push`. There are no per-platform gems here any more, and no `bin/release-gem` — that script and the `cross-compile.yml` workflow went to the `vodozemac` gem, which is what has the native extension. Run `gem kit release --dry-run` first for its gates: a changelog entry, no due deprecation deadline, a clean working tree.
 
-The tradeoff: `bin/release-gem` skips the `gem kit release` gates (changelog entry, deprecation deadlines, clean working tree). Run `gem kit release --dry-run` first to get them.
+Releasing the binding is a separate job in its own repository. Bump the dependency here only once it is on RubyGems, and remember `flake.nix` pins its platform gems by hash.
 
 A relock cannot go through the devshell's `bundle` wrapper, which pins `BUNDLE_GEMFILE` to the read-only store copy. `gem kit bump` handles it; by hand, run bundler with the store's bundler lib and `BUNDLE_GEMFILE` pointed at the checkout.

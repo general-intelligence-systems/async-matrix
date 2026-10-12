@@ -7,8 +7,9 @@ This product includes software developed at The Matrix.org Foundation C.I.C.
 vodozemac
 --------------------------------------------------------------------------------
 
-The native extension under ext/async_matrix_e2ee links vodozemac, the Rust
-implementation of the Olm and Megolm cryptographic ratchets.
+Encryption here is driven through the vodozemac gem, which is Ruby bindings for
+vodozemac, the Rust implementation of the Olm and Megolm cryptographic ratchets.
+The bindings were extracted from this project and are distributed separately.
 
   https://github.com/matrix-org/vodozemac
   Copyright 2021-2026 The Matrix.org Foundation C.I.C.
