@@ -19,37 +19,37 @@
           cp ${./lib/async/matrix/version.rb}   $out/lib/async/matrix/version.rb
         '';
 
-        # tree_sitter_language_pack (via tree_haver, via ast-crispr-ruby-prism) builds its
-        # extension with cargo, which a gem derivation does not have. Its precompiled gems
-        # need no compiler, but bundix writes one entry with no platform, so the gem it names
-        # and the hash it records come from different files. The platform belongs to the
-        # system being built for rather than to the lockfile, so it is chosen here.
-        treeSitterPlatforms = {
+        # vodozemac carries a Rust extension, and its precompiled platform gems need no compiler.
+        # bundix writes one entry with no platform, so the gem it names and the hash it records come
+        # from different files: the name resolves to the source gem, which would want cargo, while
+        # the hash is the platform gem's. The platform belongs to the system being built for rather
+        # than to the lockfile, so it is chosen here.
+        vodozemacPlatforms = {
           x86_64-linux = {
             platform = "x86_64-linux";
-            sha256 = "0zkcp53qg4jdlym362chd0ri5j1hzrrb1fbm7d10f24sdq3kxklq";
+            sha256 = "04zhxk8kbsimh70yy5yssyyj3bq6267dv8c7j6gdl8f9jnhby7w4";
           };
           aarch64-linux = {
             platform = "aarch64-linux";
-            sha256 = "0v5300q2hnkc1f7ci2wyr9i19xdznrd0r3mkc0zraak8p7dljigr";
+            sha256 = "1m28m8wh3wb00a95w7al8la8apkbqg1v52palw0czincgpabi0gi";
           };
           x86_64-darwin = {
             platform = "x86_64-darwin";
-            sha256 = "0x5gv12hm54pp54wf3g3fisc0mlp63ryhcwd72ra1fnq0s1cmnp4";
+            sha256 = "0fggkv23lr2d0rkqz01736k8bja0nqh9gvvxagdlhcncyxk58sh3";
           };
           aarch64-darwin = {
             platform = "arm64-darwin";
-            sha256 = "0xaw6wsf1qz1i4ppjhp2qk4zbdaf1k4g5k6w2k5pww044d2c6ajc";
+            sha256 = "10rxr1zfjs0gdjghvgish8wjd3aa4k4bmhdvi6hd5sljz28dx23i";
           };
         };
 
         gemset = import ./gemset.nix;
 
-        treeSitterGem =
+        vodozemacGem =
           let
-            selected = treeSitterPlatforms.${system} or (throw
-              "tree_sitter_language_pack has no precompiled gem for ${system}");
-            generic = gemset.tree_sitter_language_pack;
+            selected = vodozemacPlatforms.${system} or (throw
+              "vodozemac has no precompiled gem for ${system}");
+            generic = gemset.vodozemac;
           in
           generic // {
             version = "${generic.version}-${selected.platform}";
@@ -61,7 +61,7 @@
           ruby = pkgs.ruby_4_0;
           gemfile = ./Gemfile;
           lockfile = ./Gemfile.lock;
-          gemset = gemset // { tree_sitter_language_pack = treeSitterGem; };
+          gemset = gemset // { vodozemac = vodozemacGem; };
           extraConfigPaths = [ "${gemspecFiles}/." ];
         };
 
@@ -72,7 +72,6 @@
             gems
             gems.wrappedRuby
 
-            # license-eye, which reads .licenserc.yaml: `license-eye header check` verifies the notice every Ruby file opens with. It is Go rather than Ruby, so it comes from here rather than from the bundle.
             skywalking-eyes
           ];
 
