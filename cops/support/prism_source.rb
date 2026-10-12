@@ -3,34 +3,22 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-# Reads the file under inspection with Prism, through ast-crispr-ruby-prism, instead of through the parser gem syntax tree RuboCop hands a cop.
+# Reads the file under inspection with Prism, which ships with Ruby, instead of through the parser gem syntax tree RuboCop hands a cop.
 #
-# A cop which includes this does not use the `on_<type>` callbacks: those are driven by the parser gem tree, so a cop which reads a different tree walks it itself from `on_new_investigation`. What it gains is one parse of the file by the same Prism which runs the program, a uniform walk over every node, and the library's resolution of which comment documents which declaration.
+# A cop which includes this does not use the `on_<type>` callbacks: those are driven by the parser gem tree, so a cop which reads a different tree walks it itself from `on_new_investigation`. What it gains is one parse of the file by the same Prism which runs the program, and a uniform walk over every node.
 #
 # Offences are still reported against `Parser::Source::Range`, because that is what RuboCop and its correctors take. A Prism location and a RuboCop buffer measure the same source in bytes from the same origin, so a range is built from the offsets directly.
 #
-# The wrapper does not track parentage - `parent` and `next_sibling` are nil - so the walk records the parent of each node as it descends.
-#
-# Two kinds of leading comment are offered, because they are not interchangeable. `prism_leading_comments` is the run of lines touching a declaration, which is what documents it. `prism_owned_comments` is the wider span the library attributes to a statement, reaching back to whatever precedes it: for the first statement of a body that crosses the enclosing declaration and takes its comment too, so it answers where a comment sits rather than what a declaration says.
+# Prism does not track parentage - a node does not name the node it is written inside - so the walk records the parent of each node as it descends.
 
-require "ast-crispr-ruby-prism"
+require "prism"
 
 module RuboCop
   module Cop
     module PrismSource
-      # @returns [Ast::Crispr::DocumentContext] the file, parsed once however many times this is called.
-      def prism_document
-        self.prism_state.fetch(:document)
-      end
-
-      # @returns [Prism::Merge::FileAnalysis] what the library read the file as.
-      def prism_analysis
-        self.prism_document.ast
-      end
-
-      # @returns [TreeHaver::Backends::Prism::Node] the root of the tree, wrapped for a uniform walk.
-      def prism_root
-        self.prism_state.fetch(:root)
+      # @returns [Prism::ParseResult] the file, parsed once however many times this is called.
+      def prism_result
+        self.prism_state.fetch(:result)
       end
 
       # Every node in the file, outermost first, in source order.
@@ -135,30 +123,26 @@ module RuboCop
 
       # @returns [String] the source of the given node.
       def prism_source(node)
-        self.prism_document.location_slice(node.location)
+        node.location.slice
       end
 
       # @returns [Array(Prism::InlineComment)] every comment in the file, in source order.
       def prism_comments
-        self.prism_analysis.parse_result.comments
+        self.prism_result.comments
       end
 
-      # The run of comment lines written directly above a declaration.
+      # The run of comment lines written directly above a declaration, which is what documents it.
       #
       # @returns [Array(Prism::InlineComment)] the comments, in source order.
       def prism_leading_comments(node)
         self.prism_state.fetch(:leading)[node] ||= self.contiguous_above(node)
       end
 
-      # Every comment the library reads the given statement as owning.
+      # Every comment a declaration owns, which is the same run: a comment belongs to whatever it is written above.
       #
       # @returns [Array(Prism::InlineComment)] the comments, in source order.
       def prism_owned_comments(node)
-        self.prism_state.fetch(:owned)[node] ||= begin
-          self.prism_document.comment_regions_for(node, region: :leading, owner_scope: :all_statements)
-        rescue ::Ast::Crispr::Error
-          []
-        end
+        self.prism_leading_comments(node)
       end
 
       private
@@ -176,36 +160,29 @@ module RuboCop
       end
 
       def read(source)
-        document = ::Ast::Crispr::Ruby::Prism.document_context(
-          content: source.buffer.source,
-          source_label: source.path.to_s,
-        )
-
-        root = ::TreeHaver::Backends::Prism::Node.new(document.ast.parse_result.value, document.content)
+        result = ::Prism.parse(source.buffer.source)
 
         nodes = []
         parents = {}.compare_by_identity
 
-        self.descend(root.inner_node, nil, nodes, parents)
+        self.descend(result.value, nil, nodes, parents)
 
         by_line = {}
 
-        document.ast.parse_result.comments.each do |comment|
+        result.comments.each do |comment|
           by_line[comment.location.start_line] = comment
         end
 
         {
-          document: document,
-          root: root,
+          result: result,
           nodes: nodes,
           parents: parents,
           by_line: by_line,
           leading: {}.compare_by_identity,
-          owned: {}.compare_by_identity,
         }
       end
 
-      # The tree, recorded flat with the parent of each node, since the wrapper does not say.
+      # The tree, recorded flat with the parent of each node, since Prism does not say.
       def descend(node, parent, nodes, parents)
         nodes << node
         parents[node] = parent
