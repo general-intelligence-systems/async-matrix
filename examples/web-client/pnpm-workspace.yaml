@@ -7,3 +7,9 @@ allowBuilds:
   inferno: false
 minimumReleaseAgeExclude:
   - vite@8.3.0
+# Both reach here through a dependency rather than a direct one, so the version is forced:
+# @modelcontextprotocol/sdk through shadcn (GHSA-6qxp-vccf-f47h), and source-map-js through
+# postcss and css-tree (GHSA-68fv-2mgg-jv7q).
+overrides:
+  '@modelcontextprotocol/sdk': '>=1.31.0'
+  source-map-js: '>=1.2.2'
