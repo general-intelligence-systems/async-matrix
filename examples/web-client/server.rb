@@ -354,6 +354,18 @@ def store_inbound_session(content, sender, imported)
 end
 
 def apply_room(registry, room_id, payload, membership, me)
+  forgotten = Matrix::RoomActions.forgotten.include?(room_id)
+
+  unless forgotten && membership == "leave"
+    if forgotten
+      Matrix::RoomActions.remember!(room_id)
+    end
+
+    apply_room!(registry, room_id, payload, membership, me)
+  end
+end
+
+def apply_room!(registry, room_id, payload, membership, me)
   room = upsert(M::Room, {room_id: room_id})
   room.membership = membership
 

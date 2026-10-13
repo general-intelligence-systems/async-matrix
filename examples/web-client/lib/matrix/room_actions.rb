@@ -18,25 +18,23 @@ module Matrix
       end
 
       Session.open(credential) do |client, _credentials|
-        yield client, client.room(room_id), credential
+        yield client, room_id && client.room(room_id), credential
       end
     end
 
     class Error < StandardError; end
 
     def enqueue!(room_id, type, content)
-      transaction_id = SecureRandom.urlsafe_base64(16)
-
-      Models::Matrix::SendQueue.new(
-        room_id:        room_id,
-        transaction_id: transaction_id,
-        event_type:     type,
-        content:        content,
-        priority:       PENDING,
-        enqueued_at:    (Time.now.to_f * 1000).to_i,
-      ).save(validate: false)
-
-      transaction_id
+      SecureRandom.urlsafe_base64(16).tap do |transaction_id|
+        Models::Matrix::SendQueue.new(
+          room_id:        room_id,
+          transaction_id: transaction_id,
+          event_type:     type,
+          content:        content,
+          priority:       PENDING,
+          enqueued_at:    (Time.now.to_f * 1000).to_i,
+        ).save(validate: false)
+      end
     end
 
     def dequeue!(room_id, transaction_id)
@@ -68,6 +66,65 @@ module Matrix
       end
 
       self.send_event(room_id, "m.room.message", content)
+    end
+
+    MSGTYPES = {
+      "image" => "m.image",
+      "video" => "m.video",
+      "audio" => "m.audio",
+    }.freeze
+
+    def msgtype_for(content_type)
+      MSGTYPES.fetch(content_type.to_s.split("/").first, "m.file")
+    end
+
+    def send_attachment(room_id, bytes, content_type, filename)
+      uri = self.upload(bytes, content_type, filename)
+
+      Models::Matrix::Media.store!(uri: uri, data: bytes)
+
+      content = {
+        "msgtype" => self.msgtype_for(content_type),
+        "body"    => filename,
+        "url"     => uri,
+        "info"    => { "mimetype" => content_type, "size" => bytes.bytesize },
+      }
+
+      self.send_event(room_id, "m.room.message", content)
+    end
+
+    def upload(bytes, content_type, filename)
+      self.with_room(nil) do |client, _room, _credential|
+        client.content_repo.upload_content(bytes, content_type, filename: filename).content_uri
+      end
+    end
+
+    def media_url(uri)
+      if uri.to_s.start_with?("mxc://")
+        "/matrix/media/#{uri.to_s.delete_prefix("mxc://")}"
+      else
+        nil
+      end
+    end
+
+    def download(uri)
+      cached = Models::Matrix::Media.fetch(uri: uri)
+
+      if cached
+        cached.data
+      else
+        server, media_id = uri.to_s.delete_prefix("mxc://").split("/", 2)
+
+        bytes = self.with_room(nil) do |client, _room, _credential|
+          client.authed_content_repo.get_content_authed(server, media_id).read
+        end
+
+        unless bytes.nil?
+          Models::Matrix::Media.store!(uri: uri, data: bytes)
+        end
+
+        bytes
+      end
     end
 
     def send_event(room_id, type, content)
@@ -152,15 +209,28 @@ module Matrix
       end
     end
 
-    # Forgetting is the one action which deletes locally: the homeserver stops reporting the room,
-    # so sync will never say it is gone.
     def forget(room_id)
       self.with_room(room_id) do |_client, room, _credential|
         room.leave_room
         room.forget_room
       end
 
+      self.forget!(room_id)
       self.purge!(room_id)
+    end
+
+    FORGOTTEN = "forgotten_rooms"
+
+    def forgotten
+      Array(Models::Matrix::KV[FORGOTTEN])
+    end
+
+    def forget!(room_id)
+      Models::Matrix::KV.set!(FORGOTTEN, (self.forgotten + [room_id]).uniq)
+    end
+
+    def remember!(room_id)
+      Models::Matrix::KV.set!(FORGOTTEN, self.forgotten - [room_id])
     end
 
     def purge!(room_id)
@@ -227,7 +297,6 @@ module Matrix
       )
     end
 
-    # Power levels are one state event, so a change is read-modify-write over what is already there.
     def set_power_level(room_id, user_id, level)
       current = Models::Matrix::RoomState.content_for(room_id: room_id, event_type: "m.room.power_levels") || {}
       users = (current["users"] || {}).dup

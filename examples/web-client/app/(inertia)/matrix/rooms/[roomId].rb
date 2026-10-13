@@ -558,6 +558,10 @@ get "/" do
         senderName:      event.sender_name,
         senderAvatar:    event.sender_avatar_url,
         body:            event.content["body"],
+        msgtype:         event.content["msgtype"],
+        media:           Matrix::RoomActions.media_url(event.content["url"]),
+        mimetype:        event.content.dig("info", "mimetype"),
+        size:            event.content.dig("info", "size"),
         formatted:       event.formatted_body,
         ts:              event.origin_server_ts.to_i,
         edited:          event.edited?,
@@ -585,6 +589,19 @@ post "/" do
         params["body"].to_s,
         reply_to: params["reply_to"],
         edits:    params["edits"],
+      )
+    when "attach"
+      upload = params["file"]
+
+      if upload.nil?
+        halt(422, "matrix: no file\n")
+      end
+
+      Matrix::RoomActions.send_attachment(
+        room_id,
+        upload[:tempfile].read,
+        upload[:type].to_s,
+        upload[:filename].to_s,
       )
     when "redact"
       Matrix::RoomActions.redact(room_id, params["event_id"].to_s, reason: params["reason"])
@@ -618,7 +635,8 @@ end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link, router } from "@inertiajs/react"
+import { useRef } from "react"
 import {
   ArrowLeft,
   Lock,
@@ -680,6 +698,10 @@ type Event = {
   senderName: string
   senderAvatar: string | null
   body: string | null
+  msgtype: string | null
+  media: string | null
+  mimetype: string | null
+  size: number | null
   formatted: string | null
   ts: number
   edited: boolean
@@ -798,6 +820,30 @@ function MessageRow({
             </span>
           ) : event.redacted ? (
             <span className="text-sm">Message deleted</span>
+          ) : event.media && event.msgtype === "m.image" ? (
+            <a href={event.media} target="_blank" rel="noreferrer">
+              <img
+                src={event.media}
+                alt={event.body ?? ""}
+                className="max-h-80 max-w-full rounded"
+              />
+            </a>
+          ) : event.media && event.msgtype === "m.video" ? (
+            <video src={event.media} controls className="max-h-80 max-w-full rounded" />
+          ) : event.media && event.msgtype === "m.audio" ? (
+            <audio src={event.media} controls className="w-full" />
+          ) : event.media ? (
+            <a
+              href={event.media}
+              download={event.body ?? undefined}
+              className="flex items-center gap-2 text-sm underline"
+            >
+              <Paperclip className="size-3.5" />
+              {event.body}
+              {event.size ? (
+                <span className="text-xs opacity-70">({Math.ceil(event.size / 1024)} KB)</span>
+              ) : null}
+            </a>
           ) : event.formatted ? (
             <div
               className="text-sm [&_a]:underline [&_code]:rounded [&_code]:bg-black/10 [&_code]:px-1"
@@ -938,6 +984,7 @@ export default function MatrixRoom({
   selfId: string
 }) {
   const encoded = encodeURIComponent(room.roomId)
+  const attachment = useRef<HTMLInputElement>(null)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -989,31 +1036,78 @@ export default function MatrixRoom({
         <>
           <Timeline events={events} selfId={selfId} />
 
-          {/* MessageToolbar. The send path is not wired yet, so the controls
-              are present and inert rather than absent -- the composer is the
-              part of a chat UI that has to be laid out against real content. */}
+          {/* MessageToolbar. Enter sends, shift+Enter is a newline, and the paperclip posts the
+              file on its own as multipart -- an attachment is an upload then a message, so it
+              cannot ride along with the text. */}
           <div className="shrink-0 border-t p-3">
-            <InputGroup className="mx-auto max-w-3xl">
-              <InputGroupTextarea
-                placeholder={`Message ${room.title}`}
-                rows={1}
-                className="max-h-40"
-              />
-              <InputGroupAddon align="block-end">
-                <InputGroupButton variant="ghost" size="icon-xs" aria-label="Attach">
-                  <Paperclip className="size-4" />
-                </InputGroupButton>
-                {room.encrypted && (
-                  <Badge variant="secondary" size="sm" className="ml-1">
-                    <Lock className="size-2.5" />
-                    Encrypted
-                  </Badge>
-                )}
-                <InputGroupButton size="icon-xs" className="ms-auto" aria-label="Send">
-                  <Send className="size-4" />
-                </InputGroupButton>
-              </InputGroupAddon>
-            </InputGroup>
+            <Form
+              action={`/matrix/rooms/${encoded}`}
+              method="post"
+              resetOnSuccess
+              className="mx-auto max-w-3xl"
+            >
+              {({ processing, submit }) => (
+                <InputGroup>
+                  <input type="hidden" name="action" value="send" />
+                  <InputGroupTextarea
+                    name="body"
+                    placeholder={`Message ${room.title}`}
+                    rows={1}
+                    className="max-h-40"
+                    disabled={processing}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault()
+                        submit()
+                      }
+                    }}
+                  />
+                  <InputGroupAddon align="block-end">
+                    <InputGroupButton
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Attach"
+                      type="button"
+                      disabled={processing}
+                      onClick={() => attachment.current?.click()}
+                    >
+                      <Paperclip className="size-4" />
+                    </InputGroupButton>
+                    {room.encrypted && (
+                      <Badge variant="secondary" size="sm" className="ml-1">
+                        <Lock className="size-2.5" />
+                        Encrypted
+                      </Badge>
+                    )}
+                    <InputGroupButton
+                      size="icon-xs"
+                      className="ms-auto"
+                      aria-label="Send"
+                      type="submit"
+                      disabled={processing}
+                    >
+                      <Send className="size-4" />
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+              )}
+            </Form>
+
+            <input
+              ref={attachment}
+              type="file"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (!file) return
+                router.post(
+                  `/matrix/rooms/${encoded}`,
+                  { action: "attach", file },
+                  { forceFormData: true, preserveScroll: true },
+                )
+                event.target.value = ""
+              }}
+            />
           </div>
         </>
       )}
