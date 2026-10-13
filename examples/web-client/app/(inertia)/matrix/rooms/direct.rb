@@ -1,5 +1,71 @@
 # frozen_string_literal: true
 
+# /matrix/rooms/direct — New direct chat
+#
+# Fractal: session_view/create_direct_chat_dialog/
+#
+# NOT IMPLEMENTED.
+#
+# Start a DM: user search, then /createRoom with is_direct and the m.direct
+# account-data update.
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# session_view/create_direct_chat_dialog/mod.blp
+#
+#   <Adw.Dialog id="CreateDirectChatDialog">
+#     <Adw.ToolbarView slot="child">
+#       <Adw.HeaderBar />
+#       <Adw.Clamp>
+#         <Gtk.Box>
+#           <Gtk.Label id="heading" />
+#           <Gtk.SearchEntry id="search_entry" />
+#         </Gtk.Box>
+#       </Adw.Clamp>
+#       <Gtk.Stack slot="content" id="stack">
+#         <Gtk.StackPage>
+#           <Adw.StatusPage slot="child" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Gtk.ScrolledWindow slot="child" id="matching_page">
+#             <Adw.Clamp slot="child">
+#               <Gtk.ListBox slot="child" id="list_box" />
+#             </Adw.Clamp>
+#           </Gtk.ScrolledWindow>
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Adw.StatusPage slot="child" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Adw.StatusPage slot="child" id="error_page" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Adw.Spinner slot="child" />
+#         </Gtk.StackPage>
+#       </Gtk.Stack>
+#     </Adw.ToolbarView>
+#   </Adw.Dialog>
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/dialog-2 — "Workspace invite dialog with multi-email input and role select".
+#   The multi-value entry is the part worth taking; roles are not in play here.
+#
+#   Gtk.SearchEntry + results  ->  reui/autocomplete — async /user_directory/search
+#   selected users as pills    ->  ui/badge chips with a remove affordance
+#   Pill (components/pill)     ->  ui/badge + ui/avatar
+#
+# INSTALL, reui registry: @reui/autocomplete
+#
 get "/" do
   render("matrix/rooms/direct")
 end

@@ -1,5 +1,89 @@
 # frozen_string_literal: true
 
+# /matrix/rooms/:roomId/events/:eventId — Event
+#
+# Fractal: room_history/event_actions/properties_dialog.rs (partially)
+#
+# NOT IMPLEMENTED.
+#
+# One event: the permalink target, and the view-source screen. Only possible
+# now that matrix_events.raw exists -- the projection used to keep decrypted
+# content and discard the envelope.
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# session_view/room_history/event_actions/properties_dialog.blp
+#
+#   <ToastableDialog id="EventPropertiesDialog">
+#     <Adw.NavigationView slot="child-content" id="navigation_view">
+#       <Adw.NavigationPage>
+#         <Adw.ToolbarView slot="child">
+#           <Adw.HeaderBar />
+#           <Gtk.ScrolledWindow slot="content">
+#             <Adw.Clamp slot="child">
+#               <Gtk.Box slot="child">
+#                 <Gtk.Box>
+#                   <Label />
+#                   <Gtk.ListBox>
+#                     <CopyableRow id="original_event_id_row" />
+#                     <CopyableRow id="room_id_row" />
+#                     <Adw.ActionRow id="sender_id_row">
+#                       <Gtk.Button />
+#                     </Adw.ActionRow>
+#                     <CopyableRow id="original_timestamp_row" />
+#                     <Adw.ButtonRow />
+#                   </Gtk.ListBox>
+#                 </Gtk.Box>
+#                 <Gtk.Box>
+#                   <Gtk.Label />
+#                   <Gtk.ListBox>
+#                     <CopyableRow id="edit_event_id_row" />
+#                     <CopyableRow id="edit_timestamp_row" />
+#                     <Adw.ButtonRow />
+#                   </Gtk.ListBox>
+#                 </Gtk.Box>
+#               </Gtk.Box>
+#             </Adw.Clamp>
+#           </Gtk.ScrolledWindow>
+#         </Adw.ToolbarView>
+#       </Adw.NavigationPage>
+#       <Adw.NavigationPage id="source_page">
+#         <Adw.ToolbarView slot="child">
+#           <Adw.HeaderBar>
+#             <Gtk.Button />
+#           </Adw.HeaderBar>
+#           <Gtk.ScrolledWindow slot="content">
+#             <GtkSource.View slot="child" id="source_view" />
+#           </Gtk.ScrolledWindow>
+#         </Adw.ToolbarView>
+#       </Adw.NavigationPage>
+#     </Adw.NavigationView>
+#   </ToastableDialog>
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/sheet-14 — "Audit event detail sheet with config diff, raw JSON and request
+#   trace". Raw JSON with a diff is exactly the view-source screen, and the diff pane
+#   is where an edit shows against its original.
+#
+#   PropertiesDialog             ->  ui/card sections, or ui/sheet if opened over the timeline
+#   source / latest_edit_source  ->  reui/code-block, two panes — matrix_events.raw
+#   CopyableRow                  ->  ui/item with a copy button
+#   sender / timestamp           ->  ui/avatar + ui/tooltip
+#
+# INSTALL, reui registry: @reui/code-block
+#
+# One event: the permalink target and the view-source screen. Only possible
+# because matrix_events.raw keeps the envelope the projection used to discard.
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
@@ -23,6 +107,8 @@ get "/" do
       decryptionError: event.decryption_error,
       stateKey:        event.state_key,
     },
+    # View source, which is the whole point of this page: `raw` is the event as
+    # it arrived, and `content` is only its decrypted inside.
     source:    MultiJson.dump(event.raw || event.content, pretty: true),
     unsigned:  MultiJson.dump(event.unsigned, pretty: true),
   )

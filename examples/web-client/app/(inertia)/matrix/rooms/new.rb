@@ -1,5 +1,85 @@
 # frozen_string_literal: true
 
+# /matrix/rooms/new — New room
+#
+# Fractal: session_view/create_room_dialog.blp
+#
+# NOT IMPLEMENTED.
+#
+# Create a room: name, topic, visibility, encryption. A dialog in Fractal, a
+# page here -- this router has no modal concept and the house pattern for a
+# form that commits is get + post on one route (see app/labels/new.rb).
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# session_view/create_room_dialog.blp
+#
+#   <ToastableDialog id="CreateRoomDialog">
+#     <Adw.ToolbarView slot="child-content">
+#       <Adw.HeaderBar />
+#       <Gtk.ScrolledWindow slot="content" id="scrolled_window">
+#         <Adw.Clamp slot="child">
+#           <Gtk.Box slot="child">
+#             <Gtk.Label id="heading" />
+#             <Gtk.Box id="content">
+#               <Adw.PreferencesGroup>
+#                 <Adw.EntryRow id="room_name" />
+#               </Adw.PreferencesGroup>
+#               <Adw.PreferencesGroup id="topic_group">
+#                 <Gtk.ScrolledWindow>
+#                   <Gtk.TextView id="topic_text_view" />
+#                 </Gtk.ScrolledWindow>
+#               </Adw.PreferencesGroup>
+#               <Adw.PreferencesGroup>
+#                 <Adw.ActionRow>
+#                   <Gtk.CheckButton id="visibility_private" />
+#                 </Adw.ActionRow>
+#                 <Adw.ActionRow>
+#                   <Gtk.CheckButton id="visibility_public" />
+#                 </Adw.ActionRow>
+#               </Adw.PreferencesGroup>
+#               <Adw.PreferencesGroup>
+#                 <Adw.SwitchRow id="encryption" />
+#               </Adw.PreferencesGroup>
+#               <Adw.PreferencesGroup>
+#                 <SubstringEntryRow id="room_address" />
+#                 <Gtk.Revealer id="room_address_error_revealer">
+#                   <Gtk.Label slot="child" id="room_address_error" />
+#                 </Gtk.Revealer>
+#               </Adw.PreferencesGroup>
+#             </Gtk.Box>
+#             <LoadingButton id="create_button" />
+#           </Gtk.Box>
+#         </Adw.Clamp>
+#       </Gtk.ScrolledWindow>
+#     </Adw.ToolbarView>
+#   </ToastableDialog>
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/dialog-9 — "Create project dialog with cover image upload and status, priority,
+#   assignee, and label comboboxes". Same shape as create-room: avatar upload, name,
+#   topic, and a few enumerated choices. Rendered as a page, not a dialog.
+#
+#   Adw.EntryRow (name/topic)  ->  ui/field + ui/input / ui/textarea
+#   EditableAvatar             ->  ui/avatar + file-upload
+#   visibility / preset        ->  ui/radio-group — three mutually exclusive choices, not a select
+#   encryption switch          ->  ui/switch
+#   Adw.PreferencesGroup       ->  ui/card or reui/frame
+#
+# INSTALL, plain shadcn: radio-group
+# INSTALL, NOT IN EITHER REGISTRY -- reui lists file-upload on its components page but the
+#   base-vega registry does not carry it; check the name before relying on it.
+#
 get "/" do
   render("matrix/rooms/new")
 end

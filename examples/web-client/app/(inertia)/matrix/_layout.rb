@@ -1,6 +1,205 @@
 # frozen_string_literal: true
 
+# Everything under /matrix. Evaluated into every route file below it, which is
+# why the device and the sidebar live here rather than being fetched per page.
+#
+# ONE DEVICE, NOT A SESSION LIST. matrix_credentials is unique on user_id and
+# this app is a single operator behind SyncAuth, so Fractal's login/,
+# account_switcher/ and session_list/ have no analogue -- the device is
+# configured, not chosen. That is four of its fourteen top-level views gone.
+#
+# `share` is where the sidebar belongs: Fractal's SidebarItemList is one room
+# list partitioned into SidebarSectionNames, and the partition is computable --
+# matrix_rooms.favourite / .low_priority (m.tag), membership for invited and
+# left, and `space`. See session/sidebar_data/section/name.rs for the sections.
+#
+# `share`, not `share_props`: share_props would register the block for every
+# request in the app, including the pages that have nothing to do with Matrix.
+#
+# THE LIST GOES IN THE SHELL'S SIDEBAR AND EACH PAGE'S HEADER IN THE SHELL'S
+# HEADER. The template below renders the room list into <ShellSidebar> and
+# every page under here renders its bar into <ShellHeader>
+# (frontend/components/admin/slots.tsx) rather than drawing either itself --
+# this layout used to build its own <aside> and its own header bar, which came
+# out as a second sidebar and a second header INSIDE the shell's.
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# session_view/mod.blp
+#
+#   <Adw.Bin id="SessionView">
+#     <Gtk.Stack slot="child" id="stack">
+#       <Gtk.Overlay id="overlay">
+#         <MediaViewer id="media_viewer" />
+#         <Adw.NavigationSplitView id="split_view">
+#           <Sidebar slot="sidebar" id="sidebar" />
+#           <Content slot="content" id="content" />
+#         </Adw.NavigationSplitView>
+#       </Gtk.Overlay>
+#     </Gtk.Stack>
+#     <Gtk.ShortcutController>
+#       <Gtk.Shortcut />
+#       <Gtk.Shortcut />
+#       <Gtk.Shortcut />
+#       <Gtk.Shortcut />
+#     </Gtk.ShortcutController>
+#   </Adw.Bin>
+#
+# session_view/sidebar/mod.blp
+#
+#   <Adw.NavigationPage id="Sidebar">
+#     <Adw.ToolbarView>
+#       <Adw.HeaderBar id="header_bar">
+#         <AccountSwitcherButton id="account_switcher_button" />
+#         <Gtk.MenuButton id="appmenu_button" />
+#         <Gtk.ToggleButton id="search_button" />
+#       </Adw.HeaderBar>
+#       <Gtk.SearchBar id="room_search">
+#         <Gtk.SearchEntry slot="child" id="room_search_entry" />
+#       </Gtk.SearchBar>
+#       <Gtk.Box slot="content">
+#         <OfflineBanner />
+#         <Adw.Banner id="security_banner" />
+#         <Stack id="room_stack">
+#           <StackPage>
+#             <Adw.StatusPage slot="child" />
+#           </StackPage>
+#           <StackPage>
+#             <Gtk.ScrolledWindow slot="child" id="scrolled_window">
+#               <Gtk.ListView slot="child" id="listview" />
+#             </Gtk.ScrolledWindow>
+#           </StackPage>
+#         </Stack>
+#       </Gtk.Box>
+#     </Adw.ToolbarView>
+#   </Adw.NavigationPage>
+#
+# session_view/sidebar/section_row.blp
+#
+#   <Adw.Bin id="SidebarSectionRow">
+#     <Gtk.Box>
+#       <Gtk.Label id="display_name" />
+#       <Gtk.Stack>
+#         <Gtk.StackPage>
+#           <Gtk.Image slot="child" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Gtk.Label slot="child" id="notification_count" />
+#         </Gtk.StackPage>
+#       </Gtk.Stack>
+#       <Gtk.Image id="arrow" />
+#     </Gtk.Box>
+#   </Adw.Bin>
+#
+# session_view/sidebar/room_row.blp
+#
+#   <Adw.Bin id="SidebarRoomRow">
+#     <Gtk.Box>
+#       <Avatar id="avatar" />
+#       <Gtk.Box id="display_name_box">
+#         <Gtk.Image id="room_icon" />
+#         <Gtk.Label id="display_name" />
+#       </Gtk.Box>
+#       <Gtk.Stack>
+#         <Gtk.StackPage>
+#           <Gtk.Image slot="child" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Gtk.Label slot="child" id="notification_count" />
+#         </Gtk.StackPage>
+#       </Gtk.Stack>
+#     </Gtk.Box>
+#   </Adw.Bin>
+#
+# session_view/sidebar/icon_item_row.blp
+#
+#   <Adw.Bin id="SidebarIconItemRow">
+#     <Gtk.Box>
+#       <Gtk.Image />
+#       <Gtk.Label />
+#     </Gtk.Box>
+#   </Adw.Bin>
+#
+# session_view/sidebar/verification_row.blp
+#
+#   <Adw.Bin id="SidebarVerificationRow">
+#     <Gtk.Box>
+#       <Gtk.Image />
+#       <Gtk.Label id="display_name" />
+#       <Gtk.Label />
+#     </Gtk.Box>
+#   </Adw.Bin>
+#
+# session_view/content.blp
+#
+#   <Adw.NavigationPage id="Content">
+#     <Gtk.Stack slot="child" id="stack">
+#       <Gtk.StackPage>
+#         <Adw.ToolbarView slot="child" id="empty_page">
+#           <Adw.HeaderBar id="empty_page_header_bar" />
+#           <Adw.StatusPage slot="content" />
+#         </Adw.ToolbarView>
+#       </Gtk.StackPage>
+#       <Gtk.StackPage>
+#         <ContentRoomHistory slot="child" id="room_history" />
+#       </Gtk.StackPage>
+#       <Gtk.StackPage>
+#         <ContentInviteRequest slot="child" id="invite_request" />
+#       </Gtk.StackPage>
+#       <Gtk.StackPage>
+#         <ContentInvite slot="child" id="invite" />
+#       </Gtk.StackPage>
+#       <Gtk.StackPage>
+#         <ContentExplore slot="child" id="explore" />
+#       </Gtk.StackPage>
+#       <Gtk.StackPage>
+#         <Adw.ToolbarView slot="child" id="verification_page">
+#           <Adw.HeaderBar id="verification_page_header_bar" />
+#           <IdentityVerificationView slot="content" id="identity_verification_widget" />
+#         </Adw.ToolbarView>
+#       </Gtk.StackPage>
+#     </Gtk.Stack>
+#   </Adw.NavigationPage>
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/app-shell-21 — "AI chat workspace: resizable thread sidebar collapsing to an
+#   icon rail, pinned and grouped chats, a search palette". VERIFIED IN THE BROWSER:
+#   its sidebar is already Fractal's. "Pinned 2 / Recent 6" as collapsible groups with
+#   counts IS SidebarSection -- name, is_expanded, notification_count -- and the
+#   resizable pane IS Adw.NavigationSplitView. Built from Avatar, Badge, Collapsible,
+#   Dialog, Dropdown Menu, Empty, Input Group, Item, Kbd, Resizable, Scroll Area, Sheet.
+#
+#   Adw.NavigationSplitView            ->  ui/resizable — a draggable split, which GTK gives free
+#                                           and the web does not
+#   Adw.NavigationPage (sidebar)       ->  ui/sidebar + ui/scroll-area
+#   SidebarSection (7 of them)         ->  ui/collapsible per section; is_expanded is its open state
+#   SidebarSection.notification_count  ->  ui/badge on the group header
+#   SidebarRoomRow                     ->  ui/item — avatar + name + preview + count, which is
+#                                           Item's shape
+#   SidebarIconItem (Explore/Forget)   ->  ui/sidebar menu buttons
+#   SidebarVerificationRow             ->  ui/item with a Badge
+#   Gtk.StringFilter (sidebar search)  ->  ui/command — Cmd-K over rooms beats a filter box
+#   Adw.Avatar                         ->  ui/avatar
+#
+# INSTALL, plain shadcn: command, collapsible
+#
 
+# Fractal's SidebarSectionName, in its order, with the dataset that selects each
+# one. Its first two -- verification-request and invite-request -- have no table
+# to come from and no section until there is, so five of the seven are here.
+#
+# `normal` is the default section: joined, and neither tagged. The partition is
+# total, so a room appears in exactly one.
 SECTIONS = [
   ["invited",      "Invites",      ->(rooms){rooms.where(membership: "invite")}],
   ["favorite",     "Favourites",   ->(rooms){rooms.joined.where(favourite: true)}],
@@ -35,7 +234,10 @@ Inertia.share do
           lastActivity:  room.last_activity_at,
         }
       end,
+      # The badge on the section header, which is the sum of its rooms rather
+      # than a count of them.
       unread:   rooms.sum{|room| room.num_unread.to_i},
+      # Left is the one section nobody wants open by default.
       expanded: key != "left",
     }
   end

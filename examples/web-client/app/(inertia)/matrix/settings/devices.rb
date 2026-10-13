@@ -1,5 +1,81 @@
 # frozen_string_literal: true
 
+# /matrix/settings/devices — Devices
+#
+# Fractal: account_settings/user_session/ + session/user_sessions_list/
+#
+# NOT IMPLEMENTED.
+#
+# Our own devices: current first, then the rest, with last-seen IP and time
+# and whether each is verified.
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# account_settings/user_session/user_session_list_subpage.blp
+#
+#   <Adw.NavigationPage id="UserSessionListSubpage">
+#     <Adw.ToolbarView slot="child">
+#       <Adw.HeaderBar />
+#       <Adw.PreferencesPage slot="content">
+#         <Adw.PreferencesGroup id="current_session_group">
+#           <Gtk.ListBox id="current_session" />
+#         </Adw.PreferencesGroup>
+#         <Adw.PreferencesGroup id="other_sessions_group">
+#           <Gtk.Stack id="stack">
+#             <Gtk.StackPage>
+#               <Adw.Spinner slot="child" />
+#             </Gtk.StackPage>
+#             <Gtk.StackPage>
+#               <Gtk.ListBox slot="child" id="other_sessions" />
+#             </Gtk.StackPage>
+#             <Gtk.StackPage>
+#               <Gtk.Box slot="child">
+#                 <Gtk.Label />
+#                 <Gtk.Button />
+#               </Gtk.Box>
+#             </Gtk.StackPage>
+#           </Gtk.Stack>
+#         </Adw.PreferencesGroup>
+#       </Adw.PreferencesPage>
+#     </Adw.ToolbarView>
+#   </Adw.NavigationPage>
+#
+# account_settings/user_session/user_session_row.blp
+#
+#   <Gtk.ListBoxRow id="UserSessionRow">
+#     <Gtk.Box slot="child">
+#       <Gtk.Box>
+#         <Gtk.Box id="header">
+#           <Gtk.Label />
+#           <Gtk.Image />
+#           <Gtk.Image />
+#         </Gtk.Box>
+#         <Gtk.Label />
+#       </Gtk.Box>
+#       <Gtk.Image />
+#     </Gtk.Box>
+#   </Gtk.ListBoxRow>
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/solution-users-2 — "Member Detail Page with Sidebar Tabs for Access,
+#   Authentication, and Sessions". Its Sessions tab is this screen: current session
+#   first, then the others, each with last-seen and a verification state.
+#
+#   UserSessionListSubpage  ->  ui/item rows grouped current / other
+#   UserSessionRow          ->  ui/item — name, last_seen_ip, last_seen_ts, ui/badge(verified)
+#   bulk sign-out           ->  ui/alert-dialog, since it needs UIA re-auth
+#   verified / unverified   ->  ui/badge + reui/alert when unverified sessions exist
+#
 
 get "/" do
   credential = Models::Matrix::Credential.first

@@ -1,5 +1,59 @@
 # frozen_string_literal: true
 
+# /matrix/settings/notifications — Notifications
+#
+# Fractal: account_settings/mod + notifications_page.blp
+#
+# NOT IMPLEMENTED.
+#
+# Push rules: the global setting (All | DirectAndMentions | MentionsOnly),
+# keywords, and the per-room overrides in matrix_rooms.notification_mode.
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# account_settings/notifications_page.blp
+#
+#   <Adw.PreferencesPage id="NotificationsPage">
+#     <Adw.PreferencesGroup>
+#       <SwitchLoadingRow id="account_row" />
+#       <Adw.SwitchRow id="session_row" />
+#     </Adw.PreferencesGroup>
+#     <Adw.PreferencesGroup id="global">
+#       <CheckLoadingRow id="global_all_row" />
+#       <CheckLoadingRow id="global_direct_row" />
+#       <CheckLoadingRow id="global_mentions_row" />
+#     </Adw.PreferencesGroup>
+#     <Adw.PreferencesGroup>
+#       <ListBox id="keywords" />
+#     </Adw.PreferencesGroup>
+#   </Adw.PreferencesPage>
+#   <EntryAddRow id="keywords_add_row" />
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/settings-12 — "Notification settings page with per-channel delivery modes and
+#   collapsible auto-follow toggles". Per-channel delivery modes are
+#   NotificationsGlobalSetting; the collapsible section holds the per-room overrides.
+#
+#   NotificationsGlobalSetting (3)  ->  ui/radio-group
+#   NotificationsRoomSetting (4)    ->  ui/select per room row
+#   keywords_list                   ->  ui/badge chips + ui/input-group to add
+#   per_room_settings map           ->  ui/collapsible holding ui/item rows
+#   account/session enabled         ->  ui/switch
+#
+# INSTALL, plain shadcn: radio-group, collapsible
+#
+# Push rules. The global setting and keywords are m.push_rules; the per-room
+# overrides are the cached notification_mode on each room.
 
 get "/" do
   rules = Models::Matrix::AccountData
@@ -8,6 +62,8 @@ get "/" do
   render(
     "matrix/settings/notifications",
     global:    "all",
+    # The content rules a person added, as opposed to the server's own, which
+    # are the ones whose rule_id starts with a dot.
     keywords:  Array(rules.dig("global", "content"))
       .reject{|rule| rule["enabled"] == false || rule["rule_id"].to_s.start_with?(".")}
       .filter_map{|rule| rule["pattern"]},

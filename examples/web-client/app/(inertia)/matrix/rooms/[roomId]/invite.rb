@@ -1,5 +1,92 @@
 # frozen_string_literal: true
 
+# /matrix/rooms/:roomId/invite — Invite people
+#
+# Fractal: room_details/invite_subpage/
+#
+# NOT IMPLEMENTED.
+#
+# Invite people TO this room. Not to be confused with the invite you received,
+# which is a rendering of rooms/[roomId].rb rather than a route.
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# session_view/room_details/invite_subpage/mod.blp
+#
+#   <Adw.NavigationPage id="RoomDetailsInviteSubpage">
+#     <Adw.ToolbarView slot="child">
+#       <Adw.HeaderBar>
+#         <Gtk.Button id="cancel_button" />
+#         <LoadingButton id="invite_button" />
+#       </Adw.HeaderBar>
+#       <Adw.Clamp>
+#         <PillSearchEntry id="search_entry" />
+#       </Adw.Clamp>
+#       <Gtk.Stack slot="content" id="stack">
+#         <Gtk.StackPage>
+#           <Adw.StatusPage slot="child" id="no_search_page" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Gtk.ScrolledWindow slot="child" id="matching_page">
+#             <Adw.ClampScrollable slot="child">
+#               <Gtk.ListView slot="child" id="list_view">
+#                 <Gtk.BuilderListItemFactory slot="factory">
+#                   <RoomDetailsInviteRow slot="child" id="row" />
+#                 </Gtk.BuilderListItemFactory>
+#               </Gtk.ListView>
+#             </Adw.ClampScrollable>
+#           </Gtk.ScrolledWindow>
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Adw.StatusPage slot="child" id="no_matching_page" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Adw.StatusPage slot="child" id="error_page" />
+#         </Gtk.StackPage>
+#         <Gtk.StackPage>
+#           <Adw.Spinner slot="child" />
+#         </Gtk.StackPage>
+#       </Gtk.Stack>
+#     </Adw.ToolbarView>
+#   </Adw.NavigationPage>
+#
+# session_view/room_details/invite_subpage/row.blp
+#
+#   <Adw.Bin id="RoomDetailsInviteRow">
+#     <Gtk.Box slot="child" id="header">
+#       <Avatar />
+#       <Gtk.Box>
+#         <Gtk.Label id="subtitle" />
+#       </Gtk.Box>
+#       <Gtk.CheckButton id="check_button" />
+#       <Gtk.Label />
+#     </Gtk.Box>
+#   </Adw.Bin>
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/dialog-8 — "Multi-row collaborator invite dialog with per-row email field and
+#   role select", or @reui/wizard-5 — "Three step team invitation wizard with per-row
+#   role assignment and pre-send review" if you want the confirm step.
+#
+#   InviteSubpage search      ->  reui/autocomplete — /user_directory/search
+#   selected as pills         ->  ui/badge chips, removable
+#   InviteRow                 ->  ui/item + ui/avatar
+#   per-user failure on send  ->  reui/alert — invites fail individually, so report individually
+#
+# INSTALL, reui registry: @reui/autocomplete
+#
+# Invite people TO this room. Not the invite you received -- that is a
+# rendering of rooms/[roomId].rb.
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
@@ -8,6 +95,7 @@ get "/" do
     "matrix/rooms/[roomId]/invite",
     roomId:    room.room_id,
     roomTitle: room.title,
+    # Already in the room, so the view can mark them rather than offer them.
     existing:  room.members.exclude(membership: %w[leave ban]).select_map(:member_id),
   )
 end

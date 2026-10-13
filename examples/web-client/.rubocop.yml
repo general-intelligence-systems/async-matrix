@@ -175,3 +175,6 @@ Local/CommentStructure:
 
 Local/NoComments:
   Enabled: true
+
+  Exclude:
+    - "app/**/*"

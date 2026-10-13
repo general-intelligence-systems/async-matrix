@@ -1,5 +1,112 @@
 # frozen_string_literal: true
 
+# /matrix/users/:userId — User
+#
+# Fractal: components/dialogs/user_profile.blp -> session/user_sessions_list UserPage
+#
+# NOT IMPLEMENTED.
+#
+# One user, SESSION-SCOPED rather than room-scoped -- Fractal opens this from
+# six places (message row, reaction popover, read receipts, mention pill,
+# event properties, the session view) with no room argument. Reads
+# matrix_global_profiles, matrix_devices and matrix_user_identities; per-room
+# power level belongs behind a ?room= rather than in the path.
+# ── Fractal's widget tree ──────────────────────────────────────────────────
+#
+# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
+# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
+# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
+# it becomes in shadcn/reui is the next decision, not one this records.
+#
+# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
+# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
+# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
+# its own tree below if this view is where it is built.
+#
+# components/dialogs/user_profile.blp
+#
+#   <ToastableDialog id="UserProfileDialog">
+#     <Gtk.Stack slot="child-content" id="stack">
+#       <Gtk.StackPage>
+#         <Adw.Spinner slot="child" />
+#       </Gtk.StackPage>
+#       <Gtk.StackPage>
+#         <UserPage slot="child" id="user_page" />
+#       </Gtk.StackPage>
+#     </Gtk.Stack>
+#   </ToastableDialog>
+#
+# components/user_page.blp
+#
+#   <Adw.NavigationPage id="UserPage">
+#     <Adw.ToolbarView slot="child">
+#       <Adw.HeaderBar />
+#       <Gtk.ScrolledWindow slot="content" id="scrolled_window">
+#         <Adw.Clamp slot="child">
+#           <Gtk.Box slot="child" id="box">
+#             <Avatar id="avatar" />
+#             <Gtk.Box>
+#               <Gtk.Label />
+#               <Gtk.CenterBox>
+#                 <Gtk.Label id="user_id" />
+#                 <Gtk.Button />
+#               </Gtk.CenterBox>
+#             </Gtk.Box>
+#             <Gtk.ListBox id="direct_chat_box">
+#               <LoadingButtonRow id="direct_chat_button" />
+#             </Gtk.ListBox>
+#             <Gtk.Box id="room_box">
+#               <Gtk.Label id="room_title" />
+#               <Gtk.ListBox>
+#                 <Adw.ActionRow id="membership_row">
+#                   <Gtk.Label id="membership_label" />
+#                 </Adw.ActionRow>
+#                 <PowerLevelSelectionRow id="power_level_row" />
+#                 <LoadingButtonRow id="invite_button" />
+#                 <LoadingButtonRow id="kick_button" />
+#                 <LoadingButtonRow id="ban_button" />
+#                 <LoadingButtonRow id="unban_button" />
+#                 <LoadingButtonRow id="remove_messages_button" />
+#               </Gtk.ListBox>
+#             </Gtk.Box>
+#             <Gtk.Box>
+#               <Gtk.Label />
+#               <Gtk.ListBox>
+#                 <Adw.ActionRow id="verified_row">
+#                   <Gtk.Stack id="verified_stack">
+#                     <Gtk.StackPage>
+#                       <LoadingButton slot="child" id="verify_button" />
+#                     </Gtk.StackPage>
+#                     <Gtk.StackPage>
+#                       <Gtk.Image slot="child" />
+#                     </Gtk.StackPage>
+#                   </Gtk.Stack>
+#                 </Adw.ActionRow>
+#                 <Adw.ActionRow id="ignored_row">
+#                   <LoadingButton id="ignored_button" />
+#                 </Adw.ActionRow>
+#               </Gtk.ListBox>
+#             </Gtk.Box>
+#           </Gtk.Box>
+#         </Adw.Clamp>
+#       </Gtk.ScrolledWindow>
+#     </Adw.ToolbarView>
+#   </Adw.NavigationPage>
+#
+# ── Build with ─────────────────────────────────────────────────────────────
+#
+# @reui/solution-users-2 — "Member Detail Page with Sidebar Tabs for Access,
+#   Authentication, and Sessions". Sessions is the one that matters: UserPage lists the
+#   other user's DEVICES with their verification state, which is matrix_devices.
+#
+#   UserPage header    ->  ui/avatar + ui/badge (verified / ignored)
+#   device list        ->  ui/item rows, Badge per trust_state
+#   VERIFY action      ->  ui/button -> /matrix/verification/:flowId
+#   ignore / unignore  ->  ui/switch, writing m.ignored_user_list
+#   shared rooms       ->  ui/item list
+#
+# One user, SESSION-SCOPED. Fractal opens this from six places with no room
+# argument, so the room is context (?room=) rather than part of the path.
 
 get "/" do
   user_id = params["userId"].to_s
@@ -8,6 +115,7 @@ get "/" do
   ignored = Models::Matrix::AccountData
     .content_for(event_type: Models::Matrix::AccountData::IGNORED_USERS).to_h
 
+  # The rooms we share, which is the honest answer to "who is this".
   shared = Models::Matrix::RoomMember.where(member_id: user_id, membership: "join")
 
   render(

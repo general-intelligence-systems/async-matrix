@@ -2,22 +2,53 @@
 
 require "digest"
 
+# /matrix/login — connect this controller to a Matrix account.
+#
+# NOT A USER LOGIN. matrix_credentials is unique on user_id and the whole
+# /matrix tree is built around one device, so this is device setup, run once,
+# not a session gate. Nobody is being authenticated here except the operator
+# to MAS, and the thing we come away with is a long-lived token in a table.
+#
+# WHY THE BROWSER IS REDIRECTED RATHER THAN DRIVEN. The Rails engine does this
+# with Matrix::Mas::Login -- 337 lines that follow MAS's own redirect chain
+# server-side with a cookie jar and regex the CSRF token out of its consent
+# page. That exists because it had to mint credentials SILENTLY for a user
+# already inside the SPA. There is no session to preserve here, so the honest
+# flow works: send the operator to MAS, let them do the Authelia hop, take the
+# code on the way back. Its own comment says the replacement is "a MAS-side
+# client configuration change, not a code change" -- that change is a
+# redirect_uri pointing at this app.
+#
+# Authorization code + PKCE, hand-rolled rather than OmniAuth: the Rails app
+# HAS OmniAuth (Mastodon and friends) and still wrote this by hand, because the
+# scope is device-bound and the refresh has to be callable from a sync loop
+# with no request in scope.
 
 MAS_URL           = ENV["MAS_URL"].to_s
 MAS_CLIENT_ID     = ENV["MAS_CLIENT_ID"].to_s
 MAS_CLIENT_SECRET = ENV["MAS_CLIENT_SECRET"].to_s
 MATRIX_HOMESERVER = ENV.fetch("MATRIX_HOMESERVER_URL", "https://chat.kremlin.email")
 
+# MSC2967. `api:*` ALONE IS USELESS: it yields a token with no device attached,
+# and a device is the crypto identity matrix_device_states.account_pickle hangs
+# off. We name the device so the same id can be re-requested for the life of
+# the account.
 MATRIX_API_SCOPE    = "urn:matrix:org.matrix.msc2967.client:api:*"
 MATRIX_DEVICE_SCOPE = "urn:matrix:org.matrix.msc2967.client:device:"
 
 helpers do
   def mas_configured? = !MAS_URL.empty? && !MAS_CLIENT_ID.empty? && !MAS_CLIENT_SECRET.empty?
 
+  # Exactly what was registered, or MAS rejects the exchange. Derived from the
+  # request so controller.local and localhost both work, overridable because
+  # it has to match the client's registration character for character.
   def mas_redirect_uri = ENV.fetch("MAS_REDIRECT_URI", "#{request.base_url}/matrix/callback")
 
   def mas_scope(device_id) = "#{MATRIX_API_SCOPE} #{MATRIX_DEVICE_SCOPE}#{device_id}"
 
+  # THE DEVICE ID OUTLIVES THE TOKEN. Re-authenticating must reuse the one on
+  # file: mint a new one and every megolm session the old device holds becomes
+  # undecryptable, which looks like history silently going blank.
   def mas_device_id
     existing = Models::Matrix::Credential.first&.device_id.to_s
     existing.empty? ? Models::Matrix::Credential.generate_device_id : existing
@@ -46,6 +77,9 @@ get "/" do
   )
 end
 
+# Start the flow. The verifier and state go in the session and are read back
+# once, in the callback -- a PKCE verifier that outlives its exchange is just a
+# secret lying around.
 post "/" do
   unless mas_configured?
     halt(503, "matrix: MAS_URL, MAS_CLIENT_ID and MAS_CLIENT_SECRET must be set\n")
@@ -60,6 +94,8 @@ post "/" do
     "verifier"  => verifier,
     "state"     => state,
     "device_id" => device_id,
+    # Pinned here rather than recomputed in the callback: the token request
+    # must send back the identical string, and a proxy could change base_url.
     "redirect"  => mas_redirect_uri,
   }
 
