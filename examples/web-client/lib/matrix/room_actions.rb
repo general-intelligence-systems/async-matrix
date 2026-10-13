@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "securerandom"
+require "uri"
 
 require_relative "session"
 
@@ -81,8 +82,6 @@ module Matrix
     def send_attachment(room_id, bytes, content_type, filename)
       uri = self.upload(bytes, content_type, filename)
 
-      Models::Matrix::Media.store!(uri: uri, data: bytes)
-
       content = {
         "msgtype" => self.msgtype_for(content_type),
         "body"    => filename,
@@ -99,31 +98,13 @@ module Matrix
       end
     end
 
-    def media_url(uri)
+    def media_url(uri, width: nil, height: nil)
       if uri.to_s.start_with?("mxc://")
-        "/matrix/media/#{uri.to_s.delete_prefix("mxc://")}"
+        query = { mxc: uri, w: width, h: height }.compact
+
+        "/matrix/media?#{URI.encode_www_form(query)}"
       else
         nil
-      end
-    end
-
-    def download(uri)
-      cached = Models::Matrix::Media.fetch(uri: uri)
-
-      if cached
-        cached.data
-      else
-        server, media_id = uri.to_s.delete_prefix("mxc://").split("/", 2)
-
-        bytes = self.with_room(nil) do |client, _room, _credential|
-          client.authed_content_repo.get_content_authed(server, media_id).read
-        end
-
-        unless bytes.nil?
-          Models::Matrix::Media.store!(uri: uri, data: bytes)
-        end
-
-        bytes
       end
     end
 

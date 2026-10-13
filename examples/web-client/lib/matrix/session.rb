@@ -47,6 +47,26 @@ module Matrix
       end
     end
 
+    def client(credential)
+      client = Homeserver.client(credential.homeserver_url)
+      oauth = self.oauth_client(credential)
+
+      if oauth
+        refresher = Async::Matrix::OAuth::Issuer.new(client.authorization_server, oauth["client_id"])
+      else
+        refresher = client.refresh
+      end
+
+      credentials = Async::Matrix::Credentials.new(
+        refresher,
+        access_token:  credential.access_token,
+        refresh_token: credential.refresh_token,
+        expires_in_ms: self.expires_in_ms(credential),
+      )
+
+      client.with_credentials(credentials)
+    end
+
     def open(credential)
       Sync do
         client = Homeserver.client(credential.homeserver_url)
