@@ -5,6 +5,10 @@ source "https://rubygems.org"
 gem "ratalada", "~> 3.0.0"
 gem "ratalada-contrib", "~> 3.1.0"
 gem "ratalada-sinatra"
+# ratalada-contrib declares only ratalada and mustermann, so the prop classes `ratalada/contrib/inertia` requires are ours to bring.
+# It uses the prop system alone, nothing Rails-coupled, but the require is a hard one, and every version carrying those files wants railties.
+# Nothing loads it: Rails, ActionView and ActiveSupport are all absent at boot.
+gem "inertia_rails"
 
 gem "falcon"
 

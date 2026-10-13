@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 require "base64"
+require "ratalada"
+require "ratalada/sinatra"
+require "ratalada/contrib/vite"
+require "ratalada/contrib/inertia"
 
 # DB, the matrix_* tables and every model under Models::Matrix, in that order.
 # One database per session, named by MATRIX_SESSION; the tables are created on
