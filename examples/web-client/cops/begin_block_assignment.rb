@@ -3,12 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-# Flags a `begin ... end` assigned to a variable.
-#
-# @example
-#   begin
-#     lvar = ...
-#   end
 
 require_relative "support/prism_source"
 
@@ -21,7 +15,6 @@ module RuboCop
         MSG = "Do not assign a `begin...end` expression to a variable; " \
               "move the assignment inside the begin block."
 
-        # Every way a variable is written to with a single value on the right.
         WRITES = [
           ::Prism::LocalVariableWriteNode,
           ::Prism::InstanceVariableWriteNode,

@@ -1,35 +1,6 @@
 # frozen_string_literal: true
 
-# /matrix/rooms/:roomId/threads/:threadId — Thread
-#
-# Fractal: nothing -- see threads.rb
-#
-# NOT IMPLEMENTED.
-#
-# One thread's timeline. Its own chunk list: matrix_timeline_chunks keys on
-# (room_id, thread_root_id), so a thread paginates independently of the main
-# timeline exactly as the SDK's LinkedChunkId::Thread does.
-# ── No Fractal widget tree ─────────────────────────────────────────────────
-#
-# Fractal has no thread UI at all, so there is nothing to catalog here. The
-# nearest structure to borrow is the room timeline's -- see
-# rooms/[roomId].rb, whose tree is the one this should echo.
-#
-# ── Build with ─────────────────────────────────────────────────────────────
-#
-# @reui/ai-chat-9 — "Branching AI chat thread with reply versions, cited sources and
-#   code artifacts". It holds the transcript as a TREE with a fork rail, which is the
-#   only block in the catalog that models a thread as anything but a flat list.
-#
-#   (no Fractal equivalent)  ->  the fork rail, reused as the thread-root rail
-#   root event               ->  ui/bubble, pinned at the top
-#   replies                  ->  same message components as rooms/[roomId].rb
-#   subscribe                ->  ui/switch -> matrix_thread_subscriptions
-#
-# One thread. Its own chunk list in the schema, so it paginates independently
-# of the main timeline -- same as the SDK's LinkedChunkId::Thread.
 
-# One event, shaped the way both the root and every reply are drawn.
 def thread_event_json(event)
   {
     eventId:      event.event_id,

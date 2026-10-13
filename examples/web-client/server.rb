@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 require "base64"
+require "multi_json"
 require "ratalada"
+require "ratalada/async"
 require "ratalada/sinatra"
 require "ratalada/contrib/vite"
 require "ratalada/contrib/inertia"
+require "ratalada/contrib/router/file_based/sinatra_adapter"
 
-# DB, the matrix_* tables and every model under Models::Matrix, in that order.
-# One database per session, named by MATRIX_SESSION; the tables are created on
-# every boot and the creates are idempotent.
 require_relative "config/sequel"
 
 RELOAD = "USR2"
@@ -23,8 +23,7 @@ Server
   .use(Ratalada::Contrib::Inertia::JsonParamsMiddleware)
   .use(Ratalada::Contrib::Vite::DevServerProxy)
   .use(Ratalada::Contrib::Inertia::Middleware)
-  .use(WebOnlyCSRF)
-  .use(SyncAuth)
+  .use(Ratalada::Contrib::Inertia::CSRFMiddleware)
   .run do
     extend Ratalada::Contrib::Inertia
 

@@ -2,38 +2,24 @@
 
 source "https://rubygems.org"
 
-gem "ratalada", "~> 3.0.0"
-gem "ratalada-contrib", "~> 3.1.0"
+gem "ratalada", "~> 4.0.0"
+gem "ratalada-contrib"
 gem "ratalada-sinatra"
-# ratalada-contrib declares only ratalada and mustermann, so the prop classes `ratalada/contrib/inertia` requires are ours to bring.
-# It uses the prop system alone, nothing Rails-coupled, but the require is a hard one, and every version carrying those files wants railties.
-# Nothing loads it: Rails, ActionView and ActiveSupport are all absent at boot.
 gem "inertia_rails"
 
 gem "falcon"
 
 gem "sequel"
-# SQLite, not Postgres. extralite-bundle vendors its own SQLite, so JSONB (3.44+)
-# is there regardless of what the system library is, and it ships the Sequel
-# adapter itself -- `Sequel.connect("extralite://matrix.db")`.
 gem "extralite-bundle"
 
-# The Inertia page object in app/(inertia)/_layout.rb's HTML shell is dumped
-# with this.
 gem "multi_json"
 
 gem "vite_ruby"
 
-# lib/models/matrix/* is built on this: the pickled Olm/Megolm state in the
-# database is vodozemac state (Async::Matrix::E2EE::{Account,Session,
-# GroupSession,InboundGroupSession}), and the device talks the Client-Server API
-# through Async::Matrix::Client.
 gem "async-matrix", "~> 4.0"
 
 group :test, :development do
   gem "rubocop"
-  # .rubocop.yml names this plugin's cops, and cops/comment_structure.rb parses a comment the way
-  # decode does.
   gem "rubocop-socketry"
   gem "decode"
   gem "rspec"

@@ -6,18 +6,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Secrets gossiped to us by our own other devices over to-device
-    # messages: the cross-signing private keys and the key-backup decryption
-    # key, which is how a newly verified device gets what it needs without the
-    # user typing a recovery passphrase.
-    #
-    # An INBOX, not a store. Several devices may send the same secret and they
-    # are not all necessarily trustworthy, so the rows accumulate and the
-    # consumer picks.
     class SecretsInbox < Sequel::Model(:matrix_secrets_inbox)
-      # The secrets a device gossips, by their spec'd names. The three
-      # cross-signing private keys and the key-backup decryption key, which
-      # together are everything a newly verified device needs.
       MASTER       = "m.cross_signing.master"
       SELF_SIGNING = "m.cross_signing.self_signing"
       USER_SIGNING = "m.cross_signing.user_signing"
@@ -29,10 +18,6 @@ module Models
 
       extend Typecasting
 
-      # DELIBERATELY NOT UNIQUE on (user_id, secret_name): the index in the
-      # migration is not either. Several devices may send the same secret and
-      # they are not all necessarily trustworthy, so the rows accumulate and the
-      # consumer picks.
       def validate
         super
         validates_presence %i[secret_name secret]
@@ -41,8 +26,6 @@ module Models
       dataset_module do
         def named(secret_name) = where(secret_name: secret_name)
 
-        # Most recent first, which is the order a consumer that has no better
-        # reason to prefer one sender over another should take them in.
         def newest_first = order(Sequel.desc(:created_at))
 
       end

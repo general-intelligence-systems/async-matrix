@@ -6,19 +6,9 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Read receipts.
-    #
-    # `thread_id` is "main" for the unthreaded receipt rather than NULL --
-    # MSC3771 made receipts thread-scoped, "main" is the spec's own name for
-    # the unthreaded timeline, and it keeps the unique index total.
     class Receipt < Sequel::Model(:matrix_receipts)
-      # The spec's receipt types. m.read is public, m.read.private is the one
-      # the homeserver does not broadcast, and m.fully_read is the MARKER --
-      # which is account data, not a receipt, and so never appears here.
       TYPES = %w[m.read m.read.private].freeze
 
-      # MSC3771's name for the unthreaded timeline. NOT nil -- see the class
-      # comment.
       MAIN = "main"
 
       plugin :timestamps, update_on_create: true
@@ -39,8 +29,6 @@ module Models
         def unthreaded         = where(thread_id: MAIN)
         def in_thread(root_id) = where(thread_id: root_id)
 
-        # Everyone who has read a given event, which is the query that draws the
-        # read avatars under a message.
         def on_event(event_id) = where(event_id: event_id)
       end
     end

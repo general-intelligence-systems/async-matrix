@@ -6,17 +6,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # The server device's Olm account and sync position — one row per user.
-    #
-    # Pairs with Matrix::Credential: that holds WHO the device is to the homeserver
-    # (device_id + tokens), this holds WHAT it knows cryptographically. Both are
-    # durable for the same reason — a Matrix device is a crypto identity, and
-    # re-minting one throws away every room key it ever received.
     class DeviceState < Sequel::Model(:matrix_device_states)
-      # Below this many unclaimed one-time keys on the server, top up. The spec
-      # suggests keeping around half of max_number_of_one_time_keys available; going
-      # empty means other devices can't establish an Olm session with us, which
-      # shows up as "unable to decrypt" on THEIR side, not ours.
       OTK_THRESHOLD_RATIO = 0.5
 
       plugin :timestamps, update_on_create: true
@@ -29,11 +19,6 @@ module Models
         validates_presence :account_pickle
       end
 
-      # This session's device state, creating the Olm account on first use. The
-      # account is generated once and then never replaced — see the class comment.
-      #
-      # There is one row. The database is one session's, so a session's device
-      # state is the only device state there is.
       def self.current
         first || create_account!
       end
@@ -45,24 +30,16 @@ module Models
         )
       end
 
-      # The live vodozemac Account. Mutating it (generating keys, creating sessions)
-      # changes only this in-memory copy — persist with #save_account!.
       def account
         @account ||= Async::Matrix::E2EE::Account.from_pickle(
           account_pickle, ::Matrix::Device::Crypto.pickle_key,
         )
       end
 
-      # Re-pickle the account after any operation that advanced its state. Olm
-      # accounts are stateful (one-time keys are consumed), so failing to save after
-      # creating an inbound session loses the ability to decrypt that peer's next
-      # message.
       def save_account!
         update(account_pickle: account.pickle(::Matrix::Device::Crypto.pickle_key))
       end
 
-      # Should we upload more one-time keys? Compared against what the last /sync
-      # said the server still holds, not against what we generated.
       def needs_one_time_keys?
         otk_count < (account.max_number_of_one_time_keys * OTK_THRESHOLD_RATIO).floor
       end

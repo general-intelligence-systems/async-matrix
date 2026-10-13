@@ -3,25 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-# Requires `tap` where a method assigns and returns a local.
-#
-# @example
-#   def require_existing_column!                                    # NO
-#     column = params[:id].to_s
-#     unless connection.columns(@table).any? { |c| c.name == column }
-#       render json: { error: "unknown column" }, status: :not_found
-#     end
-#     column
-#   end
-#
-# @example
-#   def require_existing_column!                                    # YES
-#     params[:id].to_s.tap do |column|
-#       unless connection.columns(@table).any? { |c| c.name == column }
-#         render json: { error: "unknown column" }, status: :not_found
-#       end
-#     end
-#   end
 
 require_relative "support/prism_source"
 
@@ -34,7 +15,6 @@ module RuboCop
         MSG = "Assigning `%<name>s` and returning it at the end is `tap`; " \
               "write `<expression>.tap do |%<name>s| ... end`."
 
-        # Every way a local can be written to after the opening assignment.
         REASSIGNMENTS = [
           ::Prism::LocalVariableWriteNode,
           ::Prism::LocalVariableOperatorWriteNode,
@@ -57,7 +37,6 @@ module RuboCop
           end
         end
 
-        # First statement assigns a local; last statement is that same local, read and nothing else.
         def tap_shaped?(body)
           body.is_a?(::Prism::StatementsNode) &&
             body.body.size >= 2 &&
@@ -76,7 +55,6 @@ module RuboCop
           last.is_a?(::Prism::LocalVariableReadNode) && last.name == self.assigned_name(body)
         end
 
-        # `tap` yields the object the receiver evaluated to, so a body that points the name at something else partway through is a different program and must not be flagged.
         def reassigned?(body)
           name = self.assigned_name(body)
 

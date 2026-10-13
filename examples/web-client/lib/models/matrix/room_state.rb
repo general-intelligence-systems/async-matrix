@@ -7,17 +7,6 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # CURRENT room state, one row per (room, type, state_key).
-    #
-    # The projection in Matrix::Device::Sync had nowhere to put a state event,
-    # so it read the handful of types it knew (name, topic, avatar, members,
-    # space children) into matrix_rooms columns and dropped the rest. That is
-    # why join rules, history visibility, guest access, room version,
-    # tombstones and power-level *history* were all unavailable: not because
-    # they were hard, but because nothing stored the events they come from.
-    #
-    # `stripped` marks state from an invite, which is a weaker claim: no
-    # event_id, no origin_server_ts, and no guarantee the set is complete.
     class RoomState < Sequel::Model(:matrix_room_state)
       plugin :timestamps, update_on_create: true
       plugin :validation_helpers
@@ -37,20 +26,14 @@ module Models
         def in_room(room_id) = where(room_id: room_id)
         def of_type(type)    = where(event_type: type)
 
-        # The common case: the one state event of a type whose state key is "".
         def singular(type) = where(event_type: type, state_key: "")
 
-        # State we only know from an invite's stripped events, and state we
-        # actually synced. The second is the only one that can be trusted to be
-        # complete -- see the class comment.
         def stripped = where(stripped: true)
         def synced   = where(stripped: false)
       end
 
       def stripped? = !!stripped
 
-      # The content of one state event, or nil. Takes the place of the
-      # matrix_rooms columns the projection used to fold state into.
       def self.content_for(room_id:, event_type:, state_key: "")
         first(
           room_id:    room_id,

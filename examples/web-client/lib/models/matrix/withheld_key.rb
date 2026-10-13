@@ -6,16 +6,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Keys someone deliberately did not send us, and why.
-    #
-    # m.room_key.withheld is the difference between "this message is broken"
-    # and "the sender chose not to let you read this because your device is
-    # unverified" -- which is a sentence a UI can show and act on, where a
-    # decryption failure is not.
     class WithheldKey < Sequel::Model(:matrix_withheld_keys)
-      # m.room_key.withheld's codes, and the sentence each one is. The reasons
-      # are here because they are what makes this table worth having: a UI can
-      # show one, where it cannot show a decryption failure.
       UNVERIFIED   = "m.unverified"
       BLACKLISTED  = "m.blacklisted"
       UNAUTHORISED = "m.unauthorised"
@@ -45,8 +36,6 @@ module Models
         def in_room(room_id) = where(room_id: room_id)
       end
 
-      # What to show instead of "unable to decrypt". The sender's own `reason`
-      # wins when they sent one, since they know more than the code does.
       def explanation
         if reason.to_s.empty?
           MESSAGES.fetch(code, "The sender did not share this message's key.")
@@ -55,7 +44,6 @@ module Models
         end
       end
 
-      # The events this withholding accounts for.
       def events
         Event.where(room_id: room_id, session_id: session_id)
       end

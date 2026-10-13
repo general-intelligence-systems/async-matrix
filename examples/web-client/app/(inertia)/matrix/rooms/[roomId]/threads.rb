@@ -1,31 +1,5 @@
 # frozen_string_literal: true
 
-# /matrix/rooms/:roomId/threads — Threads
-#
-# Fractal: nothing -- Fractal has no thread UI
-#
-# NOT IMPLEMENTED.
-#
-# The room's threads. NO FRACTAL EQUIVALENT: it has no thread support at all,
-# so this is ours. Reads matrix_events.rel_type and
-# matrix_thread_subscriptions.
-# ── No Fractal widget tree ─────────────────────────────────────────────────
-#
-# Fractal has no thread UI at all, so there is nothing to catalog here. The
-# nearest structure to borrow is the room timeline's -- see
-# rooms/[roomId].rb, whose tree is the one this should echo.
-#
-# ── Build with ─────────────────────────────────────────────────────────────
-#
-# @reui/ai-chat-1 — its "tabbed switcher over pinned and recent chats" is a thread list:
-#   root message, reply count, last activity, participation.
-#
-#   (no Fractal equivalent)  ->  ui/item rows + ui/tabs for subscribed / all
-#   reply count              ->  ui/badge
-#   participants             ->  stacked ui/avatar
-#
-# Threads. No Fractal equivalent -- it has no thread UI -- so this is ours,
-# built on matrix_events.rel_type and matrix_thread_subscriptions.
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
@@ -37,8 +11,6 @@ get "/" do
     "matrix/rooms/[roomId]/threads",
     roomId:    room.room_id,
     roomTitle: room.title,
-    # filter_map rather than map: a summary whose root event has not arrived
-    # yet has nothing to draw, and the thread list is not the place to find out.
     threads:   Models::Matrix::ThreadSummary
       .in_room(room.room_id)
       .by_latest_reply

@@ -10,6 +10,7 @@ require:
   - ./cops/no_return.rb
   - ./cops/use_tap.rb
   - ./cops/comment_structure.rb
+  - ./cops/no_comments.rb
 
 AllCops:
   DisabledByDefault: true
@@ -171,3 +172,6 @@ Local/CommentStructure:
   # called by the framework, so the prose stands on its own.
   Annotations:
     Enabled: false
+
+Local/NoComments:
+  Enabled: true

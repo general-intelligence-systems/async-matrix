@@ -3,15 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-# Bans the modifier `if` / `unless` form.
-#
-# @example
-#   return true if task.state_task_completed?     # NO
-#
-# @example
-#   if task.state_task_completed?                 # YES
-#     return true
-#   end
 
 require_relative "support/prism_source"
 
@@ -40,8 +31,6 @@ module RuboCop
 
         private
 
-        # A modifier has its keyword written after what it guards, and so has no `end` to close.
-        # A ternary has no keyword at all, and is not this cop's business.
         def modifier_form?(node)
           if node.is_a?(::Prism::UnlessNode)
             keyword = node.keyword_loc
@@ -60,7 +49,6 @@ module RuboCop
           end
         end
 
-        # Two shapes are left for a human.
         def safe_to_unwrap?(node)
           self.own_line?(node) && !self.prism_heredoc?(node)
         end
@@ -80,7 +68,6 @@ module RuboCop
             "#{indent}end"
         end
 
-        # Move the body to a new indent.
         def reindent(node, indent)
           target = indent.length + 2
           delta = target - self.prism_column(node)

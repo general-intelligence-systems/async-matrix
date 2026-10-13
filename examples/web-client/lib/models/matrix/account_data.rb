@@ -7,22 +7,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Account data, global and per-room in one table.
-    #
-    # ONE TABLE, NOT TWO. The SDK splits global_account_data from
-    # room_account_data because its keys differ; here the only difference is
-    # whether room_id is set, and splitting would mean two reads to answer
-    # "what does this account say about notifications" (m.push_rules is
-    # global, the per-room override is not).
-    #
-    # This is the missing half of the sidebar. m.tag is where Favorite and
-    # Low priority come from, m.direct is what makes a room a DM,
-    # m.fully_read positions the unread divider, m.ignored_user_list hides
-    # rooms outright -- none of which were derivable from the ten tables.
     class AccountData < Sequel::Model(:matrix_account_data)
-      # The event types the sidebar is built out of, so the places that read
-      # them are not spelling them inline. The two `marked_unread` spellings are
-      # both in the wild -- see matrix_rooms.marked_unread_source.
       TAG           = "m.tag"
       DIRECT        = "m.direct"
       FULLY_READ    = "m.fully_read"
@@ -30,7 +15,6 @@ module Models
       PUSH_RULES    = "m.push_rules"
       MARKED_UNREAD = "m.marked_unread"
 
-      # "" is global, for the same uniqueness reason as the column's default.
       GLOBAL = ""
 
       plugin :timestamps, update_on_create: true
@@ -55,9 +39,6 @@ module Models
 
       def global? = room_id == GLOBAL
 
-      # The content of one account data event, or nil. The per-room override
-      # falls back to the global event, which is the whole reason the two live
-      # in one table.
       def self.content_for(event_type:, room_id: GLOBAL)
         row = first(room_id: room_id, event_type: event_type) ||
           first(room_id: GLOBAL, event_type: event_type)

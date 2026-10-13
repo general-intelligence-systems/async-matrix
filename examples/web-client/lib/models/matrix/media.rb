@@ -6,20 +6,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # The media cache: the bytes behind an mxc:// URI.
-    #
-    # matrix-sdk-sqlite gives this a DATABASE OF ITS OWN -- the media store, in
-    # the cache directory rather than the data directory, so that clearing a
-    # cache cannot lose anything that is not refetchable. Here it is a table in
-    # the one file, which is the single place this departs from that layout; the
-    # reason it is still worth separating in the SDK is the reason `ignore_policy`
-    # exists below.
-    #
-    # KEYED ON (uri, format), NOT uri. One mxc:// URI has a full-size file and a
-    # thumbnail per requested size, and they are different rows: `format` is the
-    # thumbnail spec, or the marker for the original.
     class Media < Sequel::Model(:matrix_media)
-      # `format` for the unmodified file, as opposed to a thumbnail of it.
       FILE = "file"
 
       plugin :timestamps, update_on_create: true
@@ -36,18 +23,11 @@ module Models
       dataset_module do
         def for_uri(uri) = where(uri: uri)
 
-        # What a cache eviction pass may remove, oldest first. Rows the policy
-        # is ignored for are not in it -- see #retain?.
         def evictable = where(ignore_policy: false).order(:last_access)
       end
 
-      # Whether the cache retention policy leaves this row alone. Set for media
-      # the user has deliberately kept, which is why the policy is a per-row
-      # flag rather than a sweep over everything.
       def retain? = !!ignore_policy
 
-      # Reading a cached file is what keeps it cached, so the read records
-      # itself. Milliseconds, like every other timestamp the homeserver speaks.
       def touch!
         update(last_access: (Time.now.to_f * 1000).to_i)
       end

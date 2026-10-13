@@ -6,13 +6,6 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Per-room encryption policy.
-    #
-    # Distinct from matrix_rooms.encryption, which is the room's own
-    # m.room.encryption state event. This is OUR policy for the room: whether
-    # to refuse to send to unverified devices, and the rotation thresholds we
-    # apply, which DeviceStore#outbound_session takes as its `rotation:`
-    # argument.
     class RoomCryptoSettings < Sequel::Model(:matrix_room_crypto_settings)
       plugin :timestamps, update_on_create: true
       plugin :validation_helpers
@@ -25,10 +18,6 @@ module Models
         validates_unique :room_id
       end
 
-      # Our policy for a room, or the defaults. A room with no row is a room
-      # nobody has set a policy for, which is not the same as a room whose
-      # policy is permissive -- but it behaves the same, so there is no reason
-      # to write a row to say so.
       def self.for(room_id:)
         first(room_id: room_id) ||
           new(room_id: room_id)
@@ -36,9 +25,6 @@ module Models
 
       def only_allow_trusted_devices? = !!only_allow_trusted_devices
 
-      # What DeviceStore#outbound_session takes as its `rotation:` argument.
-      # Nils are left in: the caller's own defaults are the spec's, and a nil
-      # here means "no opinion" rather than "rotate never".
       def rotation
         {
           period_ms:       session_rotation_period_ms,

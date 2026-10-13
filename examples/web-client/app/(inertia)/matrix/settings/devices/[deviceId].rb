@@ -1,58 +1,5 @@
 # frozen_string_literal: true
 
-# /matrix/settings/devices/:deviceId — Device
-#
-# Fractal: account_settings/user_session/
-#
-# NOT IMPLEMENTED.
-#
-# One of our devices: rename, verify, or sign out.
-# ── Fractal's widget tree ──────────────────────────────────────────────────
-#
-# COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
-# properties, bindings, styles and handlers are dropped. This is the STRUCTURE
-# to rebuild, not a prescription: an Adw.ActionRow is a GTK list row, and what
-# it becomes in shadcn/reui is the next decision, not one this records.
-#
-# Adw.* is libadwaita, which is where the patterns live (PreferencesPage ->
-# PreferencesGroup -> ActionRow is GNOME's settings idiom). Gtk.* is plain
-# GTK. A bare <Name> with no prefix is one of Fractal's own widgets, and gets
-# its own tree below if this view is where it is built.
-#
-# account_settings/user_session/user_session_subpage.blp
-#
-#   <Adw.NavigationPage id="UserSessionSubpage">
-#     <Adw.ToolbarView slot="child">
-#       <Adw.HeaderBar />
-#       <Adw.PreferencesPage slot="content">
-#         <Adw.PreferencesGroup>
-#           <CopyableRow />
-#           <Adw.EntryRow id="display_name">
-#             <ActionButton id="display_name_button" />
-#           </Adw.EntryRow>
-#           <Adw.ActionRow id="verified_status" />
-#           <Adw.ActionRow />
-#           <Adw.ActionRow />
-#         </Adw.PreferencesGroup>
-#         <Adw.PreferencesGroup>
-#           <Adw.ButtonRow id="log_out_button" />
-#           <LoadingButtonRow id="loading_disconnect_button" />
-#           <Adw.ButtonRow id="open_url_disconnect_button" />
-#         </Adw.PreferencesGroup>
-#       </Adw.PreferencesPage>
-#     </Adw.ToolbarView>
-#   </Adw.NavigationPage>
-#
-# ── Build with ─────────────────────────────────────────────────────────────
-#
-# @reui/profile-10 — one key, revealed, renamed, revoked. A device is the same object.
-#
-#   UserSessionSubpage    ->  ui/card with ui/field rows
-#   rename                ->  ui/input, inline save
-#   device/identity keys  ->  ui/item + copy, monospace
-#   sign out              ->  ui/alert-dialog
-#   verify                ->  ui/button -> /matrix/verification/:flowId
-#
 
 get "/" do
   credential = Models::Matrix::Credential.first

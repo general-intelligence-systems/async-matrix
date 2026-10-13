@@ -29,7 +29,7 @@ template :layout do
   ERB
 end
 
-share do
+Inertia.share do
   { flash: session.delete(:flash) }
 end
 

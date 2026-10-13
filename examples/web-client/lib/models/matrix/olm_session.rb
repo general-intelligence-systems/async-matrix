@@ -6,11 +6,6 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # A 1:1 Olm session with one other device, identified by its curve25519 key.
-    #
-    # Only ever used to wrap and unwrap to-device messages — chiefly m.room.key, the
-    # event that carries a Megolm session key. Room messages themselves are Megolm;
-    # nothing here touches them.
     class OlmSession < Sequel::Model(:matrix_olm_sessions)
       plugin :timestamps, update_on_create: true
       plugin :validation_helpers
@@ -24,9 +19,6 @@ module Models
         validates_unique :session_id
       end
 
-      # Sessions with +sender_key+, most recently used first. The spec says to try
-      # decrypting with each known session for a peer, and to encrypt with the most
-      # recent — several can exist when both sides established one concurrently.
       dataset_module do
         def with_peer(sender_key)
           where(sender_key: sender_key).order(Sequel.lit("last_used_at DESC NULLS LAST"))
@@ -39,8 +31,6 @@ module Models
         )
       end
 
-      # Olm sessions ratchet on every message, so the pickle MUST be written back
-      # after each encrypt/decrypt or the chain desynchronises with the peer.
       def save_session!
         update(
           pickle:       session.pickle(::Matrix::Device::Crypto.pickle_key),

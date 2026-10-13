@@ -7,20 +7,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Room key bundles (MSC4268): the history a room's inviter shares with an
-    # invitee so the new member can read what came before them.
-    #
-    # `state` covers both of the SDK's tables -- it tracks a bundle we expect
-    # ("pending", we invited someone and owe them one) and one we received
-    # ("received", waiting to be imported) in one place, because they are the
-    # same object at two points in its life.
     class RoomKeyBundle < Sequel::Model(:matrix_room_key_bundles)
-      # The two points in one bundle's life -- see the class comment for why
-      # they are one table.
-      #
-      # PENDING is ours to send: we invited someone and owe them history.
-      # RECEIVED is theirs to us, waiting to be imported. IMPORTED is the end of
-      # it, kept so the import is not attempted twice.
       PENDING  = "pending"
       RECEIVED = "received"
       IMPORTED = "imported"
@@ -45,14 +32,11 @@ module Models
         def pending  = where(state: PENDING)
         def received = where(state: RECEIVED)
 
-        # What the importer drains: a bundle we hold and have not read yet.
         def importable = where(state: RECEIVED).exclude(bundle: nil)
       end
 
       def imported? = state == IMPORTED
 
-      # The bundle is in. Keeps the row and drops the payload, which is a pile
-      # of room keys we now hold in matrix_megolm_inbound_sessions.
       def imported!
         update(state: IMPORTED, bundle: nil)
       end

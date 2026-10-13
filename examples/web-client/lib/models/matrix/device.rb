@@ -7,22 +7,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # ── Other people's devices ──────────────────────────────────────────────
-    #
-    # The ten tables could decrypt but not really encrypt. matrix_olm_sessions
-    # is keyed by sender_key alone, which is enough to find a session you
-    # already have and useless for the question that comes first: who are the
-    # devices in this room, what are their keys, and should I send to them?
-    # That answer is /keys/query's, and nothing stored it -- so every send had
-    # to re-query, and `shared_with` on an outbound session could not be
-    # checked against anything.
-    #
-    # It is also what verification needs. A device with no stored identity key
-    # cannot be verified, and a verification that is not persisted is a
-    # verification you do again tomorrow.
     class Device < Sequel::Model(:matrix_devices)
-      # matrix-sdk-crypto's LocalTrust. `unset` is the default and means only
-      # that nobody has decided; it is not a claim either way.
       UNSET       = "unset"
       VERIFIED    = "verified"
       BLACKLISTED = "blacklisted"
@@ -47,15 +32,11 @@ module Models
       dataset_module do
         def of_user(matrix_user_id) = where(matrix_user_id: matrix_user_id)
 
-        # A deleted device still has rows -- its keys are what verify the
-        # signatures on events it sent while it existed -- so every send has to
-        # exclude them explicitly.
         def live = where(deleted: false)
 
         def verified    = where(trust_state: VERIFIED)
         def blacklisted = where(trust_state: BLACKLISTED)
 
-        # Who to encrypt a room key for: live, and not refused.
         def sendable = live.exclude(trust_state: [BLACKLISTED, IGNORED])
 
         def with_identity_key(key) = where(identity_key: key)
@@ -65,14 +46,9 @@ module Models
       def blacklisted? = trust_state == BLACKLISTED
       def sendable?    = !deleted && ![BLACKLISTED, IGNORED].include?(trust_state)
 
-      # The curve25519 an Olm session is opened against, and the ed25519 a
-      # signature is checked with. Hoisted into columns, but the full `keys`
-      # object stays authoritative -- these are a cache of two of its entries.
       def curve25519 = identity_key
       def ed25519    = fingerprint
 
-      # Our own session with this device, if we have one. Keyed on the identity
-      # key, which is all matrix_olm_sessions knows about a peer.
       def olm_sessions
         OlmSession.with_peer(identity_key)
       end

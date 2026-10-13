@@ -16,18 +16,13 @@ module Models
 
       jsonb :content, :raw, :unsigned, :push_actions
 
-      # msgtypes whose content carries a file. m.sticker is its own event type.
       MEDIA_MSGTYPES = %w[m.image m.video m.audio m.file].freeze
 
-      # The rel_types `rel_type` carries, which is the whole of what this table
-      # knows about relations -- the SDK indexes exactly these two columns.
       THREAD     = "m.thread"
       REPLACE    = "m.replace"
       ANNOTATION = "m.annotation"
       REFERENCE  = "m.reference"
 
-      # The relations that are folded into their target rather than rendered in
-      # their own right. m.reference is not one: a reference is its own message.
       AGGREGATIONS = [THREAD, REPLACE, ANNOTATION].freeze
 
       def validate
@@ -42,24 +37,8 @@ module Models
         def chronological    = order(:origin_server_ts)
         def undecryptable    = exclude(decryption_error: nil)
 
-        # A thread reply is an event whose relation is m.thread, which is what
-        # `relates_to_id` and `rel_type` already say. There is no thread_root_id
-        # column because the SDK's events table has no such field -- the
-        # relation IS the thread, and matrix_timeline_chunks is where a thread
-        # gets a timeline of its own.
         def in_thread(root_id) = where(relates_to_id: root_id, rel_type: THREAD)
 
-        # The room's own timeline: no thread replies, and no aggregations.
-        #
-        # A REACTION AND AN EDIT ARE NOT TIMELINE ROWS. They are folded into the
-        # event they relate to -- #reactions and #edited? are how -- so a
-        # timeline that also listed them would show each one twice, once as
-        # itself and once on its target.
-        #
-        # It has to say "or null" out loud. `rel_type` is null on every event
-        # that is not a relation at all, and `rel_type NOT IN (...)` is NULL
-        # rather than true for those -- so a plain exclude() would hide the
-        # entire timeline, which is the one thing this exists to show.
         def main_timeline
           where(rel_type: nil).or(Sequel.~(rel_type: AGGREGATIONS))
         end
@@ -79,21 +58,14 @@ module Models
 
       def redacted? = !!redacted
 
-      # Edited if anything relates to it with m.replace. There is no edited_ts
-      # column: an edit is its own event, and the relation is what says so.
       def edited?
         self.class.where(relates_to_id: event_id, rel_type: REPLACE).any?
       end
 
-      # m.in_reply_to, which lives inside the relation rather than beside it --
-      # a reply is not one of the rel_types.
       def reply_to_id = content.dig("m.relates_to", "m.in_reply_to", "event_id")
 
       def formatted_body = presence(content["formatted_body"])
 
-      # Who sent it, as the room knows them. The member row carries the
-      # per-room display name and avatar; the global profile is the fallback for
-      # somebody who has since left.
       def sender_member
         RoomMember.first(room_id: room_id, member_id: sender)
       end
@@ -110,8 +82,6 @@ module Models
         sender_member&.avatar_url || sender_profile&.avatar_url
       end
 
-      # Reactions to this event, one row per distinct key, with whether
-      # +member_id+ is among the people who sent it.
       def reactions(member_id = nil)
         self.class
           .where(relates_to_id: event_id, rel_type: ANNOTATION)

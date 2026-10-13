@@ -6,8 +6,6 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # One member of one room, in one user's view. Written by Matrix::Device::Sync
-    # from m.room.member state, read by clients over Electric.
     class RoomMember < Sequel::Model(:matrix_room_members)
       plugin :timestamps, update_on_create: true
       plugin :validation_helpers
@@ -24,11 +22,8 @@ module Models
         def joined = where(membership: "join")
       end
 
-      # The three named rungs, and what anything else is called. Fractal's
-      # permissions view draws exactly these.
       ROLES = { 100 => "Admin", 50 => "Moderator", 0 => "Default" }.freeze
 
-      # What the UI shows: the display name when the room has one, else the raw id.
       def name
         if display_name.to_s.empty?
           member_id
@@ -37,9 +32,6 @@ module Models
         end
       end
 
-      # This member's effective power level. NOT a column: it comes from the
-      # room's m.room.power_levels, which is one state event rather than a
-      # number copied onto every member row.
       def power_level
         room&.power_level_of(member_id).to_i
       end

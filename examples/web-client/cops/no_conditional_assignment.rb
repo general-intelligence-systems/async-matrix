@@ -3,21 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-# Bans assigning an `if` / `unless` / `case` expression.
-#
-# @example
-#   status = case task.state                  # NO
-#            when :done then :ok
-#            else :pending
-#            end
-#   obj.status = cond ? :ok : :pending        # NO
-#
-# @example
-#   status = :pending                         # YES
-#   case task.state
-#   when :done
-#     status = :ok
-#   end
 
 require_relative "support/prism_source"
 
@@ -31,7 +16,6 @@ module RuboCop
         MSG = "Do not assign a `%<keyword>s` expression to a variable; " \
               "assign inside each branch of the %<keyword>s."
 
-        # Every way a name is written to with a single value on the right.
         WRITES = [
           ::Prism::ClassVariableAndWriteNode,
           ::Prism::ClassVariableOperatorWriteNode,
@@ -60,7 +44,6 @@ module RuboCop
           ::Prism::MultiWriteNode,
         ].freeze
 
-        # The writes whose target is a plain name, and so can be repeated in every branch.
         SIMPLE = [
           ::Prism::ClassVariableWriteNode,
           ::Prism::ConstantWriteNode,
@@ -106,7 +89,6 @@ module RuboCop
           !rhs.nil? && CONDITIONALS.any?{|klass| rhs.is_a?(klass)}
         end
 
-        # `obj.status = value` is a call whose name ends in `=`.
         def assignment_method?(node)
           node.name.to_s.end_with?("=") && !node.name.to_s.end_with?("==") && !node.arguments.nil?
         end
@@ -115,9 +97,7 @@ module RuboCop
           node.arguments&.arguments&.last
         end
 
-        # The target must be re-evaluable without side effects.
         def safe_to_push_inside?(node, rhs)
-          # `case/in` pattern matching is left alone — its branch headers are patterns, not expressions, and reproducing them is a different job.
           !rhs.is_a?(::Prism::CaseMatchNode) &&
             self.own_line?(node) &&
             self.simple_target?(node) &&
@@ -145,7 +125,6 @@ module RuboCop
           line[0...self.prism_column(node)].strip.empty?
         end
 
-        # The assignment prefix repeated in every branch — "x = ", "@y = ", "obj.z = ".
         def target_source(node)
           if node.is_a?(::Prism::CallNode)
             "#{self.prism_source(node.receiver)}.#{node.name.to_s.chomp("=")} = "
@@ -154,7 +133,6 @@ module RuboCop
           end
         end
 
-        # Each branch as `[condition_source, body_node]`, in source order.
         def branches(rhs)
           if rhs.is_a?(::Prism::CaseNode) || rhs.is_a?(::Prism::CaseMatchNode)
             self.case_branches(rhs)
@@ -182,7 +160,6 @@ module RuboCop
             [[nil, node.else_clause&.statements]]
         end
 
-        # What follows the then-branch: an `else`, or a chained `elsif`.
         def else_branch(node)
           if node.is_a?(::Prism::UnlessNode)
             node.else_clause
@@ -215,7 +192,6 @@ module RuboCop
             "#{header}\n#{indent}  #{target}#{body ? self.prism_source(body) : "nil"}"
           }
 
-          # The replacement begins at the node's own column, so the first line must NOT carry the indent again.
           "#{parts.join("\n").sub(/\A#{indent}/, "")}\n#{indent}end"
         end
 
@@ -233,12 +209,10 @@ module RuboCop
           "#{head}\n#{parts.join("\n")}\n#{indent}end"
         end
 
-        # A ternary has no keyword at all.
         def ternary?(node)
           node.is_a?(::Prism::IfNode) && node.if_keyword_loc.nil?
         end
 
-        # `keyword` is "ternary" on a ternary — it has no `if` token to point at.
         def keyword(rhs)
           if rhs.is_a?(::Prism::IfNode)
             if self.ternary?(rhs)

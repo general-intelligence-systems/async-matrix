@@ -7,22 +7,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # ── The send queue ──────────────────────────────────────────────────────
-    #
-    # Matrix::Device::Session's comment makes the old position explicit: "a
-    # sent message is not done until the homeserver echoes it back", so
-    # nothing was stored between the POST and the echo. That is correct about
-    # truth and wrong about the interface -- it means a message cannot be
-    # shown as sending, cannot be retried after a failure, and is simply lost
-    # if the process dies mid-send.
-    #
-    # This table does not change where truth lives. matrix_events is still
-    # written only by sync. This is the OUTBOX: rows go in when the user hits
-    # send, come out when the echo arrives, and `wedge_reason` is where a send
-    # that cannot proceed records why instead of disappearing.
     class SendQueue < Sequel::Model(:matrix_send_queue)
-      # Higher goes first. Named so the call sites do not spell the numbers --
-      # the only thing that matters is the order between them.
       PRIORITY_BULK      = -10
       PRIORITY_DEFAULT   = 0
       PRIORITY_IMMEDIATE = 10
@@ -44,8 +29,6 @@ module Models
       dataset_module do
         def in_room(room_id) = where(room_id: room_id)
 
-        # Still sendable: nothing has wedged it. This is the queue the sender
-        # drains, in the order the covering index is built for.
         def sendable = where(wedge_reason: nil).order(Sequel.desc(:priority), :enqueued_at)
 
         def wedged = exclude(wedge_reason: nil)
@@ -53,19 +36,14 @@ module Models
 
       def wedged? = !wedge_reason.nil?
 
-      # Park a send that cannot proceed unattended, with the reason a UI can
-      # show. The row STAYS -- that is the point of the table.
       def wedge!(reason)
         update(wedge_reason: reason)
       end
 
-      # The user said try again. Clears the reason and nothing else, so the row
-      # keeps its place in the queue.
       def unwedge!
         update(wedge_reason: nil)
       end
 
-      # Sends parked against this one, waiting for its event_id.
       def dependents
         SendQueueDependent.where(parent_transaction_id: transaction_id)
       end

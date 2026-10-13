@@ -23,11 +23,6 @@
 #      Naming processes runs only those, which is how to take one of them over: `bin/dev vite`
 #      in one terminal and `bin/serve` in another, under whatever debugger wanted.
 #
-#      On the way in, a missing MATRIX_ENCRYPTION_KEY is minted into .env. The key encrypts
-#      the access and refresh tokens at rest, so it has to be the same key on the next run or
-#      the rows already written stop decrypting — which is why it is written down rather than
-#      generated per boot.
-#
 # FILES
 #      Procfile.dev
 #              The processes, one per line.
@@ -39,6 +34,10 @@
 # ENVIRONMENT
 #      MATRIX_SESSION
 #              Which session database under sessions/ to open. See config/sequel.rb.
+#
+#      PORT
+#              The port `web` serves on, 9292 by default, which is also ratalada's. Overmind's own
+#              base is 5000, so it is set here rather than left to it.
 #
 #      MATRIX_ENCRYPTION_KEY
 #              The Sequel :column_encryption key for Credential's token columns, which must be
@@ -63,11 +62,9 @@ set -o nounset
 
 cd "$(dirname "$0")/.."
 
-# Sequel wants exactly 32 bytes, and alphanumeric(32) is 32 of them -- no decoding step here,
-# because credential.rb hands the value to the plugin as it stands.
 if ! grep -q '^MATRIX_ENCRYPTION_KEY=' .env 2>/dev/null; then
 	printf 'MATRIX_ENCRYPTION_KEY=%s\n' "$(ruby -rsecurerandom -e 'print SecureRandom.alphanumeric(32)')" >>.env
 	echo "bin/dev: minted MATRIX_ENCRYPTION_KEY into .env" >&2
 fi
 
-exec overmind start -D --procfile Procfile.dev "$@"
+exec overmind start -D --procfile Procfile.dev --port "${PORT:-9292}" "$@"

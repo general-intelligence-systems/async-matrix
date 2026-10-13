@@ -6,13 +6,6 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Which events sit in which chunk, and in what order.
-    #
-    # SEPARATE FROM matrix_events ON PURPOSE. One event can appear in more
-    # than one timeline -- the room's main timeline and a thread's -- at
-    # different positions, so position cannot live on the event. It is also
-    # what lets the event rows be rewritten (a late decryption, an edit)
-    # without touching the ordering.
     class TimelineEntry < Sequel::Model(:matrix_timeline_entries)
       plugin :timestamps, update_on_create: true
       plugin :validation_helpers
@@ -35,9 +28,6 @@ module Models
         def ordered            = order(:chunk_id, :position)
       end
 
-      # The event this entry points at. A JOIN rather than an association
-      # because the key is (user_id, event_id) and not a foreign key -- see the
-      # migration for why there are none.
       def event
         Event.first(event_id: event_id)
       end

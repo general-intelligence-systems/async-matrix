@@ -7,17 +7,7 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # Sends that depend on a send that has not landed yet.
-    #
-    # Reacting to, editing or redacting a message that is still in the queue
-    # is a normal thing for a person to do, and it cannot be expressed as a
-    # queued event: the content needs an event_id that does not exist. So the
-    # dependent is parked here against its parent's transaction id, and is
-    # promoted into matrix_send_queue once the parent's echo supplies the
-    # event_id (`parent_key`).
     class SendQueueDependent < Sequel::Model(:matrix_send_queue_dependents)
-      # What to do with the parent once it exists. The migration's comment
-      # carries the same four.
       REACT       = "react"
       EDIT        = "edit"
       REDACT      = "redact"
@@ -42,21 +32,16 @@ module Models
       dataset_module do
         def of_parent(transaction_id) = where(parent_transaction_id: transaction_id)
 
-        # Ready to be promoted into the queue: the echo has supplied the
-        # parent's event_id.
         def resolved = exclude(parent_key: nil)
         def pending  = where(parent_key: nil)
       end
 
       def resolved? = !parent_key.nil?
 
-      # The echo landed. Records the parent's event_id, which is the one thing
-      # this row was waiting for.
       def resolve!(parent_key)
         update(parent_key: parent_key)
       end
 
-      # The queued send this one is parked against, while it is still queued.
       def parent
         SendQueue.first(
           room_id:        room_id,

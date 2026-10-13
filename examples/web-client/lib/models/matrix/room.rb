@@ -7,13 +7,6 @@ require_relative "typecasting"
 
 module Models
   module Matrix
-    # One room in one user's room list, as the server device sees it.
-    #
-    # Written only by Matrix::Device::Sync and read only by Electric — no controller
-    # mutates this. A client that wants to change a room (rename, invite, leave)
-    # posts to the engine's endpoints, which acts through the device; the change then
-    # comes back down through sync like any other, so there is exactly one direction
-    # of truth.
     class Room < Sequel::Model(:matrix_rooms)
       plugin :timestamps, update_on_create: true
       plugin :validation_helpers
@@ -35,20 +28,13 @@ module Models
       dataset_module do
         def joined = where(membership: "join")
 
-        # Sidebar order: most recent activity first, nulls (never-used rooms) last.
         def by_activity = order(Sequel.lit("last_activity_at DESC NULLS LAST"))
       end
 
-      # What the sidebar and every page header label this room. `display_name` is
-      # the SDK's cached RoomDisplayName -- the computed one, which for a room
-      # with no m.room.name is built from its heroes; `name` is the literal
-      # m.room.name. Falling back through both to the id means a header is never
-      # blank.
       def title
         display_name || name || canonical_alias || room_id
       end
 
-      # The sidebar's one-line preview, out of RoomInfo.latest_event_value.
       def preview        = latest_event&.dig("content", "body")
       def preview_sender = latest_event&.dig("sender")
 
@@ -60,26 +46,18 @@ module Models
         RoomMember.where(room_id: room_id)
       end
 
-      # m.room.power_levels, which is a state event like any other -- the SDK
-      # keeps only `max_power_level` on the room itself, so this reads the event
-      # rather than a denormalized copy of it.
       def power_levels
         RoomState.content_for(room_id: room_id, event_type: "m.room.power_levels") || {}
       end
 
-      # Power level required for +action+ ("kick", "ban", "invite", "redact"), or the
-      # events_default / state_default fallback the spec defines.
       def power_level_for(action, default: 50)
         power_levels[action.to_s] || default
       end
 
-      # A member's effective power level: their explicit entry, else users_default.
       def power_level_of(member_id)
         power_levels.dig("users", member_id) || power_levels["users_default"] || 0
       end
 
-      # Whether +member_id+ outranks the bar for sending one kind of state event.
-      # The spec's fallback for a state event nobody named is state_default.
       def can_send_state?(event_type, member_id)
         bar = power_levels.dig("events", event_type) ||
           power_levels["state_default"] ||
@@ -87,14 +65,10 @@ module Models
         power_level_of(member_id).to_i >= bar.to_i
       end
 
-      # m.tag, which is room account data. `favourite` and `low_priority` are the
-      # only two the room itself carries, because they are the only two the SDK's
-      # RoomNotableTags has.
       def tags
         AccountData.content_for(room_id: room_id, event_type: AccountData::TAG)&.fetch("tags", {}) || {}
       end
 
-      # m.space.child, one state event per child.
       def children
         RoomState.in_room(room_id).of_type("m.space.child").select_map(:state_key)
       end

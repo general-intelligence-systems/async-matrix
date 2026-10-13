@@ -3,41 +3,6 @@
 # Released under the Apache License, Version 2.0.
 # Copyright, 2026, by General Intelligence Systems.
 
-# Checks the structure of a comment, which decode parses into three parts: the summary, the annotations, and the summary belonging to each annotation.
-#
-# @example
-#   # Connect to the given endpoint, returning the HTTP client and reference.   <- summary
-#   # @parameter endpoint [Endpoint] used to connect to the remote system.      <- annotation
-#   # @returns [Tuple(Client, Reference)] the client and reference.
-#
-# Four things are checked, each measured against how async-rest, async-discord and async-ollama document themselves:
-#
-# A paragraph occupies one line. None of the 99 summary paragraphs in those three projects is wrapped, and async-rest's run to 544 characters.
-#
-# A summary is short, and no longer than the code it describes earns. Across 76 documented methods the median summary is 4 to 9 words whatever the length of the method, so the allowance starts at ten words and grows by three per line of body, to a ceiling of thirty.
-#
-# A module's summary is ten words or fewer. The only commented module in async-rest is exactly ten.
-#
-# A documented method says what it takes and returns. A summary with no annotations describes the method in prose and leaves the signature undocumented, which is what annotations are for. A method with no comment at all is not this cop's business: that is documentation coverage, which decode reports on separately.
-#
-# Nothing here is corrected automatically. A comment which breaks these rules has to be rewritten rather than reflowed, and a correction which only moved the words around would hide that.
-#
-# Each check is configured on its own, because they are not all worth applying everywhere:
-#
-# @example
-#   Local/CommentStructure:
-#     Annotations:
-#       Include:
-#         - "lib/**/*.rb"
-#     Length:
-#       Exclude:
-#         - "bin/**/*"
-#     Wrapping:
-#       Enabled: true
-#
-# A check with no `Include` runs everywhere; given one, it runs only where a path matches. `Exclude` then removes paths from whatever is left. `Annotations` defaults to `lib` alone: a script in `bin` and a case in `test` have no interface for anyone else to call, so annotating them documents nothing.
-#
-# What a declaration says is read from the run of comment lines touching it. Where an offence is reported is read from the wider span the library attributes to the declaration, less any magic comment, because decode reports a part's position within that span rather than the line it came from.
 
 require "decode/language/ruby/generic"
 
@@ -59,7 +24,6 @@ module RuboCop
 
         TAGS = Decode::Language::Ruby::Generic::TAGS
 
-        # Each check, and the paths it applies to when the configuration names none.
         CHECKS = {
           "Wrapping" => nil,
           "Length" => nil,
@@ -70,12 +34,10 @@ module RuboCop
 
         HEADER = /\A#\s*(frozen_string_literal:|Released under|Copyright,|!)/
 
-        # What a Ruby file says to the interpreter rather than to a reader.
         MAGIC = /\A#\s*(frozen_string_literal:|encoding:|coding:|warn_indent:|shareable_constant_value:|!|-\*-)/
 
         TERMINAL = [".", ":", "?", "!"].freeze
 
-        # Multi-line content is the point of these, so their summaries are left alone.
         FREEFORM = [Decode::Comment::Example].freeze
 
         def on_new_investigation
@@ -102,7 +64,6 @@ module RuboCop
 
         private
 
-        # Whether a check applies to the file being inspected.
         def applies?(check)
           configuration = self.cop_config[check] || {}
 
@@ -118,7 +79,6 @@ module RuboCop
           end
         end
 
-        # @parameter default [Boolean] what an absent or empty list of patterns means.
         def matches?(path, patterns, default)
           if patterns.nil? or patterns.empty?
             default
@@ -144,7 +104,6 @@ module RuboCop
           end
         end
 
-        # The comment which documents a declaration, as the parts decode reads it as.
         def parts_of(node)
           comments = self.documenting(node)
 
@@ -155,12 +114,10 @@ module RuboCop
           end
         end
 
-        # The comment above a declaration, without the file's own header.
         def documenting(node)
           self.prism_leading_comments(node).reject{|comment| self.prism_source(comment).match?(HEADER)}
         end
 
-        # Every comment the declaration owns, which is what the parts are indexed against.
         def owned(node)
           self.prism_owned_comments(node).drop_while{|comment| self.prism_source(comment).match?(MAGIC)}
         end
@@ -192,7 +149,6 @@ module RuboCop
           end
         end
 
-        # Consecutive comment lines: a block is what documents one thing, so a wrap can only happen inside one.
         def blocks
           [].tap do |found|
             current = []
@@ -240,7 +196,6 @@ module RuboCop
           end
         end
 
-        # decode consumes the lines it parses and does not report where they came from, so they are handed over through something which records what it gave away.
         def parse(block)
           source = Consumable.new(block.each_with_index.map{|comment, index| [index, self.text_of(comment)]})
           nodes = []
@@ -256,12 +211,10 @@ module RuboCop
           nodes
         end
 
-        # The comment without its `#`, keeping the indentation which tells decode what is nested.
         def text_of(comment)
           self.prism_source(comment).sub(/\A#\s?/, "")
         end
 
-        # Where to report a summary which is too long: the comment line it starts on, or the declaration itself when the summary cannot be traced back to one.
         def summary_range(node, parts, text)
           comments = self.owned(node)
           entry = text && parts.find{|part, _| part.equal?(text)}
@@ -279,7 +232,6 @@ module RuboCop
           text.empty? or TERMINAL.any?{|mark| text.end_with?(mark)}
         end
 
-        # What decode shifts lines off, which remembers them.
         class Consumable
           def initialize(entries)
             @entries = entries
