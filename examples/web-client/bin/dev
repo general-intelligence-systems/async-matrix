@@ -45,9 +45,4 @@
 #
 # async-matrix                          October 12, 2026                              DEV(1)
 
-set -o errexit
-set -o nounset
-
-cd "$(dirname "$0")/.."
-
-exec overmind start -d --procfile Procfile.dev "$@"
+exec overmind start -D "$@"
