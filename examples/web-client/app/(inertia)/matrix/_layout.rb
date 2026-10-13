@@ -237,11 +237,32 @@ helpers do
   end
 end
 
+# A layout's `before` runs when its app is reached, and Sinatra runs filters ahead of route
+# matching -- so this fires for anything walking the chain, not just what these files answer.
+# Hence both tests: the path has to be under /matrix before the gate has any say over it.
+MATRIX = %r{\A/matrix(/|\z)}
+
 PUBLIC = %r{\A/matrix/(login|callback|error)(/|\z)}
 
+# How long before expiry the access token is replaced, which is the margin Credentials keeps.
+RENEW_MARGIN_MS = 60_000
+
 before do
-  unless PUBLIC.match?(request.path_info) || Models::Matrix::Credential.first&.usable?
-    redirect("/matrix/login", 303)
+  if MATRIX.match?(request.path_info) && !PUBLIC.match?(request.path_info)
+    credential = Models::Matrix::Credential.first
+
+    unless credential&.usable?
+      redirect("/matrix/login", 303)
+    end
+
+    # A session whose token is about to expire is renewed here rather than on the first request that
+    # happens to be unlucky. Credentials renews in memory; Session.renew! writes the new pair back.
+    if credential.expired?(RENEW_MARGIN_MS) && !credential.refresh_token.to_s.empty?
+      if Matrix::Session.renew!(credential).nil?
+        session[:matrix_login_error] = "the session expired and could not be renewed"
+        redirect("/matrix/login", 303)
+      end
+    end
   end
 end
 

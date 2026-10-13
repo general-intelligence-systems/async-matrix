@@ -114,7 +114,11 @@ export default function MatrixLogin({
           <Button render={<Link href="/matrix/login/homeserver" />} className="w-full">
             Log in
           </Button>
-          <Button variant="ghost" disabled className="w-full">
+          <Button
+            variant="ghost"
+            render={<Link href="/matrix/login/homeserver?register=1" />}
+            className="w-full"
+          >
             Create account
           </Button>
         </div>

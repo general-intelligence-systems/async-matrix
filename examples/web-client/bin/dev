@@ -12,9 +12,12 @@
 #      Starts every process in Procfile.dev under overmind, in the foreground, and stops them
 #      all on Ctrl-C.
 #
-#      There are two, and the app needs both: `web` is the Falcon server out of server.rb, and
-#      `vite` is the asset server the page's script tags point at. Running `web` alone serves a
-#      page whose assets 404.
+#      There are two, and the app needs both: `web` is the server out of server.rb, and `vite` is
+#      the asset server the page's script tags point at. Running `web` alone serves a page whose
+#      assets 404.
+#
+#      The sync loop is not a process. server.rb runs it beside the accept loop in the same
+#      reactor, so `web` is what fills the session database the pages read.
 #
 #      Overmind's default is wanted here and --any-can-die is not: a dev server which has
 #      quietly crashed while the other one carries on looks like the app is up and
@@ -35,6 +38,9 @@
 #      MATRIX_SESSION
 #              Which session database under sessions/ to open. See config/sequel.rb.
 #
+#      MATRIX_SYNC_TIMEOUT
+#              How long the homeserver holds a sync poll open, in milliseconds. 30000 when unset.
+#
 #      PORT
 #              The port `web` serves on, 9292 by default, which is also ratalada's. Overmind's own
 #              base is 5000, so it is set here rather than left to it.
@@ -53,7 +59,7 @@
 #            bin/dev vite
 #
 # SEE ALSO
-#      overmind(1), bin/serve, bin/vite, lib/models/matrix/credential.rb
+#      overmind(1), bin/serve, bin/vite, lib/matrix/sync.rb
 #
 # async-matrix                          October 13, 2026                              DEV(1)
 

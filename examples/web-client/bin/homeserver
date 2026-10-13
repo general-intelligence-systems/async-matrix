@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+
+# HOMESERVER(1)                      General Commands Manual                   HOMESERVER(1)
+#
+# NAME
+#      bin/homeserver — run a Synapse for the example to talk to
+#
+# SYNOPSIS
+#      bin/homeserver up | down | reset | logs | seed | status
+#
+# DESCRIPTION
+#      One current Synapse on port 8008, SQLite, open registration, no federation. The gem's
+#      own rig at ../../synapse runs a service per specification version against images its
+#      flake builds; this is not that. The example is a client and does not care which version
+#      it is talking to, so it gets one server and a seed.
+#
+#      The signing key is generated into the volume on first `up`, because Synapse will not
+#      start without one and a key committed to a repository is a key everybody has.
+#
+#      `up` waits for the health check, so when it returns the homeserver is answering.
+#
+# COMMANDS
+#      up
+#              Start it, generating the signing key if the volume has none, and wait until it
+#              answers /_matrix/client/versions.
+#
+#      seed
+#              Register MATRIX_USER and create a few rooms, so the room list has something in
+#              it. Idempotent: an already-registered user is logged in instead.
+#
+#      down
+#              Stop it, keeping the volume.
+#
+#      reset
+#              Stop it and delete the volume, which is how to start from an empty homeserver.
+#
+#      logs
+#              Follow Synapse's log.
+#
+#      status
+#              What compose thinks is running.
+#
+# ENVIRONMENT
+#      MATRIX_USER, MATRIX_PASSWORD
+#              Who `seed` registers. "alice" and "password" when unset.
+#
+# EXAMPLES
+#      A homeserver with rooms in it, then the app:
+#
+#            bin/homeserver up
+#            bin/homeserver seed
+#            bin/dev
+#
+#      Then log in at http://localhost:9292 with the domain `localhost:8008`, auto-discovery
+#      off — the domain has no .well-known, so it is a URL rather than a server name.
+#
+# SEE ALSO
+#      bin/dev, bin/serve, synapse/docker-compose.yml, server.rb
+#
+# async-matrix                          October 13, 2026                       HOMESERVER(1)
+
+set -o errexit
+set -o nounset
+
+cd "$(dirname "$0")/.."
+
+COMPOSE=(docker compose --file synapse/docker-compose.yml)
+VOLUME=async-matrix-web-client_synapse
+
+generate_signing_key() {
+	if ! docker volume inspect "$VOLUME" >/dev/null 2>&1; then
+		docker volume create "$VOLUME" >/dev/null
+	fi
+
+	if ! docker run --rm --volume "$VOLUME:/data" --entrypoint test \
+		ghcr.io/element-hq/synapse:latest -f /data/signing.key 2>/dev/null
+	then
+		echo "bin/homeserver: generating a signing key" >&2
+		docker run --rm --volume "$VOLUME:/data" --entrypoint generate_signing_key \
+			ghcr.io/element-hq/synapse:latest -o /data/signing.key
+
+		# Synapse drops privileges after start, and generate_signing_key leaves the key
+		# readable by root alone.
+		docker run --rm --volume "$VOLUME:/data" --entrypoint chmod \
+			ghcr.io/element-hq/synapse:latest 0644 /data/signing.key
+	fi
+}
+
+case "${1:-up}" in
+	up)
+		generate_signing_key
+		"${COMPOSE[@]}" up --detach --wait
+		echo "bin/homeserver: http://localhost:8008 is up" >&2
+		;;
+	seed)
+		exec bundle exec ruby bin/seed-homeserver.rb
+		;;
+	down)
+		"${COMPOSE[@]}" down
+		;;
+	reset)
+		"${COMPOSE[@]}" down --volumes
+		;;
+	logs)
+		"${COMPOSE[@]}" logs --follow synapse
+		;;
+	status)
+		"${COMPOSE[@]}" ps
+		;;
+	*)
+		echo "usage: bin/homeserver up | down | reset | logs | seed | status" >&2
+		exit 64
+		;;
+esac

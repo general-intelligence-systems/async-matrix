@@ -1,0 +1,59 @@
+server_name: "localhost"
+pid_file: /data/homeserver.pid
+public_baseurl: "http://localhost:8008/"
+
+listeners:
+  - port: 8008
+    type: http
+    tls: false
+    bind_addresses: ["0.0.0.0"]
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: sqlite3
+  args:
+    database: /data/homeserver.db
+
+media_store_path: /data/media_store
+signing_key_path: /data/signing.key
+
+log_config: "/data/log.config"
+
+registration_shared_secret: "web-client-dev-shared-secret-not-a-real-one"
+macaroon_secret_key: "web-client-dev-macaroon-not-a-real-one"
+form_secret: "web-client-dev-form-secret-not-a-real-one"
+
+enable_registration: true
+enable_registration_without_verification: true
+
+report_stats: false
+default_room_version: "11"
+encryption_enabled_by_default_for_room_type: "off"
+
+serve_server_wellknown: true
+suppress_key_server_warning: true
+trusted_key_servers: []
+
+rc_message:
+  per_second: 1000
+  burst_count: 1000
+rc_registration:
+  per_second: 1000
+  burst_count: 1000
+rc_login:
+  address:
+    per_second: 1000
+    burst_count: 1000
+  account:
+    per_second: 1000
+    burst_count: 1000
+  failed_attempts:
+    per_second: 1000
+    burst_count: 1000
+rc_joins:
+  local:
+    per_second: 1000
+    burst_count: 1000

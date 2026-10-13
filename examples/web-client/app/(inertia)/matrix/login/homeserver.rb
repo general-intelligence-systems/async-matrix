@@ -48,10 +48,15 @@
 #
 
 get "/" do
+  unless params["register"].to_s.empty?
+    session[:matrix_register_intent] = true
+  end
+
   render(
     "matrix/login/homeserver",
     autodiscovery: session.fetch(:matrix_autodiscovery, true),
     value:         session[:matrix_homeserver_input].to_s,
+    register:      session[:matrix_register_intent] || false,
     error:         session.delete(:matrix_homeserver_error),
   )
 end
@@ -77,7 +82,24 @@ post "/" do
     redirect("/matrix/login/homeserver", 303)
   end
 
-  flows = Matrix::Homeserver.flows(base_url)
+  # Fractal's discover_login_api, in order: the OAuth 2.0 API is preferred, the native API is the
+  # fallback, and within the native API a homeserver without m.login.password goes straight to the
+  # browser because there is no form to show (login/mod.rs).
+  if Matrix::Homeserver.oauth?(base_url)
+    session[:matrix_base_url] = base_url
+    session[:matrix_auth] = "oauth"
+    session[:matrix_flows] = []
+
+    if autodiscovery
+      session[:matrix_domain] = input
+    else
+      session[:matrix_domain] = nil
+    end
+
+    redirect("/matrix/login/browser", 303)
+  end
+
+  flows = Matrix::Homeserver.login_flows(base_url)
 
   if flows.empty?
     session[:matrix_homeserver_error] = "no Matrix homeserver answered at #{base_url}"
@@ -85,12 +107,21 @@ post "/" do
   end
 
   session[:matrix_base_url] = base_url
+  session[:matrix_auth] = "matrix"
   session[:matrix_flows] = flows
 
   if autodiscovery
     session[:matrix_domain] = input
   else
     session[:matrix_domain] = nil
+  end
+
+  if session.delete(:matrix_register_intent)
+    redirect("/matrix/login/register", 303)
+  end
+
+  unless flows.include?("m.login.password")
+    redirect("/matrix/login/browser", 303)
   end
 
   redirect("/matrix/login/method", 303)
@@ -110,10 +141,12 @@ import { ShellHeader } from "@/components/admin/slots"
 export default function MatrixLoginHomeserver({
   autodiscovery,
   value,
+  register,
   error,
 }: {
   autodiscovery: boolean
   value: string
+  register: boolean
   error: string | null
 }) {
   // Fractal swaps the entry's own title and help text on the auto-discovery setting, because a
@@ -135,7 +168,9 @@ export default function MatrixLoginHomeserver({
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-md flex-col gap-6 p-6">
-        <h2 className="text-xl font-semibold tracking-tight">Homeserver</h2>
+        <h2 className="text-xl font-semibold tracking-tight">
+          {register ? "Where to create the account" : "Homeserver"}
+        </h2>
 
         {error ? (
           <Alert variant="destructive">

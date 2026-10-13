@@ -195,6 +195,9 @@ const SECTIONS = [
   { href: "/matrix/settings/encryption", title: "Encryption", hint: "Cross-signing, recovery and key backup" },
   { href: "/matrix/settings/safety", title: "Safety", hint: "Ignored users and media previews" },
   { href: "/matrix/settings/devices", title: "Devices", hint: "Where this account is signed in" },
+  { href: "/matrix/settings/password", title: "Change Password", hint: "When the homeserver owns it" },
+  { href: "/matrix/settings/logout", title: "Log Out", hint: "End this session on this device" },
+  { href: "/matrix/settings/deactivate", title: "Deactivate Account", hint: "Close the account for good" },
 ]
 
 export default function MatrixSettings({

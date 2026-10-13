@@ -21,6 +21,10 @@
 #      MATRIX_SESSION
 #              Which session database under sessions/ to open, "default" when unset.
 #
+#      MATRIX_SYNC_TIMEOUT
+#              How long the homeserver holds a sync poll open, in milliseconds. 30000 when unset.
+#              server.rb runs the sync loop in this process, beside the accept loop.
+#
 #      MATRIX_SESSIONS
 #              The directory those databases live in, "sessions" when unset.
 #

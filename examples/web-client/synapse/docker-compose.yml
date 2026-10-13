@@ -1,0 +1,34 @@
+# A homeserver for the example to talk to: one Synapse, SQLite, open registration, no federation.
+#
+#   bin/homeserver up
+#
+# The gem's own rig at ../../synapse runs one service per specification version against images built
+# by its flake. This is not that: it is a single current Synapse, because the example is a client
+# and does not care which version it is talking to.
+name: async-matrix-web-client
+
+services:
+  synapse:
+    image: ghcr.io/element-hq/synapse:latest
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./homeserver.yaml:/data/homeserver.yaml:ro
+      - ./log.config:/data/log.config:ro
+      - synapse:/data
+    environment:
+      SYNAPSE_SERVER_NAME: localhost
+      SYNAPSE_REPORT_STATS: "no"
+      # The image drops to 991:991 unless told otherwise, and everything in the volume was made by
+      # root. This is a throwaway homeserver, so it stays root rather than chowning a volume.
+      UID: "0"
+      GID: "0"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 40
+      start_period: 5s
+
+volumes:
+  synapse:
