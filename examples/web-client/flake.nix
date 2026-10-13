@@ -12,32 +12,42 @@
         pkgs = nixpkgs.legacyPackages.${system};
         lib = mine.lib.${system};
 
-        asyncMatrixGems = {
-          "x86_64-linux" = { platform = "x86_64-linux"; sha256 = "1fz3qad96gr73hwj8q8mrcn0lxgl5lnfy7xqxklv8acqk5pjb5mm"; };
-          "aarch64-linux" = { platform = "aarch64-linux"; sha256 = "0h48m7ki01i8ki3898rriy5bzifqf7j2gr424kwwqrc18k34zism"; };
-          "x86_64-darwin" = { platform = "x86_64-darwin"; sha256 = "1zv4knrglbpblgz5pqngi3fj7l2agdskj0023pffdpxl0fvrp6bs"; };
-          "aarch64-darwin" = { platform = "arm64-darwin"; sha256 = "1awm77al95gmm7isghv13qc1mfnih6jka2y98g4l9d38jbmlqrva"; };
+        vodozemacPlatforms = {
+          x86_64-linux = {
+            platform = "x86_64-linux";
+            sha256 = "17sv2ccpbgxn7ymj6yf2kgc5z6f6j2rqfi4ivkxijzdkpsmksjzj";
+          };
+          aarch64-linux = {
+            platform = "aarch64-linux";
+            sha256 = "0c471xf3p8k6ylzi1jh2cfzfrwvr1bhf8pgfriavj9h9nrybyvd8";
+          };
+          x86_64-darwin = {
+            platform = "x86_64-darwin";
+            sha256 = "1kl0np4lkcngwpw3j87b0c7mp6krwq8cs4q20xsj60ckqbjvjcj7";
+          };
+          aarch64-darwin = {
+            platform = "arm64-darwin";
+            sha256 = "03qdp7dzmbpgmcds5w42vbd4n0hfqijync4bm8g6d7f9w3y639p1";
+          };
         };
-
-        asyncMatrixGem = asyncMatrixGems.${system} or null;
 
         gemsetAttrs = import ./gemset.nix;
 
-        gemset =
-          if asyncMatrixGem == null then
-            gemsetAttrs
-          else
-            gemsetAttrs // {
-              async-matrix = gemsetAttrs.async-matrix // {
-                platform = asyncMatrixGem.platform;
-                source = gemsetAttrs.async-matrix.source // {
-                  sha256 = asyncMatrixGem.sha256;
-                };
-              };
-            };
+        vodozemacGem =
+          let
+            selected = vodozemacPlatforms.${system} or (throw
+              "vodozemac has no precompiled gem for ${system}");
+            generic = gemsetAttrs.vodozemac;
+          in
+          generic // {
+            version = "${generic.version}-${selected.platform}";
+            source = generic.source // { sha256 = selected.sha256; };
+          };
+
+        gemset = gemsetAttrs // { vodozemac = vodozemacGem; };
 
         gems = pkgs.bundlerEnv {
-          name = "async-matrix";
+          name = "async-matrix-example";
           ruby = pkgs.ruby_3_4;
           gemfile = ./Gemfile;
           lockfile = ./Gemfile.lock;
@@ -45,7 +55,7 @@
         };
 
         pnpmDeps = pkgs.fetchPnpmDeps {
-          pname = "async-matrix";
+          pname = "async-matrix-example";
           version = "0";
           src = ./.;
           fetcherVersion = 4;
@@ -61,6 +71,13 @@
             gems
             gems.wrappedRuby
           ];
+
+          shellHook = /* bash */ ''
+            export BUNDLE_FORCE_RUBY_PLATFORM=false
+            export BUNDLE_GEMFILE="$PWD/Gemfile"
+            export BUNDLE_FROZEN=false
+          '';
+
         };
       }));
 }

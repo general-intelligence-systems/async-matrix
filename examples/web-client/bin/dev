@@ -45,4 +45,4 @@
 #
 # async-matrix                          October 12, 2026                              DEV(1)
 
-exec overmind start -D "$@"
+exec overmind start -D --procfile Procfile.dev "$@"
