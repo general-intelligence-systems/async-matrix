@@ -16,7 +16,7 @@ gem "multi_json"
 
 gem "vite_ruby"
 
-gem "async-matrix", "~> 4.0"
+gem "async-matrix", "~> 4.0.1"
 
 group :test, :development do
   gem "rubocop"

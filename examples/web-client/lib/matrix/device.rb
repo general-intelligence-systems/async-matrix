@@ -11,8 +11,6 @@ module Matrix
 
     SESSION_DUMP = "megolm_sessions"
 
-    DEVICE = "olm_device"
-
     module Crypto
       module_function
 
@@ -24,23 +22,54 @@ module Matrix
     module_function
 
     def crypto
-      @crypto ||= self.restore || Async::Matrix::E2EE::Olm.new
+      self.machine.crypto
     end
 
     def restore
+      credential = Models::Matrix::Credential.first
       dumped = Models::Matrix::KV[OLM_DUMP]
 
       unless dumped.to_s.empty?
-        Async::Matrix::E2EE::Olm.load(dumped, Crypto.pickle_key)
+        Async::Matrix::E2EE::Machine.load(
+          dumped,
+          Crypto.pickle_key,
+          user_id:   credential&.matrix_user_id.to_s,
+          device_id: credential&.device_id.to_s,
+          crypto:    Async::Matrix::E2EE::Olm,
+          version:   Homeserver::VERSION,
+        )
       end
+    rescue Async::Matrix::MismatchedAccountError => error
+      Console.warn(self, "The stored device belongs to another session.", expected: error.expected, got: error.got)
+
+      self.discard!
+
+      nil
     rescue StandardError => error
       Console.warn(self, "Could not read the stored device.", error: error)
 
       nil
     end
 
+    def fresh
+      credential = Models::Matrix::Credential.first
+
+      Async::Matrix::E2EE::Machine.new(
+        user_id:   credential&.matrix_user_id.to_s,
+        device_id: credential&.device_id.to_s,
+        crypto:    Async::Matrix::E2EE::Olm.new,
+        version:   Homeserver::VERSION,
+      )
+    end
+
+    def discard!
+      Models::Matrix::KV.unset!(OLM_DUMP)
+      Models::Matrix::KV.unset!(SESSION_DUMP)
+      Models::Matrix::KV.unset!(Models::Matrix::KV::SYNC_TOKEN)
+    end
+
     def persist!
-      Models::Matrix::KV.set!(OLM_DUMP, self.crypto.dump(Crypto.pickle_key))
+      Models::Matrix::KV.set!(OLM_DUMP, self.machine.dump(Crypto.pickle_key))
       Models::Matrix::KV.set!(SESSION_DUMP, self.remembered)
     end
 
@@ -75,18 +104,7 @@ module Matrix
     end
 
     def machine
-      credential = Models::Matrix::Credential.first
-
-      @machine ||= self.adopt!(
-        self.remember!(
-          Async::Matrix::E2EE::Machine.new(
-            user_id:   credential&.matrix_user_id.to_s,
-            device_id: credential&.device_id.to_s,
-            crypto:    self.crypto,
-            version:   Homeserver::VERSION,
-          ),
-        ),
-      )
+      @machine ||= self.adopt!(self.remember!(self.restore || self.fresh))
     end
 
     def adopt!(machine)
@@ -102,20 +120,7 @@ module Matrix
     end
 
     def forget!
-      @crypto = nil
       @machine = nil
-    end
-
-    def adopted!(device_id)
-      unless Models::Matrix::KV[DEVICE] == device_id
-        Models::Matrix::KV.unset!(OLM_DUMP)
-        Models::Matrix::KV.unset!(SESSION_DUMP)
-
-        Models::Matrix::KV.unset!(Models::Matrix::KV::SYNC_TOKEN)
-        Models::Matrix::KV.set!(DEVICE, device_id)
-
-        self.forget!
-      end
     end
 
     def state

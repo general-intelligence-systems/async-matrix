@@ -109,8 +109,8 @@ module Matrix
       }
     end
 
-    def prepare!(credential)
-      Device.adopted!(credential.device_id)
+    def prepare!
+      Device.forget!
       Device.describe_storage!
 
       self.with_client do |client, _opened|

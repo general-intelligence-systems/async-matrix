@@ -628,15 +628,22 @@ def sync_loop
 
         Matrix::Session.open(credential) do |client, _credentials|
           since = M::KV.sync_token
+          device_id = credential.device_id
 
-          Console.info(self, "Starting sync.", user_id: credential.matrix_user_id, resumed: !since.nil?)
+          Console.info(self, "Starting sync.", user_id: credential.matrix_user_id, device_id: device_id, resumed: !since.nil?)
 
           apply_devices(credential)
 
           sync = client.sync(since: since, timeout: since.nil? ? 0 : SYNC_TIMEOUT)
 
           sync.each(retries: 8, timeout: SYNC_TIMEOUT) do |batch|
-            apply_batch(client, batch, credential.matrix_user_id)
+            if M::Credential.first&.device_id == device_id
+              apply_batch(client, batch, credential.matrix_user_id)
+            else
+              Console.info(self, "The session signed in as another device.", was: device_id)
+
+              break
+            end
           end
         end
       else

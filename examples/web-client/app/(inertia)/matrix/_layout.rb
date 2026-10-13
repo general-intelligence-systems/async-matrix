@@ -305,7 +305,7 @@ helpers do
       credential.save_changes
 
       # A session which has not published its keys cannot be sent to, so this is part of signing in.
-      Matrix::Crypto.prepare!(credential)
+      Matrix::Crypto.prepare!
     end
   end
 end
