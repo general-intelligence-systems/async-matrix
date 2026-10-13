@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/cancelled_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # Either side cancelled, with the m.key.verification.cancel code as the reason.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -38,47 +36,61 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/cancelled",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { ShieldX } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Button } from "@/components/ui/button"
+import { Flow, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidCancelled({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationCancelled({ flow }: { flow: Flow; step: string }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Cancelled"} />
+    <>
+      <Head title="Cancelled" />
+      <Step flow={flow} title="Cancelled">
+        <div className="flex flex-col items-center gap-2 py-4">
+          <ShieldX className="size-10 text-muted-foreground" />
+          <h2 className="text-center text-xl font-semibold tracking-tight">
+            Verification Cancelled
+          </h2>
+        </div>
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Cancelled</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+        <Alert variant={flow.cancelCode === "m.mismatched_sas" ? "destructive" : "warning"}>
+          <AlertTitle>{flow.cancelReason || "It was cancelled"}</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/cancelled_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            {flow.cancelCode === "m.mismatched_sas" ? (
+              <>
+                Emoji that do not match is what an interception looks like. Nothing was signed, and
+                it is worth asking the other person over a channel you trust.
+              </>
+            ) : (
+              <>
+                Nothing was signed. Code <code>{flow.cancelCode || "unknown"}</code>.
+              </>
+            )}
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" render={<Link href="/matrix/settings/encryption/identity" />}>
+            Try again
+          </Button>
+          <Button size="sm" variant="ghost" render={<Link href="/matrix/verification" />}>
+            Back
+          </Button>
+        </div>
+      </Step>
+    </>
   )
 }

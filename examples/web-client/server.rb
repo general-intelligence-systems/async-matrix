@@ -13,6 +13,8 @@ require_relative "config/sequel"
 require_relative "lib/matrix/homeserver"
 require_relative "lib/matrix/session"
 require_relative "lib/matrix/room_actions"
+require_relative "lib/matrix/crypto"
+require_relative "lib/matrix/verification"
 
 RELOAD = "USR2"
 reloading = false
@@ -245,6 +247,16 @@ def apply_room_account_data(room, room_id, event)
   end
 end
 
+TYPING = {}
+
+TYPING_MUTEX = Mutex.new
+
+def typing_in(room_id, me)
+  TYPING_MUTEX.synchronize do
+    Array(TYPING[room_id]) - [me]
+  end
+end
+
 def apply_ephemeral(room, room_id, event)
   case event
   in {content: Events::Receipt => content}
@@ -269,8 +281,16 @@ def apply_ephemeral(room, room_id, event)
     unless latest.nil?
       room.latest_receipt_event_id = latest
     end
-  in {content: Events::Typing}
-    nil
+  in {content: Events::Typing => content}
+    TYPING_MUTEX.synchronize do
+      users = Array(content.user_ids).map(&:to_s)
+
+      if users.empty?
+        TYPING.delete(room_id)
+      else
+        TYPING[room_id] = users
+      end
+    end
   else
     nil
   end
@@ -333,12 +353,42 @@ def apply_to_device(event)
       .save_changes(validate: false)
   in {content: Events::SecretSend => content}
     upsert(M::SecretsInbox, {secret_name: content.request_id}).set(secret: content.secret).save_changes(validate: false)
+  in {content: Events::KeyVerificationRequest => content}
+    Matrix::Verification.requested!(content.transaction_id, event[:sender], content.to_h)
+  in {content: Events::KeyVerificationReady => content}
+    Matrix::Verification.ready!(content.transaction_id, content.to_h)
+  in {content: Events::KeyVerificationStartReciprocateV => content}
+    Matrix::Verification.reciprocated!(content.transaction_id, content.to_h)
+  in {content: Events::KeyVerificationStartSasV | Events::KeyVerificationStart => content}
+    accept_verification(content)
+  in {content: Events::KeyVerificationAccept => content}
+    Matrix::Verification.accepted!(content.transaction_id, content.to_h)
+  in {content: Events::KeyVerificationKey => content}
+    Matrix::Verification.receive_key!(content.transaction_id, content.key)
+  in {content: Events::KeyVerificationMac => content}
+    Matrix::Verification.receive_mac!(content.transaction_id, content.to_h)
+  in {content: Events::KeyVerificationDone => content}
+    Matrix::Verification.done!(content.transaction_id)
+  in {content: Events::KeyVerificationCancel => content}
+    Matrix::Verification.cancelled!(content.transaction_id, code: content.code.to_s, reason: content.reason)
   in {content: Events::RoomKeyBundle => content}
     upsert(M::RoomKeyBundle, {room_id: content.room_id, sender_user_id: event[:sender]})
       .set(state: "received", bundle: content.to_h)
       .save_changes(validate: false)
   else
     Console.debug(self, "Unhandled to-device event.", type: event.type)
+  end
+end
+
+def accept_verification(content)
+  flow = M::VerificationFlow.first(flow_id: content.transaction_id)
+
+  if flow.nil?
+    Console.warn(self, "A verification started which was never requested.", flow: content.transaction_id)
+  elsif flow.started_by_us
+    Console.debug(self, "Both sides started: ours wins.", flow: content.transaction_id)
+  else
+    Matrix::Verification.accept_start!(content.transaction_id, content.to_h)
   end
 end
 

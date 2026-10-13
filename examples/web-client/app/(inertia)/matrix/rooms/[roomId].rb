@@ -576,6 +576,25 @@ get "/" do
     # Who we are, so the view can align our own messages to the end the way
     # Message's align="end" expects.
     selfId: me,
+    # Fractal shows receipts under the event each member has read up to, and the typing row
+    # excludes you -- you know you are typing.
+    receipts: Models::Matrix::Receipt
+      .where(room_id: room.room_id, receipt_type: "m.read")
+      .exclude(member_id: me)
+      .all
+      .group_by(&:event_id)
+      .transform_values{|rows|
+        rows.map{|receipt|
+          member = Models::Matrix::RoomMember.first(room_id: room.room_id, member_id: receipt.member_id)
+
+          { memberId: receipt.member_id, name: member&.name || receipt.member_id, avatarUrl: member&.avatar_url }
+        }
+      },
+    typing: typing_in(room.room_id, me).map{|member_id|
+      member = Models::Matrix::RoomMember.first(room_id: room.room_id, member_id: member_id)
+
+      { memberId: member_id, name: member&.name || member_id, avatarUrl: member&.avatar_url }
+    },
     can:    {
       send:        room.power_level_of(me).to_i >= (room.power_levels["events_default"] || 0).to_i,
       redactOwn:   room.power_level_of(me).to_i >= (room.power_levels.dig("events", "m.room.redaction") || 0).to_i,
@@ -813,6 +832,7 @@ function MessageRow({
   showHeader: boolean
   roomId: string
   can: Permissions
+  readers: Reader[]
   onCompose: (mode: "reply" | "edit", event: Event) => void
 }) {
   return (
@@ -890,6 +910,7 @@ function MessageRow({
             <TooltipContent>{new Date(event.ts).toLocaleString()}</TooltipContent>
           </Tooltip>
           {event.edited && <span className="ml-1">(edited)</span>}
+          <ReadReceipts readers={readers} />
           <EventMenu
             event={event}
             roomId={roomId}
@@ -1033,17 +1054,76 @@ function EventMenu({
   )
 }
 
+type Reader = { memberId: string; name: string; avatarUrl: string | null }
+
+// read_receipts_list/mod.rs shows five avatars and then a "{n} +" overflow.
+const MAX_RECEIPTS_SHOWN = 5
+
+function ReadReceipts({ readers }: { readers: Reader[] }) {
+  if (readers.length === 0) return null
+
+  const shown = readers.slice(0, MAX_RECEIPTS_SHOWN)
+  const extra = readers.length - shown.length
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className="ms-1 inline-flex items-center -space-x-1.5">
+            {shown.map((reader) => (
+              <Avatar key={reader.memberId} className="size-3.5 ring-1 ring-background">
+                {reader.avatarUrl && <AvatarImage src={reader.avatarUrl} alt="" />}
+                <AvatarFallback className="text-[7px]">{initial(reader.name)}</AvatarFallback>
+              </Avatar>
+            ))}
+            {extra > 0 && <span className="ps-1 text-[10px] tabular-nums">{extra} +</span>}
+          </span>
+        }
+      />
+      <TooltipContent>{readers.map((reader) => reader.name).join(", ")}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+// typing_row.rs: one name, or a count. The homeserver stops reporting a member when they stop,
+// so an empty list simply hides the row.
+function TypingRow({ typing }: { typing: Reader[] }) {
+  if (typing.length === 0) return null
+
+  return (
+    <div className="flex items-center gap-2 px-4 pb-2 text-xs text-muted-foreground">
+      <span className="inline-flex -space-x-1.5">
+        {typing.slice(0, MAX_RECEIPTS_SHOWN).map((member) => (
+          <Avatar key={member.memberId} className="size-4 ring-1 ring-background">
+            {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt="" />}
+            <AvatarFallback className="text-[8px]">{initial(member.name)}</AvatarFallback>
+          </Avatar>
+        ))}
+      </span>
+      <span>
+        {typing.length === 1
+          ? `${typing[0].name} is typing…`
+          : `${typing.length} members are typing…`}
+      </span>
+    </div>
+  )
+}
+
 function Timeline({
   events,
   selfId,
   roomId,
   can,
+  receipts,
+  typing,
   onCompose,
 }: {
   events: Event[]
   selfId: string
   roomId: string
   can: Permissions
+  receipts: Record<string, Reader[]>
+  typing: Reader[]
   onCompose: (mode: "reply" | "edit", event: Event) => void
 }) {
   if (events.length === 0) {
@@ -1101,12 +1181,15 @@ function Timeline({
                     showHeader={!sameSender || newDay}
                     roomId={roomId}
                     can={can}
+                    readers={receipts[event.eventId] ?? []}
                     onCompose={onCompose}
                   />
                 </MessageGroup>
               )
             })}
           </MessageScrollerContent>
+
+          <TypingRow typing={typing} />
         </MessageScrollerViewport>
 
         {/* Pinned to the bottom until the reader scrolls up, then this appears. */}
@@ -1159,11 +1242,15 @@ export default function MatrixRoom({
   events,
   selfId,
   can,
+  receipts,
+  typing,
 }: {
   room: Room
   events: Event[]
   selfId: string
   can: Permissions
+  receipts: Record<string, Reader[]>
+  typing: Reader[]
 }) {
   const encoded = encodeURIComponent(room.roomId)
   const attachment = useRef<HTMLInputElement>(null)
@@ -1265,6 +1352,8 @@ export default function MatrixRoom({
             selfId={selfId}
             roomId={room.roomId}
             can={can}
+            receipts={receipts}
+            typing={typing}
             onCompose={(mode, event) => setComposing({ mode, event })}
           />
 

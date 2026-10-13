@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/choose_method_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # QR code or emoji, which is m.qr_code.show.v1 against m.sas.v1.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -39,47 +37,97 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/method",
-    flowId:    params["flowId"],
+    flow:    verification_row(flow),
+    step:    verification_step(flow),
+    offered: Matrix::Verification.offered(flow),
+    qr:      Matrix::Verification.qr_payload(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { QrCode, SmilePlus } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Button } from "@/components/ui/button"
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
+import { usePoll } from "@/hooks/use-poll"
+import { Act, Flow, Stale, Step, flowPath } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidMethod({flowId}: {
-  flowId: string
+export default function MatrixVerificationMethod({
+  flow,
+  step,
+  offered,
+  qr,
+}: {
+  flow: Flow
+  step: string
+  offered: string[]
+  qr: string | null
 }) {
+  usePoll(flow.live, ["flow", "step"])
+
+  const sas = offered.includes("m.sas.v1")
+  const scan = offered.includes("m.qr_code.show.v1") && qr !== null
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Choose a method"} />
+    <>
+      <Head title="Choose a method" />
+      <Step flow={flow} title="Choose a method">
+        {step === "method" ? null : <Stale flow={flow} />}
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Choose a method</h1>
-      </ShellHeader>
+        {!sas && !scan && (
+          <Alert variant="warning">
+            <AlertTitle>Nothing both sides can do</AlertTitle>
+            <AlertDescription>
+              <Link href={flowPath(flow, "unsupported")} className="underline">
+                See what that means
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/choose_method_page.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
-      </div>
-    </div>
+        {sas && (
+          <Item variant="outline">
+            <ItemContent>
+              <ItemTitle className="flex items-center gap-2">
+                <SmilePlus className="size-4" />
+                Compare emoji
+              </ItemTitle>
+              <ItemDescription>
+                Seven emoji appear on both screens. They match or they do not.
+              </ItemDescription>
+            </ItemContent>
+            <Act flow={flow} action="start">
+              Start
+            </Act>
+          </Item>
+        )}
+
+        {scan && (
+          <Item variant="outline">
+            <ItemContent>
+              <ItemTitle className="flex items-center gap-2">
+                <QrCode className="size-4" />
+                Show a QR code
+              </ItemTitle>
+              <ItemDescription>Let the other device scan this one's code.</ItemDescription>
+            </ItemContent>
+            <Button size="sm" variant="outline" render={<Link href={flowPath(flow, "scan")} />}>
+              Show
+            </Button>
+          </Item>
+        )}
+
+        <Act flow={flow} action="cancel" code="user" variant="ghost">
+          Cancel
+        </Act>
+      </Step>
+    </>
   )
 }

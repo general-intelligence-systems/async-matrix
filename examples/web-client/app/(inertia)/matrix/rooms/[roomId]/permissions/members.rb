@@ -55,10 +55,22 @@
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  levels = room.power_levels
+
   render(
     "matrix/rooms/[roomId]/permissions/members",
     roomId:    room.room_id,
     roomTitle: room.title,
+    members:   (levels["users"] || {}).sort_by{|_id, level| -level.to_i}.map{|member_id, level|
+      member = Models::Matrix::RoomMember.first(room_id: room.room_id, member_id: member_id)
+
+      {
+        memberId:  member_id,
+        name:      member&.name || member_id,
+        avatarUrl: member&.avatar_url,
+        level:     level.to_i,
+      }
+    },
   )
 end
 
@@ -74,35 +86,117 @@ end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Head, Link, router } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/reui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixRoomsRoomidPermissionsMembers({roomId, roomTitle}: {
+function MemberList({
+  members,
+  empty,
+  action,
+  label,
+  roomId,
+}: {
+  members: { memberId: string; name: string; avatarUrl: string | null; level?: number }[]
+  empty: string
+  action: string
+  label: string
+  roomId: string
+}) {
+  const encoded = encodeURIComponent(roomId)
+
+  if (members.length === 0) {
+    return (
+      <Empty className="py-10">
+        <EmptyHeader>
+          <EmptyTitle>{empty}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {members.map((member) => (
+        <Item key={member.memberId}>
+          <Avatar className="size-8">
+            {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt="" />}
+            <AvatarFallback className="text-[11px]">
+              {member.name.replace(/^@/, "").charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <ItemContent>
+            <ItemTitle>{member.name}</ItemTitle>
+            <ItemDescription className="font-mono text-xs">{member.memberId}</ItemDescription>
+          </ItemContent>
+          {member.level !== undefined && (
+            <Badge variant="secondary" size="sm">
+              {member.level}
+            </Badge>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              router.post(
+                `/matrix/rooms/${encoded}/permissions/${action}`,
+                { user_id: member.memberId, level: action === "add" ? 50 : "" },
+                { preserveScroll: true },
+              )
+            }
+          >
+            {label}
+          </Button>
+        </Item>
+      ))}
+    </div>
+  )
+}
+
+export default function MatrixRoomPermissionsMembers({
+  roomId,
+  roomTitle,
+  members,
+}: {
   roomId: string
   roomTitle: string
+  members: { memberId: string; name: string; avatarUrl: string | null; level: number }[]
 }) {
+  const encoded = encodeURIComponent(roomId)
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={`Privileged members · ${roomTitle}`} />
+      <Head title={`Members With Assigned Power Levels · ${roomTitle}`} />
 
       <ShellHeader>
-        <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}/about`} className="text-muted-foreground hover:text-foreground">
+        <Link
+          href={`/matrix/rooms/${encoded}/permissions`}
+          className="text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Privileged members</h1>
+        <h1 className="truncate text-sm font-medium">Members With Assigned Power Levels</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>session_view/room_details/permissions/members_subpage.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+        <Card>
+          <CardContent className="pt-6">
+            <MemberList
+              members={members}
+              empty="No Room Members"
+              action="members"
+              label="Reset"
+              roomId={roomId}
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

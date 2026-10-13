@@ -4,8 +4,6 @@
 #
 # Fractal: components/crypto/recovery_setup_view.{blp,rs} (tag incomplete)
 #
-# NOT IMPLEMENTED.
-#
 # Secret storage exists but something it should hold is missing, so recovery would not restore everything.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -42,43 +40,93 @@
 #
 
 get "/" do
-  render("matrix/settings/encryption/recovery/incomplete")
+  render(
+    "matrix/settings/encryption/recovery/incomplete",
+    status: Matrix::Crypto.status,
+  )
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::Crypto.write_secrets!
+  end
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { Form, Head, Link } from "@inertiajs/react"
+import { ArrowLeft, ShieldAlert } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
+import { Item, ItemContent, ItemTitle } from "@/components/ui/item"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixSettingsEncryptionRecoveryIncomplete({}: {
+const NAMES: Record<string, string> = {
+  "m.cross_signing.master": "Master key",
+  "m.cross_signing.self_signing": "Self-signing key",
+  "m.cross_signing.user_signing": "User-signing key",
+  "m.megolm_backup.v1": "Key backup key",
+}
 
+export default function MatrixSettingsEncryptionRecoveryIncomplete({
+  status,
+}: {
+  status: { identity: boolean; recovery: boolean; missing: string[]; backup: string | null }
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Recovery incomplete"} />
+      <Head title="Recovery incomplete" />
 
       <ShellHeader>
-        <Link href={"/matrix/settings/encryption/recovery"} className="text-muted-foreground hover:text-foreground">
+        <Link href="/matrix/settings/encryption" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Recovery incomplete</h1>
+        <h1 className="truncate text-sm font-medium">Account Recovery Incomplete</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+        <div className="flex flex-col items-center gap-2 py-4">
+          <ShieldAlert className="size-10 text-muted-foreground" />
+          <h2 className="text-center text-xl font-semibold tracking-tight">
+            Account Recovery Incomplete
+          </h2>
+        </div>
+
+        <Alert variant="warning">
+          <AlertTitle>Something it should hold is missing</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>components/crypto/recovery_setup_view.blp</code>. The widget tree to rebuild is in the
-            route file.
+            Recovery exists but does not have everything, so a new session would not get all of it
+            back. Writing what this session holds fills the gaps it can.
           </AlertDescription>
         </Alert>
+
+        {status.missing.map((name) => (
+          <Item key={name} variant="outline">
+            <ItemContent>
+              <ItemTitle>{NAMES[name] || name}</ItemTitle>
+            </ItemContent>
+            <span className="text-xs text-muted-foreground">Missing</span>
+          </Item>
+        ))}
+
+        {status.missing.length === 0 && (
+          <Alert>
+            <AlertTitle>Nothing is missing any more</AlertTitle>
+            <AlertDescription>This session holds every secret recovery should carry.</AlertDescription>
+          </Alert>
+        )}
+
+        <Form action="/matrix/settings/encryption/recovery/incomplete" method="post">
+          {({ processing }) => (
+            <>
+              <input type="hidden" name="return_to" value="/matrix/settings/encryption" />
+              <Button type="submit" disabled={processing || status.missing.length === 0}>
+                Write what this session holds
+              </Button>
+            </>
+          )}
+        </Form>
       </div>
     </div>
   )

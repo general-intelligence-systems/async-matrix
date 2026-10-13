@@ -4,8 +4,6 @@
 #
 # Fractal: components/crypto/identity_setup_view.{blp,rs} (tag choose-method)
 #
-# NOT IMPLEMENTED.
-#
 # How this device joins the account's cross-signing identity: verify against a device that already has it, or bootstrap a new one.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -41,43 +39,118 @@
 #
 
 get "/" do
-  render("matrix/settings/encryption/identity")
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
+  render(
+    "matrix/settings/encryption/identity",
+    status:  Matrix::Crypto.status,
+    session: Models::Matrix::Device
+      .of_user(Models::Matrix::Credential.first&.matrix_user_id)
+      .live
+      .exclude(device_id: Models::Matrix::Credential.first&.device_id)
+      .count,
+  )
 end
 
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, KeyRound, MonitorSmartphone } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixSettingsEncryptionIdentity({}: {
-
+export default function MatrixSettingsEncryptionIdentity({
+  status,
+  session,
+}: {
+  status: { identity: boolean; recovery: boolean; published: boolean; missing: string[] }
+  session: number
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Crypto identity"} />
+      <Head title="Crypto identity" />
 
       <ShellHeader>
-        <Link href={"/matrix/settings/encryption"} className="text-muted-foreground hover:text-foreground">
+        <Link href="/matrix/settings/encryption" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Crypto identity</h1>
+        <h1 className="truncate text-sm font-medium">Verify Your New Session</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>components/crypto/identity_setup_view.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+        {status.identity ? (
+          <Alert>
+            <AlertTitle>This account has a crypto identity</AlertTitle>
+            <AlertDescription>
+              Verify this session against one that already holds the keys, or recover them from
+              account recovery.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert variant="warning">
+            <AlertTitle>No crypto identity</AlertTitle>
+            <AlertDescription>
+              You need to set up a crypto identity, since it has never been created.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {status.identity ? (
+          <>
+            <Item variant="outline">
+              <ItemContent>
+                <ItemTitle className="flex items-center gap-2">
+                  <MonitorSmartphone className="size-4" />
+                  Verify With Another Session
+                </ItemTitle>
+                <ItemDescription>
+                  {session === 0
+                    ? "No other session is signed in to answer."
+                    : `${session} other ${session === 1 ? "session" : "sessions"} can answer.`}
+                </ItemDescription>
+              </ItemContent>
+              <Button size="sm" disabled={session === 0} render={<Link href="/matrix/settings/encryption/identity/verify" />}>
+                Verify
+              </Button>
+            </Item>
+
+            <Item variant="outline">
+              <ItemContent>
+                <ItemTitle className="flex items-center gap-2">
+                  <KeyRound className="size-4" />
+                  Recover Account
+                </ItemTitle>
+                <ItemDescription>Restore full access to your account.</ItemDescription>
+              </ItemContent>
+              <Button size="sm" variant="outline" render={<Link href="/matrix/settings/encryption/recovery" />}>
+                Recover
+              </Button>
+            </Item>
+          </>
+        ) : (
+          <Item variant="outline">
+            <ItemContent>
+              <ItemTitle>Set Up</ItemTitle>
+              <ItemDescription>Mint the master, self-signing and user-signing keys.</ItemDescription>
+            </ItemContent>
+            <Button size="sm" render={<Link href="/matrix/settings/encryption/identity/bootstrap" />}>
+              Set Up
+            </Button>
+          </Item>
+        )}
+
+        <Item variant="muted">
+          <ItemContent>
+            <ItemTitle>Reset Crypto Identity</ItemTitle>
+            <ItemDescription>
+              Everyone who verified you, and every other session, has to verify again.
+            </ItemDescription>
+          </ItemContent>
+          <Button size="sm" variant="destructive" render={<Link href="/matrix/settings/encryption/identity/reset" />}>
+            Reset
+          </Button>
+        </Item>
       </div>
     </div>
   )

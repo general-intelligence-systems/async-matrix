@@ -218,6 +218,50 @@ helpers do
     end
   end
 
+  def verification_flow!
+    Models::Matrix::VerificationFlow.first(flow_id: params["flowId"].to_s) ||
+      halt(404, "matrix: no such verification\n")
+  end
+
+  def verification_row(flow)
+    {
+      flowId:       flow.flow_id,
+      userId:       flow.other_user_id,
+      displayName:  Models::Matrix::GlobalProfile.first(matrix_user_id: flow.other_user_id)&.display_name,
+      deviceId:     flow.other_device_id,
+      state:        flow.state,
+      live:         flow.live?,
+      own:          flow.own?,
+      startedByUs:  flow.started_by_us,
+      method:       flow.verification_method,
+      methods:      flow.methods_offered.to_a,
+      emoji:        Matrix::Verification.emoji(flow),
+      decimals:     flow.decimals.to_a,
+      cancelCode:   flow.cancel_code,
+      cancelReason: flow.cancel_reason,
+      roomId:       flow.room_id,
+    }
+  end
+
+  def verification_step(flow)
+    case flow.state
+    in Models::Matrix::VerificationFlow::REQUESTED
+      flow.started_by_us ? "wait" : "accept"
+    in Models::Matrix::VerificationFlow::READY
+      "method"
+    in Models::Matrix::VerificationFlow::STARTED | Models::Matrix::VerificationFlow::ACCEPTED
+      flow.verification_method == Matrix::Verification::RECIPROCATE ? "confirm" : "wait"
+    in Models::Matrix::VerificationFlow::KEYED
+      "sas"
+    in Models::Matrix::VerificationFlow::CONFIRMED
+      flow.verification_method == Matrix::Verification::RECIPROCATE ? "scanned" : "wait"
+    in Models::Matrix::VerificationFlow::DONE
+      "completed"
+    in Models::Matrix::VerificationFlow::CANCELLED
+      "cancelled"
+    end
+  end
+
   def act!
     yield
 

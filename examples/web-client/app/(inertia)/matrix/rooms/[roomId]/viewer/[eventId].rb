@@ -43,11 +43,22 @@
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  event = Models::Matrix::Event.first(room_id: room.room_id, event_id: params["eventId"]) ||
+    halt(404, "matrix: no such event\n")
+
   render(
     "matrix/rooms/[roomId]/viewer/[eventId]",
     roomId:    room.room_id,
     roomTitle: room.title,
-    eventId:   params["eventId"],
+    event:     {
+      eventId:  event.event_id,
+      body:     event.content["body"],
+      msgtype:  event.content["msgtype"],
+      media:    Matrix::RoomActions.media_url(event.content["url"]),
+      mimetype: event.content.dig("info", "mimetype"),
+      sender:   event.sender,
+      ts:       event.origin_server_ts.to_i,
+    },
   )
 end
 
@@ -58,35 +69,65 @@ end
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Download } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixRoomsRoomidViewerEventid({roomId, roomTitle, eventId}: {
+export default function MatrixRoomViewer({
+  roomId,
+  roomTitle,
+  event,
+}: {
   roomId: string
   roomTitle: string
-  eventId: string
+  event: {
+    eventId: string
+    body: string | null
+    msgtype: string | null
+    media: string | null
+    mimetype: string | null
+    sender: string
+    ts: number
+  }
 }) {
+  const encoded = encodeURIComponent(roomId)
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={`Media viewer · ${roomTitle}`} />
+    <div className="flex min-h-0 flex-1 flex-col bg-black/95">
+      <Head title={`${event.body ?? "Media"} · ${roomTitle}`} />
 
       <ShellHeader>
-        <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}/about`} className="text-muted-foreground hover:text-foreground">
+        <Link href={`/matrix/rooms/${encoded}`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Media viewer</h1>
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-medium">{event.body}</span>
+          <span className="truncate text-xs text-muted-foreground">
+            {event.sender} · {new Date(event.ts).toLocaleString()}
+          </span>
+        </div>
+        {event.media && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ms-auto"
+            nativeButton={false}
+            render={<a href={event.media} download={event.body ?? undefined} />}
+          >
+            <Download className="size-4" />
+          </Button>
+        )}
       </ShellHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>session_view/media_viewer.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+        {event.media && event.msgtype === "m.video" ? (
+          <video src={event.media} controls className="max-h-full max-w-full" />
+        ) : event.media ? (
+          <img src={event.media} alt={event.body ?? ""} className="max-h-full max-w-full object-contain" />
+        ) : (
+          <p className="text-sm text-muted-foreground">This event carries no media.</p>
+        )}
       </div>
     </div>
   )

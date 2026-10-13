@@ -48,10 +48,17 @@
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+
   render(
     "matrix/rooms/[roomId]/requests",
     roomId:    room.room_id,
     roomTitle: room.title,
+    requests:  Models::Matrix::RoomMember
+      .where(room_id: room.room_id, membership: "knock")
+      .all
+      .map{|member|
+        { memberId: member.member_id, name: member.name, avatarUrl: member.avatar_url }
+      },
   )
 end
 
@@ -61,35 +68,76 @@ end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Head, Link, router } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixRoomsRoomidRequests({roomId, roomTitle}: {
+export default function MatrixRoomRequests({
+  roomId,
+  roomTitle,
+  requests,
+}: {
   roomId: string
   roomTitle: string
+  requests: { memberId: string; name: string; avatarUrl: string | null }[]
 }) {
+  const encoded = encodeURIComponent(roomId)
+  const act = (action: string, userId: string) =>
+    router.post(`/matrix/rooms/${encoded}/members`, { action, user_id: userId }, { preserveScroll: true })
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Head title={`Join requests · ${roomTitle}`} />
 
       <ShellHeader>
-        <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}`} className="text-muted-foreground hover:text-foreground">
+        <Link href={`/matrix/rooms/${encoded}/about`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
         <h1 className="truncate text-sm font-medium">Join requests</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>session_view/invite_request.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+        {requests.length === 0 ? (
+          <Empty className="py-16">
+            <EmptyHeader>
+              <EmptyTitle>No join requests</EmptyTitle>
+              <EmptyDescription>
+                A knock appears here when someone asks to join this room.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col gap-2 pt-6">
+              {requests.map((request) => (
+                <Item key={request.memberId}>
+                  <Avatar className="size-8">
+                    {request.avatarUrl && <AvatarImage src={request.avatarUrl} alt="" />}
+                    <AvatarFallback className="text-[11px]">
+                      {request.name.replace(/^@/, "").charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <ItemContent>
+                    <ItemTitle>{request.name}</ItemTitle>
+                    <ItemDescription className="font-mono text-xs">{request.memberId}</ItemDescription>
+                  </ItemContent>
+                  <Button size="sm" onClick={() => act("invite", request.memberId)}>
+                    Approve
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => act("kick", request.memberId)}>
+                    Deny
+                  </Button>
+                </Item>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

@@ -4,8 +4,6 @@
 #
 # Fractal: components/crypto/identity_setup_view.{blp,rs} (tag bootstrap)
 #
-# NOT IMPLEMENTED.
-#
 # Minting the master, self-signing and user-signing keys when the account has none.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -39,43 +37,107 @@
 #
 
 get "/" do
-  render("matrix/settings/encryption/identity/bootstrap")
+  render(
+    "matrix/settings/encryption/identity/bootstrap",
+    status: Matrix::Crypto.status,
+    error:  session.delete(:matrix_crypto_error),
+  )
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  credential = Models::Matrix::Credential.first
+  password = params["password"].to_s
+
+  if password.empty?
+    auth = nil
+  else
+    auth = Matrix::Session.password_auth(credential, password)
+  end
+
+  Matrix::Crypto.bootstrap_identity!(auth: auth)
+
+  redirect("/matrix/settings/encryption", 303)
+rescue Matrix::RoomActions::Error => error
+  session[:matrix_crypto_error] = error.message
+  redirect("/matrix/settings/encryption/identity/bootstrap", 303)
+rescue Async::Matrix::RequestError => error
+  session[:matrix_crypto_error] = error.message
+  redirect("/matrix/settings/encryption/identity/bootstrap", 303)
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixSettingsEncryptionIdentityBootstrap({}: {
-
+export default function MatrixSettingsEncryptionIdentityBootstrap({
+  status,
+  error,
+}: {
+  status: { identity: boolean }
+  error: string | null
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Set up crypto identity"} />
+      <Head title="Set up crypto identity" />
 
       <ShellHeader>
-        <Link href={"/matrix/settings/encryption/identity"} className="text-muted-foreground hover:text-foreground">
+        <Link href="/matrix/settings/encryption/identity" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Set up crypto identity</h1>
+        <h1 className="truncate text-sm font-medium">Set Up</h1>
       </ShellHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-6">
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTitle>It did not go through</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {status.identity ? (
+          <Alert variant="warning">
+            <AlertTitle>This account already has an identity</AlertTitle>
+            <AlertDescription>
+              Setting one up again replaces it, which is what Reset Crypto Identity does.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle>You need to set up a crypto identity, since it has never been created.</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>components/crypto/identity_setup_view.blp</code>. The widget tree to rebuild is in the
-            route file.
+            Three keys are minted here and published: a master key which is your identity, a
+            self-signing key for your own sessions, and a user-signing key for the people you verify.
           </AlertDescription>
         </Alert>
+
+        <Form action="/matrix/settings/encryption/identity/bootstrap" method="post" className="flex flex-col gap-4">
+          {({ processing }) => (
+            <>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="password">Account password</FieldLabel>
+                  <Input id="password" name="password" type="password" autoComplete="current-password" />
+                  <FieldDescription>
+                    Only needed where the homeserver asks for it before publishing keys.
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+
+              <Button type="submit" disabled={processing} className="self-start">
+                Set Up
+              </Button>
+            </>
+          )}
+        </Form>
       </div>
     </div>
   )

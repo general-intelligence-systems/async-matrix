@@ -78,7 +78,18 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    case params["action"].to_s
+    when "room"
+      Matrix::RoomActions.set_room_notification(params["room_id"].to_s, params["mode"].to_s)
+    else
+      Matrix::RoomActions.set_push_rules(
+        global:   params["global"].to_s,
+        keywords: Array(params["keywords"]).reject(&:empty?),
+        account:  params["account_enabled"] == "true",
+      )
+    end
+  end
 end
 
 __END__

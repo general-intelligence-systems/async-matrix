@@ -109,7 +109,30 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    case params["action"].to_s
+    when "ignore"
+      Matrix::RoomActions.ignore_user(params["user_id"].to_s)
+    when "unignore"
+      Matrix::RoomActions.unignore_user(params["user_id"].to_s)
+    else
+      Matrix::RoomActions.set_global_account_data(
+        "m.media_previews",
+        {
+          "media_previews" => params.fetch("media_previews", "private").to_s,
+          "invite_avatars" => params["invite_avatars"] == "true" ? "on" : "off",
+        },
+      )
+
+      Matrix::RoomActions.set_global_account_data(
+        "m.read_receipts", { "enabled" => params["read_receipts"] == "true" },
+      )
+
+      Matrix::RoomActions.set_global_account_data(
+        "m.typing_notifications", { "enabled" => params["typing_notices"] == "true" },
+      )
+    end
+  end
 end
 
 __END__

@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/wait_for_other_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The request is sent and the other session has not answered yet.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -38,47 +36,47 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/wait",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { Head } from "@inertiajs/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Spinner } from "@/components/ui/spinner"
+import { usePoll } from "@/hooks/use-poll"
+import { Act, Flow, Stale, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidWait({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationWait({ flow, step }: { flow: Flow; step: string }) {
+  usePoll(flow.live, ["flow", "step"])
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Waiting for the other party"} />
+    <>
+      <Head title="Waiting" />
+      <Step flow={flow} title="Waiting for the other party">
+        {step === "wait" ? null : <Stale flow={flow} />}
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Waiting for the other party</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle className="flex items-center gap-2">
+            <Spinner className="size-4" />
+            Waiting for the other session
+          </AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/wait_for_other_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            The request is sent. Accept it on the other device and this page moves on by itself.
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <Act flow={flow} action="cancel" code="user" variant="outline">
+          Cancel
+        </Act>
+      </Step>
+    </>
   )
 }

@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/qr_code_scanned_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The other side scanned ours and is asking us to confirm it.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -36,47 +34,49 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/scanned",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { Head } from "@inertiajs/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { usePoll } from "@/hooks/use-poll"
+import { Act, Flow, Stale, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidScanned({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationScanned({ flow, step }: { flow: Flow; step: string }) {
+  usePoll(flow.live, ["flow", "step"])
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"QR code scanned"} />
+    <>
+      <Head title="QR code scanned" />
+      <Step flow={flow} title="QR code scanned">
+        {step === "scanned" ? null : <Stale flow={flow} />}
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">QR code scanned</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle>The other side scanned this code</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/qr_code_scanned_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            It sent back the secret the code carried, which only something that saw the screen could
+            know. Confirm if that device is the one in front of you.
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <div className="flex items-center gap-2">
+          <Act flow={flow} action="confirm_qr">
+            Confirm
+          </Act>
+          <Act flow={flow} action="cancel" code="m.user_mismatch" variant="destructive">
+            That was not me
+          </Act>
+        </div>
+      </Step>
+    </>
   )
 }

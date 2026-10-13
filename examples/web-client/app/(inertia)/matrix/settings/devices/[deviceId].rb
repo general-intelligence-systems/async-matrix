@@ -77,7 +77,16 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  device_id = params["deviceId"].to_s
+
+  act! do
+    case params["action"].to_s
+    when "delete"
+      Matrix::RoomActions.delete_device(device_id)
+    else
+      Matrix::RoomActions.rename_device(device_id, params["display_name"].to_s)
+    end
+  end
 end
 
 __END__

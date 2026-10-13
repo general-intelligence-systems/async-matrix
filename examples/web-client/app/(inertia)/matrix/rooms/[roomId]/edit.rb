@@ -50,10 +50,20 @@
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  me = Models::Matrix::Credential.first&.matrix_user_id.to_s
+
   render(
     "matrix/rooms/[roomId]/edit",
     roomId:    room.room_id,
     roomTitle: room.title,
+    name:      room.name,
+    topic:     room.topic,
+    avatarUrl: room.avatar_url,
+    can:       {
+      name:   room.can_send_state?("m.room.name", me),
+      topic:  room.can_send_state?("m.room.topic", me),
+      avatar: room.can_send_state?("m.room.avatar", me),
+    },
   )
 end
 
@@ -77,35 +87,92 @@ end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixRoomsRoomidEdit({roomId, roomTitle}: {
+export default function MatrixRoomEdit({
+  roomId,
+  roomTitle,
+  name,
+  topic,
+  avatarUrl,
+  can,
+}: {
   roomId: string
   roomTitle: string
+  name: string | null
+  topic: string | null
+  avatarUrl: string | null
+  can: { name: boolean; topic: boolean; avatar: boolean }
 }) {
+  const encoded = encodeURIComponent(roomId)
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={`Edit details · ${roomTitle}`} />
+      <Head title={`Edit Room Details · ${roomTitle}`} />
 
       <ShellHeader>
-        <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}/about`} className="text-muted-foreground hover:text-foreground">
+        <Link href={`/matrix/rooms/${encoded}/about`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
         <h1 className="truncate text-sm font-medium">Edit Room Details</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>session_view/room_details/edit_details_subpage.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+        <Card>
+          <CardContent className="pt-6">
+            <Form action={`/matrix/rooms/${encoded}/edit`} method="post" className="flex flex-col gap-4">
+              {({ processing }) => (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="size-14">
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+                      <AvatarFallback>{roomTitle.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <Field className="flex-1">
+                      <FieldLabel htmlFor="avatar_url">Avatar</FieldLabel>
+                      <Input
+                        id="avatar_url"
+                        name="avatar_url"
+                        defaultValue={avatarUrl ?? ""}
+                        placeholder="mxc://"
+                        disabled={!can.avatar}
+                      />
+                    </Field>
+                  </div>
+
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="name">Name</FieldLabel>
+                      <Input id="name" name="name" defaultValue={name ?? ""} disabled={!can.name} />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="topic">Description</FieldLabel>
+                      <Textarea id="topic" name="topic" rows={3} defaultValue={topic ?? ""} disabled={!can.topic} />
+                      <FieldDescription>m.room.topic</FieldDescription>
+                    </Field>
+                  </FieldGroup>
+
+                  <Button
+                    type="submit"
+                    className="self-start"
+                    disabled={processing || !(can.name || can.topic || can.avatar)}
+                  >
+                    Save
+                  </Button>
+                </>
+              )}
+            </Form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

@@ -51,7 +51,17 @@
 #
 
 get "/" do
-  render("matrix/settings/safety/ignored")
+  ignored = Models::Matrix::AccountData
+    .content_for(event_type: Models::Matrix::AccountData::IGNORED_USERS).to_h
+
+  render(
+    "matrix/settings/safety/ignored",
+    users: ignored["ignored_users"].to_h.keys.sort.map{|user_id|
+      profile = Models::Matrix::GlobalProfile.first(matrix_user_id: user_id)
+
+      { userId: user_id, name: profile&.display_name || user_id, avatarUrl: profile&.avatar_url }
+    },
+  )
 end
 
 post "/" do
@@ -60,34 +70,75 @@ end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Head, Link, router } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixSettingsSafetyIgnored({}: {
-
+export default function MatrixSettingsIgnored({
+  users,
+}: {
+  users: { userId: string; name: string; avatarUrl: string | null }[]
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Ignored users"} />
+      <Head title="Ignored Users · matrix" />
 
       <ShellHeader>
-        <Link href={"/matrix/settings/safety"} className="text-muted-foreground hover:text-foreground">
+        <Link href="/matrix/settings/safety" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Ignored users</h1>
+        <h1 className="truncate text-sm font-medium">Ignored Users</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>account_settings/safety_page/ignored_users_subpage/mod.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+        {users.length === 0 ? (
+          <Empty className="py-16">
+            <EmptyHeader>
+              <EmptyTitle>No Ignored Users</EmptyTitle>
+              <EmptyDescription>
+                Ignoring someone hides their messages everywhere, from this account.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col gap-2 pt-6">
+              {users.map((user) => (
+                <Item key={user.userId}>
+                  <Avatar className="size-8">
+                    {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+                    <AvatarFallback className="text-[11px]">
+                      {user.name.replace(/^@/, "").charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <ItemContent>
+                    <ItemTitle>{user.name}</ItemTitle>
+                    <ItemDescription className="font-mono text-xs">{user.userId}</ItemDescription>
+                  </ItemContent>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      router.post(
+                        "/matrix/settings/safety",
+                        { action: "unignore", user_id: user.userId },
+                        { preserveScroll: true },
+                      )
+                    }
+                  >
+                    Stop ignoring
+                  </Button>
+                </Item>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

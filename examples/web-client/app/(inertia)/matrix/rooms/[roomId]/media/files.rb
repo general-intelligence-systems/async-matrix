@@ -49,11 +49,29 @@
 #
 
 get "/" do
-  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\\n")
+
   render(
     "matrix/rooms/[roomId]/media/files",
     roomId:    room.room_id,
     roomTitle: room.title,
+    items:     room.events
+      .where(type: "m.room.message")
+      .order(Sequel.desc(:origin_server_ts))
+      .limit(200)
+      .all
+      .select{|event| ["m.file"].include?(event.content["msgtype"])}
+      .map{|event|
+        {
+          eventId:  event.event_id,
+          body:     event.content["body"],
+          media:    Matrix::RoomActions.media_url(event.content["url"]),
+          mimetype: event.content.dig("info", "mimetype"),
+          size:     event.content.dig("info", "size"),
+          sender:   event.sender,
+          ts:       event.origin_server_ts.to_i,
+        }
+      },
   )
 end
 
@@ -64,35 +82,78 @@ end
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Paperclip } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Card, CardContent } from "@/components/ui/card"
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixRoomsRoomidMediaFiles({roomId, roomTitle}: {
+type Item_ = {
+  eventId: string
+  body: string | null
+  media: string | null
+  mimetype: string | null
+  size: number | null
+  sender: string
+  ts: number
+}
+
+export default function MatrixRoomMediaFiles({
+  roomId,
+  roomTitle,
+  items,
+}: {
   roomId: string
   roomTitle: string
+  items: Item_[]
 }) {
+  const encoded = encodeURIComponent(roomId)
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Head title={`Files · ${roomTitle}`} />
 
       <ShellHeader>
-        <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}/about`} className="text-muted-foreground hover:text-foreground">
+        <Link href={`/matrix/rooms/${encoded}/about`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
         <h1 className="truncate text-sm font-medium">Files</h1>
       </ShellHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>session_view/room_details/history_viewer/file.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
-      </div>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
+          {items.length === 0 ? (
+            <Empty className="py-16">
+              <EmptyHeader>
+                <EmptyTitle>No Files</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col gap-2 pt-6">
+                {items.map((item) => (
+                  <Item key={item.eventId}>
+                    {item.media && (
+                      <a href={item.media} download={item.body ?? undefined}>
+                        <Paperclip className="size-4 text-muted-foreground" />
+                      </a>
+                    )}
+                    <ItemContent>
+                      <ItemTitle className="truncate">{item.body}</ItemTitle>
+                      <ItemDescription>
+                        {item.sender} · {new Date(item.ts).toLocaleDateString()}
+                        {item.size ? ` · ${Math.ceil(item.size / 1024)} KB` : ""}
+                      </ItemDescription>
+                    </ItemContent>
+                  </Item>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   )
 }

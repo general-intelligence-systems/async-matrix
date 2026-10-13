@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/sas_page.{blp,rs} + sas_emoji.blp
 #
-# NOT IMPLEMENTED.
-#
 # The seven emoji both sides derive from the shared secret, which match or they do not.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -40,47 +38,64 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/sas",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { Head } from "@inertiajs/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { usePoll } from "@/hooks/use-poll"
+import { Act, Flow, Stale, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidSas({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationSas({ flow, step }: { flow: Flow; step: string }) {
+  usePoll(flow.live, ["flow", "step"])
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Compare emoji"} />
+    <>
+      <Head title="Compare emoji" />
+      <Step flow={flow} title="Compare emoji">
+        {step === "sas" ? null : <Stale flow={flow} />}
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Compare emoji</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle>Do these appear on the other screen too?</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/sas_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            In the same order. If anything differs, say they do not match: that is what an
+            interception looks like.
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <div className="grid grid-cols-4 gap-3 rounded-md border p-4">
+          {flow.emoji.map((item, index) => (
+            <div key={`${item.symbol}-${index}`} className="flex flex-col items-center gap-1">
+              <span className="text-3xl leading-none">{item.symbol}</span>
+              <span className="text-center text-[11px] text-muted-foreground">{item.name}</span>
+            </div>
+          ))}
+        </div>
+
+        {flow.decimals.length > 0 && (
+          <p className="text-center font-mono text-sm text-muted-foreground">
+            {flow.decimals.join(" · ")}
+          </p>
+        )}
+
+        <div className="flex items-center gap-2">
+          <Act flow={flow} action="confirm">
+            They match
+          </Act>
+          <Act flow={flow} action="cancel" code="m.mismatched_sas" variant="destructive">
+            They do not match
+          </Act>
+        </div>
+      </Step>
+    </>
   )
 }

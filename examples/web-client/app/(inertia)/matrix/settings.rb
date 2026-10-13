@@ -174,7 +174,15 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    unless params["display_name"].nil?
+      Matrix::RoomActions.set_display_name(params["display_name"].to_s)
+    end
+
+    unless params["avatar_url"].nil?
+      Matrix::RoomActions.set_avatar_url(params["avatar_url"].to_s)
+    end
+  end
 end
 
 __END__

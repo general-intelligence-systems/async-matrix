@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/completed_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The flow finished and the signature is published.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -36,47 +34,56 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/completed",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { ShieldCheck } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Button } from "@/components/ui/button"
+import { Flow, Stale, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidCompleted({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationCompleted({ flow, step }: { flow: Flow; step: string }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Verified"} />
+    <>
+      <Head title="Verified" />
+      <Step flow={flow} title="Verified">
+        {step === "completed" ? null : <Stale flow={flow} />}
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Verified</h1>
-      </ShellHeader>
+        <div className="flex flex-col items-center gap-2 py-4">
+          <ShieldCheck className="size-10 text-primary" />
+          <h2 className="text-center text-xl font-semibold tracking-tight">
+            {flow.own ? "Session Verified" : "Verification Complete"}
+          </h2>
+        </div>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle>The signature is published</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/completed_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            {flow.own
+              ? "This session can read your encrypted messages, and your other sessions trust it."
+              : "Your clients trust each other's keys. A new device of theirs will need verifying again."}
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <div className="flex items-center gap-2">
+          <Button size="sm" render={<Link href="/matrix/settings/encryption" />}>
+            Encryption settings
+          </Button>
+          <Button size="sm" variant="outline" render={<Link href="/matrix/verification" />}>
+            Done
+          </Button>
+        </div>
+      </Step>
+    </>
   )
 }

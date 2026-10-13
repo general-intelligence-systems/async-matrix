@@ -57,6 +57,7 @@ module Models
         room_key_bundle
         secrets_inbox
         global_profile
+        verification_flow
         member_display_name
         media
       ].freeze

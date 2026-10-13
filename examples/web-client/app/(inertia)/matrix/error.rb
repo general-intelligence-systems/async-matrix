@@ -72,7 +72,10 @@
 #
 
 get "/" do
-  render("matrix/error")
+  render(
+    "matrix/error",
+    message: session.delete(:matrix_error),
+  )
 end
 
 post "/" do
@@ -82,34 +85,34 @@ end
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { TriangleAlert } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Button } from "@/components/ui/button"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 
-export default function MatrixError({}: {
-
-}) {
+export default function MatrixError({ message }: { message: string | null }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Error"} />
+      <Head title="Error" />
 
-      <ShellHeader>
-        <Link href={"/matrix"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Error</h1>
-      </ShellHeader>
+      <Empty className="flex-1">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <TriangleAlert className="size-6" />
+          </EmptyMedia>
+          <EmptyTitle>Error</EmptyTitle>
+          <EmptyDescription>
+            {message ?? "The session could not be opened. Check your network connection."}
+          </EmptyDescription>
+        </EmptyHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>error_page.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
-      </div>
+        <div className="flex gap-2">
+          <Button render={<Link href="/matrix" />}>Try Again</Button>
+          <Button variant="outline" render={<Link href="/matrix/login" />}>
+            Log in again
+          </Button>
+        </div>
+      </Empty>
     </div>
   )
 }

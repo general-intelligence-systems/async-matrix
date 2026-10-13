@@ -71,7 +71,11 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    room_id = Matrix::RoomActions.create_direct(params["user_id"].to_s)
+
+    redirect("/matrix/rooms/#{CGI.escape(room_id)}", 303)
+  end
 end
 
 __END__

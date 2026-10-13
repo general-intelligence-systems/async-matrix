@@ -85,7 +85,27 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    payload = {
+      name:   params["name"].to_s,
+      topic:  params["topic"].to_s,
+      preset: params.fetch("preset", "private_chat").to_s,
+    }.reject{|_key, value| value.to_s.empty?}
+
+    unless params["alias"].to_s.empty?
+      payload[:room_alias_name] = params["alias"].to_s
+    end
+
+    if params["encrypted"] == "true"
+      payload[:initial_state] = [
+        { type: "m.room.encryption", state_key: "", content: { algorithm: "m.megolm.v1.aes-sha2" } },
+      ]
+    end
+
+    room_id = Matrix::RoomActions.create_room(**payload)
+
+    redirect("/matrix/rooms/#{CGI.escape(room_id)}", 303)
+  end
 end
 
 __END__

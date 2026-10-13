@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/room_left_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # An in-room verification whose room is gone, which strands the flow.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -35,47 +33,52 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/room-left",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Button } from "@/components/ui/button"
+import { Act, Flow, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidRoomLeft({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationRoomLeft({ flow }: { flow: Flow; step: string }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Room left"} />
-
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Room left</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+    <>
+      <Head title="Room left" />
+      <Step flow={flow} title="Room left">
+        <Alert variant="warning">
+          <AlertTitle>The room this ran in is gone</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/room_left_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            An in-room verification carries its messages in the room's timeline, so leaving it
+            strands the flow. {flow.roomId ? <code className="font-mono">{flow.roomId}</code> : null}
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <p className="text-sm text-muted-foreground">
+          Start again from a direct message, or verify the sessions themselves from encryption
+          settings.
+        </p>
+
+        <div className="flex items-center gap-2">
+          {flow.live && (
+            <Act flow={flow} action="cancel" code="m.user_mismatch">
+              Cancel
+            </Act>
+          )}
+          <Button size="sm" variant="outline" render={<Link href="/matrix/settings/encryption/identity" />}>
+            Encryption settings
+          </Button>
+        </div>
+      </Step>
+    </>
   )
 }

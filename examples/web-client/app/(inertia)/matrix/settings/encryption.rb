@@ -277,6 +277,7 @@ get "/" do
   credential = Models::Matrix::Credential.first
   identity = Models::Matrix::UserIdentity.first(matrix_user_id: credential&.matrix_user_id)
   own_devices = Models::Matrix::Device.of_user(credential&.matrix_user_id).live
+  status = Matrix::Crypto.status
 
   render(
     "matrix/settings/encryption",
@@ -286,47 +287,120 @@ get "/" do
       verified: identity&.verified || false,
     },
     recovery:     {
-      configured: Models::Matrix::SecretsInbox
-        .named(Models::Matrix::SecretsInbox::MEGOLM_BACKUP).any?,
+      configured: status[:recovery],
+      passphrase: Matrix::Crypto.passphrase?,
+      missing:    status[:missing],
+    },
+    backup:       {
+      version: status[:backup],
+      key:     status[:key],
     },
     # Unverified sessions are the thing worth shouting about: each one can read
     # everything sent to this account.
     unverified:   own_devices.exclude(trust_state: Models::Matrix::Device::VERIFIED).count,
-    backedUp:     Models::Matrix::MegolmInboundSession.where(backed_up: true).count,
-    total:        Models::Matrix::MegolmInboundSession.count,
+    backedUp:     status[:backup].to_s.empty? ? 0 : status[:sessions],
+    total:        status[:sessions],
+    fingerprint:  Matrix::Device.fingerprint,
+    published:    status[:published],
+    error:        session.delete(:matrix_crypto_error),
+    flash:        session.delete(:matrix_crypto_flash),
   )
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  case params["action"].to_s
+  in "publish"
+    Matrix::Crypto.with_client do |client, _credential|
+      Matrix::Device.publish_keys!(client)
+    end
+
+    session[:matrix_crypto_flash] = "This session's keys are published."
+  in "backup"
+    session[:matrix_crypto_flash] = "Backup version #{Matrix::Crypto.ensure_backup!}."
+  in "back_up_keys"
+    session[:matrix_crypto_flash] = "Backed up #{Matrix::Crypto.back_up_keys!} room keys."
+  in "restore"
+    session[:matrix_crypto_flash] = "Restored #{Matrix::Crypto.restore_backup!} room keys."
+  in "delete_backup"
+    Matrix::Crypto.delete_backup!
+    session[:matrix_crypto_flash] = "The backup is deleted."
+  in "disable_recovery"
+    Matrix::Crypto.disable_recovery!
+    session[:matrix_crypto_flash] = "Account recovery is off."
+  else
+    halt(400, "matrix: no such action\n")
+  end
+
+  redirect("/matrix/settings/encryption", 303)
+rescue Matrix::RoomActions::Error => error
+  session[:matrix_crypto_error] = error.message
+  redirect("/matrix/settings/encryption", 303)
+rescue Async::Matrix::RequestError => error
+  session[:matrix_crypto_error] = error.message
+  redirect("/matrix/settings/encryption", 303)
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link } from "@inertiajs/react"
 import { ArrowLeft, KeyRound, ShieldAlert, ShieldCheck } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
 import { Badge } from "@/components/reui/badge"
 import { Button } from "@/components/ui/button"
-import { Item, ItemContent, ItemTitle } from "@/components/ui/item"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ShellHeader } from "@/components/admin/slots"
 
+function Action({
+  action,
+  children,
+  variant,
+  disabled,
+}: {
+  action: string
+  children: React.ReactNode
+  variant?: "default" | "outline" | "destructive"
+  disabled?: boolean
+}) {
+  return (
+    <Form action="/matrix/settings/encryption" method="post">
+      {({ processing }) => (
+        <>
+          <input type="hidden" name="action" value={action} />
+          <Button type="submit" size="sm" variant={variant} disabled={processing || disabled}>
+            {children}
+          </Button>
+        </>
+      )}
+    </Form>
+  )
+}
+
 export default function MatrixSettingsEncryption({
   crossSigning,
   recovery,
+  backup,
   unverified,
   backedUp,
   total,
+  fingerprint,
+  published,
+  error,
+  flash,
 }: {
   crossSigning: { present: boolean; master: boolean; verified: boolean }
-  recovery: { configured: boolean }
+  recovery: { configured: boolean; passphrase: boolean; missing: string[] }
+  backup: { version: string | null; key: boolean }
   unverified: number
   backedUp: number
   total: number
+  fingerprint: string
+  published: boolean
+  error: string | null
+  flash: string | null
 }) {
   const percent = total > 0 ? Math.round((backedUp / total) * 100) : 0
 
@@ -343,6 +417,19 @@ export default function MatrixSettingsEncryption({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
+          {error ? (
+            <Alert variant="destructive">
+              <AlertTitle>It did not go through</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {flash ? (
+            <Alert>
+              <AlertTitle>{flash}</AlertTitle>
+            </Alert>
+          ) : null}
+
           {unverified > 0 && (
             <Alert variant="destructive">
               <AlertTitle>
@@ -384,11 +471,20 @@ export default function MatrixSettingsEncryption({
                   {crossSigning.verified ? "Verified" : "Unverified"}
                 </Badge>
               </div>
-              {!crossSigning.present && (
-                <Button size="sm" className="self-start">
-                  Set up cross-signing
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Session key</span>
+                <code className="font-mono text-xs break-all">{fingerprint || "none"}</code>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={crossSigning.present ? "outline" : "default"}
+                  render={<Link href="/matrix/settings/encryption/identity" />}
+                >
+                  {crossSigning.present ? "Manage identity" : "Set up cross-signing"}
                 </Button>
-              )}
+                {!published && <Action action="publish">Publish this session's keys</Action>}
+              </div>
             </CardContent>
           </Card>
 
@@ -399,56 +495,111 @@ export default function MatrixSettingsEncryption({
                 Account Recovery
               </CardTitle>
               <CardDescription>
-                {/* Losing this loses every message ever encrypted to this
-                    device -- the pickle key is not recoverable from anywhere. */}
-                A recovery key restores your message history on a new device. There is no way
-                back without it.
+                Secret storage, which is what a new session reads the keys back from.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-muted-foreground">Recovery key</span>
+                <span className="text-muted-foreground">Recovery</span>
                 <Badge variant={recovery.configured ? "primary" : "secondary"} size="sm">
-                  {recovery.configured ? "Stored" : "Not set"}
+                  {recovery.configured
+                    ? recovery.passphrase
+                      ? "Passphrase"
+                      : "Recovery key"
+                    : "Not set up"}
                 </Badge>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant={recovery.configured ? "outline" : "default"}>
-                  {recovery.configured ? "Change recovery key" : "Set up recovery"}
-                </Button>
-                {recovery.configured && (
-                  <Button size="sm" variant="ghost">
-                    Reveal
+              {recovery.missing.length > 0 && (
+                <Alert variant="warning">
+                  <AlertTitle>Account Recovery Incomplete</AlertTitle>
+                  <AlertDescription>
+                    {recovery.missing.length} of 4 secrets are missing.{" "}
+                    <Link href="/matrix/settings/encryption/recovery/incomplete" className="underline">
+                      See what
+                    </Link>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {recovery.configured ? (
+                  <>
+                    <Button size="sm" variant="outline" render={<Link href="/matrix/settings/encryption/recovery" />}>
+                      Recover Account
+                    </Button>
+                    <Button size="sm" variant="outline" render={<Link href="/matrix/settings/encryption/recovery/reset" />}>
+                      Reset
+                    </Button>
+                    <Action action="disable_recovery" variant="destructive">
+                      Turn off
+                    </Action>
+                  </>
+                ) : (
+                  <Button size="sm" render={<Link href="/matrix/settings/encryption/recovery/enable" />}>
+                    Set Up
                   </Button>
                 )}
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="flex items-center justify-between gap-4 border-t pt-3 text-sm">
-                <span className="text-muted-foreground">Room keys backed up</span>
-                <span className="tabular-nums">
-                  {backedUp} / {total}
-                </span>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Key Backup</CardTitle>
+              <CardDescription>
+                {backup.version
+                  ? `Version ${backup.version} on the homeserver.`
+                  : "No backup exists, so nothing is kept for a new session."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Room keys held here</span>
+                <span>{total}</span>
               </div>
               <Progress value={percent} />
+              <p className="text-xs text-muted-foreground">
+                {backedUp} of {total} backed up.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {backup.version ? (
+                  <>
+                    <Action action="back_up_keys" disabled={total === 0 || !backup.key}>
+                      Back up now
+                    </Action>
+                    <Action action="restore" variant="outline" disabled={!backup.key}>
+                      Restore from backup
+                    </Action>
+                    <Action action="delete_backup" variant="destructive">
+                      Delete backup
+                    </Action>
+                  </>
+                ) : (
+                  <Action action="backup">Create a backup</Action>
+                )}
+              </div>
+              {backup.version && !backup.key && (
+                <Alert variant="warning">
+                  <AlertTitle>This session does not hold the backup key</AlertTitle>
+                  <AlertDescription>
+                    Recover the account, or verify against a session that has it.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
-          {/* Fractal has no separate backup group: the backup is what Account Recovery sets up,
-              so its progress is reported there and this group is the two key transfer rows. */}
-          <Card>
-            <CardContent className="flex flex-col gap-1 pt-6">
-              <Item render={<Link href="/matrix/settings/encryption/keys?action=export" />}>
-                <ItemContent>
-                  <ItemTitle>Export Room Encryption Keys</ItemTitle>
-                </ItemContent>
-              </Item>
-              <Item render={<Link href="/matrix/settings/encryption/keys?action=import" />}>
-                <ItemContent>
-                  <ItemTitle>Import Room Encryption Keys</ItemTitle>
-                </ItemContent>
-              </Item>
-            </CardContent>
-          </Card>
+          <Item variant="outline">
+            <ItemContent>
+              <ItemTitle>Import and export keys</ItemTitle>
+              <ItemDescription>
+                Room keys as a passphrase-encrypted file, which is the manual alternative to
+                recovery.
+              </ItemDescription>
+            </ItemContent>
+            <Button size="sm" variant="outline" render={<Link href="/matrix/settings/encryption/keys" />}>
+              Open
+            </Button>
+          </Item>
         </div>
       </ScrollArea>
     </div>

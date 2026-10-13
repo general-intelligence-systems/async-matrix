@@ -47,10 +47,18 @@
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  me = Models::Matrix::Credential.first&.matrix_user_id.to_s
+
   render(
     "matrix/rooms/[roomId]/join",
-    roomId:    room.room_id,
-    roomTitle: room.title,
+    roomId:     room.room_id,
+    roomTitle:  room.title,
+    avatarUrl:  room.avatar_url,
+    topic:      room.topic,
+    membership: room.membership,
+    inviter:    Models::Matrix::RoomState.first(
+      room_id: room.room_id, event_type: "m.room.member", state_key: me,
+    )&.sender,
   )
 end
 
@@ -69,36 +77,69 @@ end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Head, Link, router } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixRoomsRoomidJoin({roomId, roomTitle}: {
+export default function MatrixRoomJoin({
+  roomId,
+  roomTitle,
+  avatarUrl,
+  topic,
+  membership,
+  inviter,
+}: {
   roomId: string
   roomTitle: string
+  avatarUrl: string | null
+  topic: string | null
+  membership: string
+  inviter: string | null
 }) {
+  const encoded = encodeURIComponent(roomId)
+  const act = (action: string) =>
+    router.post(`/matrix/rooms/${encoded}/join`, { action }, { preserveScroll: true })
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Head title={`Invitation · ${roomTitle}`} />
 
       <ShellHeader>
-        <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}`} className="text-muted-foreground hover:text-foreground">
+        <Link href="/matrix" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
         <h1 className="truncate text-sm font-medium">Invitation</h1>
       </ShellHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>session_view/invite.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
-      </div>
+      <Empty className="flex-1">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Avatar className="size-12">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+              <AvatarFallback>{roomTitle.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+          </EmptyMedia>
+          <EmptyTitle>{roomTitle}</EmptyTitle>
+          <EmptyDescription>
+            {inviter ? `${inviter} invited you.` : "You were invited to this room."}
+            {topic ? ` ${topic}` : ""}
+          </EmptyDescription>
+        </EmptyHeader>
+
+        <div className="flex gap-2">
+          <Button onClick={() => act("join")}>Accept</Button>
+          <Button variant="outline" onClick={() => act("decline")}>
+            Decline
+          </Button>
+        </div>
+        {membership === "knock" && (
+          <p className="text-xs text-muted-foreground">You asked to join. A moderator decides.</p>
+        )}
+      </Empty>
     </div>
   )
 }

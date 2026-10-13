@@ -41,10 +41,14 @@
 
 get "/" do
   room = Models::Matrix::Room.first(room_id: params["roomId"]) || halt(404, "matrix: no such room\n")
+  me = Models::Matrix::Credential.first&.matrix_user_id.to_s
+
   render(
     "matrix/rooms/[roomId]/visibility",
     roomId:    room.room_id,
     roomTitle: room.title,
+    value:     room.history_visibility || "shared",
+    editable:  room.can_send_state?("m.room.history_visibility", me),
   )
 end
 
@@ -56,35 +60,89 @@ end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixRoomsRoomidVisibility({roomId, roomTitle}: {
-  roomId: string
-  roomTitle: string
+// history_visibility_subpage.blp, verbatim and in its order.
+const OPTIONS = [
+  { value: "world_readable", label: "Anyone, even if they are not in the room" },
+  { value: "shared", label: "Members only, since this option was selected" },
+  { value: "invited", label: "Members only, since they were invited" },
+  { value: "joined", label: "Members only, since they joined the room" },
+]
+
+function Choice({
+  name,
+  options,
+  value,
+}: {
+  name: string
+  options: { value: string; label: string }[]
+  value: string
 }) {
   return (
+    <RadioGroup name={name} defaultValue={value} className="gap-3">
+      {options.map((option) => (
+        <div key={option.value} className="flex items-start gap-2">
+          <RadioGroupItem value={option.value} id={`${name}-${option.value}`} className="mt-0.5" />
+          <Label htmlFor={`${name}-${option.value}`} className="font-normal">
+            {option.label}
+          </Label>
+        </div>
+      ))}
+    </RadioGroup>
+  )
+}
+
+export default function MatrixRoomVisibility({
+  roomId,
+  roomTitle,
+  value,
+  editable,
+}: {
+  roomId: string
+  roomTitle: string
+  value: string
+  editable: boolean
+}) {
+  const encoded = encodeURIComponent(roomId)
+
+  return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={`History visibility · ${roomTitle}`} />
+      <Head title={`Who Can Read History · ${roomTitle}`} />
 
       <ShellHeader>
-        <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}/about`} className="text-muted-foreground hover:text-foreground">
+        <Link href={`/matrix/rooms/${encoded}/about`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
         <h1 className="truncate text-sm font-medium">Who Can Read History</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>session_view/room_details/history_visibility_subpage.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+        <Card>
+          <CardContent className="pt-6">
+            <Form
+              action={`/matrix/rooms/${encoded}/visibility`}
+              method="post"
+              className="flex flex-col gap-4"
+            >
+              {({ processing }) => (
+                <>
+                  <Choice name="history_visibility" options={OPTIONS} value={value} />
+                  <Button type="submit" className="self-start" disabled={processing || !editable}>
+                    Save
+                  </Button>
+                </>
+              )}
+            </Form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

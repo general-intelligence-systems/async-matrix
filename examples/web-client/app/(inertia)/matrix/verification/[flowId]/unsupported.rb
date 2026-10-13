@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/no_supported_methods_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # Nothing both sides can do: no camera here, no emoji there.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -36,47 +34,72 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/unsupported",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
+    offered: Matrix::Verification.offered(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Button } from "@/components/ui/button"
+import { Act, Flow, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidUnsupported({flowId}: {
-  flowId: string
+const NAMES: Record<string, string> = {
+  "m.sas.v1": "Compare emoji",
+  "m.qr_code.show.v1": "Show a QR code",
+  "m.qr_code.scan.v1": "Scan a QR code",
+  "m.reciprocate.v1": "Reciprocate a scanned code",
+}
+
+export default function MatrixVerificationUnsupported({
+  flow,
+  offered,
+}: {
+  flow: Flow
+  step: string
+  offered: string[]
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"No supported methods"} />
-
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">No supported methods</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+    <>
+      <Head title="No supported methods" />
+      <Step flow={flow} title="No supported methods">
+        <Alert variant="warning">
+          <AlertTitle>Nothing both sides can do</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/no_supported_methods_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            The other session offered{" "}
+            {flow.methods.length === 0 ? "no method at all" : flow.methods.join(", ")}, and this one
+            does emoji and QR codes. There is no way to compare anything.
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        {offered.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-md border p-4 text-sm">
+            <span className="text-muted-foreground">What both sides can do</span>
+            {offered.map((method) => (
+              <span key={method}>{NAMES[method] || method}</span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          {flow.live && (
+            <Act flow={flow} action="cancel" code="m.unknown_method">
+              Cancel
+            </Act>
+          )}
+          <Button size="sm" variant="ghost" render={<Link href="/matrix/verification" />}>
+            Back
+          </Button>
+        </div>
+      </Step>
+    </>
   )
 }

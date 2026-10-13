@@ -144,7 +144,22 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  user_id = params["userId"].to_s
+
+  act! do
+    case params["action"].to_s
+    when "ignore"
+      Matrix::RoomActions.ignore_user(user_id)
+    when "unignore"
+      Matrix::RoomActions.unignore_user(user_id)
+    when "direct"
+      room_id = Matrix::RoomActions.create_direct(user_id)
+
+      redirect("/matrix/rooms/#{CGI.escape(room_id)}", 303)
+    else
+      halt(422, "matrix: unknown action\n")
+    end
+  end
 end
 
 __END__

@@ -4,8 +4,6 @@
 #
 # Fractal: components/crypto/recovery_setup_view.{blp,rs} (tag enable)
 #
-# NOT IMPLEMENTED.
-#
 # Creating secret storage and the megolm backup, with a generated key and an optional passphrase.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -43,43 +41,115 @@
 #
 
 get "/" do
-  render("matrix/settings/encryption/recovery/enable")
+  render(
+    "matrix/settings/encryption/recovery/enable",
+    status: Matrix::Crypto.status,
+    error:  session.delete(:matrix_crypto_error),
+  )
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  passphrase = params["passphrase"].to_s
+  confirm = params["confirm_passphrase"].to_s
+
+  unless passphrase.empty? || passphrase == confirm
+    session[:matrix_crypto_error] = "Passphrases do not match"
+    redirect("/matrix/settings/encryption/recovery/enable", 303)
+  end
+
+  session[:matrix_recovery_key] = Matrix::Crypto.enable_recovery!(passphrase)
+
+  redirect("/matrix/settings/encryption/recovery/success", 303)
+rescue Matrix::RoomActions::Error => error
+  session[:matrix_crypto_error] = error.message
+  redirect("/matrix/settings/encryption/recovery/enable", 303)
+rescue Async::Matrix::RequestError => error
+  session[:matrix_crypto_error] = error.message
+  redirect("/matrix/settings/encryption/recovery/enable", 303)
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixSettingsEncryptionRecoveryEnable({}: {
-
+export default function MatrixSettingsEncryptionRecoveryEnable({
+  status,
+  error,
+}: {
+  status: { identity: boolean; recovery: boolean; missing: string[] }
+  error: string | null
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Set up account recovery"} />
+      <Head title="Set up account recovery" />
 
       <ShellHeader>
-        <Link href={"/matrix/settings/encryption/recovery"} className="text-muted-foreground hover:text-foreground">
+        <Link href="/matrix/settings/encryption" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Set up account recovery</h1>
+        <h1 className="truncate text-sm font-medium">Set Up Account Recovery</h1>
       </ShellHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-6">
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTitle>It did not go through</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {status.recovery && (
+          <Alert variant="warning">
+            <AlertTitle>Recovery is already set up</AlertTitle>
+            <AlertDescription>
+              Setting it up again replaces the key, which is what Reset Account Recovery does.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle>Where the keys are kept</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>components/crypto/recovery_setup_view.blp</code>. The widget tree to rebuild is in the
-            route file.
+            Your crypto identity and the key backup are encrypted and stored on the homeserver,
+            which cannot read them. A new session reads them back with what is set here.
           </AlertDescription>
         </Alert>
+
+        <Form action="/matrix/settings/encryption/recovery/enable" method="post" className="flex flex-col gap-4">
+          {({ processing }) => (
+            <>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="passphrase">Recovery passphrase</FieldLabel>
+                  <Input id="passphrase" name="passphrase" type="password" autoComplete="new-password" />
+                  <FieldDescription>
+                    If you do not provide a recovery passphrase, a recovery key will be created.
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="confirm_passphrase">Confirm passphrase</FieldLabel>
+                  <Input
+                    id="confirm_passphrase"
+                    name="confirm_passphrase"
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </Field>
+              </FieldGroup>
+
+              <Button type="submit" disabled={processing} className="self-start">
+                Set Up
+              </Button>
+            </>
+          )}
+        </Form>
       </div>
     </div>
   )

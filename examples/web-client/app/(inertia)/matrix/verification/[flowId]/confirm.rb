@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/confirm_qr_code_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # We scanned theirs, and confirming is what signs it.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -39,47 +37,49 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/confirm",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { Head } from "@inertiajs/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { usePoll } from "@/hooks/use-poll"
+import { Act, Flow, Stale, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidConfirm({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationConfirm({ flow, step }: { flow: Flow; step: string }) {
+  usePoll(flow.live, ["flow", "step"])
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Confirm QR code"} />
+    <>
+      <Head title="Confirm QR code" />
+      <Step flow={flow} title="Confirm QR code">
+        {step === "confirm" ? null : <Stale flow={flow} />}
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Confirm QR code</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle>The code read correctly</AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/confirm_qr_code_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            Confirming is what signs those keys. Wait for the other screen to say it is verified
+            too.
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <div className="flex items-center gap-2">
+          <Act flow={flow} action="confirm_qr">
+            Confirm
+          </Act>
+          <Act flow={flow} action="cancel" code="m.key_mismatch" variant="destructive">
+            Something is wrong
+          </Act>
+        </div>
+      </Step>
+    </>
   )
 }

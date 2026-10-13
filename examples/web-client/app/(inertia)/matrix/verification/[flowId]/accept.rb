@@ -4,8 +4,6 @@
 #
 # Fractal: identity_verification_view/accept_request_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # An incoming verification request, to accept or decline.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -39,47 +37,52 @@
 #
 
 get "/" do
+  flow = verification_flow!
+
   render(
     "matrix/verification/[flowId]/accept",
-    flowId:    params["flowId"],
+    flow: verification_row(flow),
+    step: verification_step(flow),
   )
-end
-
-post "/" do
-  halt(501, "matrix: not implemented\n")
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { Head } from "@inertiajs/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { usePoll } from "@/hooks/use-poll"
+import { Act, Flow, Stale, Step } from "@/components/matrix/verification"
 
-export default function MatrixVerificationFlowidAccept({flowId}: {
-  flowId: string
-}) {
+export default function MatrixVerificationAccept({ flow, step }: { flow: Flow; step: string }) {
+  usePoll(flow.live, ["flow", "step"])
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Accept request"} />
+    <>
+      <Head title="Accept request" />
+      <Step flow={flow} title="Accept request">
+        {step === "accept" ? null : <Stale flow={flow} />}
 
-      <ShellHeader>
-        <Link href={"/matrix/verification"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Accept request</h1>
-      </ShellHeader>
-
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
         <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
+          <AlertTitle>
+            {flow.own ? "Another of your sessions wants to verify" : "Someone wants to verify you"}
+          </AlertTitle>
           <AlertDescription>
-            Scaffolded from Fractal's <code>identity_verification_view/accept_request_page.blp</code>. The widget tree to rebuild is in the
-            route file.
+            {flow.own
+              ? "Accepting hands that session the keys it needs to read your encrypted messages."
+              : "Accepting lets you both compare a short code, after which your clients trust each other's keys."}
           </AlertDescription>
         </Alert>
-      </div>
-    </div>
+
+        <div className="flex items-center gap-2">
+          <Act flow={flow} action="accept">
+            Accept
+          </Act>
+          <Act flow={flow} action="cancel" code="user" variant="outline">
+            Decline
+          </Act>
+        </div>
+      </Step>
+    </>
   )
 }

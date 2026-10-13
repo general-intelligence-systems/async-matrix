@@ -226,6 +226,130 @@ module Matrix
       Models::Matrix::Room.where(room_id: room_id).delete
     end
 
+    def with_client
+      credential = Models::Matrix::Credential.first
+
+      unless credential&.usable?
+        raise Error, "not signed in"
+      end
+
+      Session.open(credential) do |client, _credentials|
+        yield client, credential
+      end
+    end
+
+    def set_display_name(name)
+      self.with_client do |client, credential|
+        client.profile.set_display_name(credential.matrix_user_id, name)
+      end
+    end
+
+    def set_avatar_url(url)
+      self.with_client do |client, credential|
+        client.profile.set_avatar_url(credential.matrix_user_id, url)
+      end
+    end
+
+    def set_global_account_data(type, content)
+      self.with_client do |client, credential|
+        client.account_data.set_account_data(credential.matrix_user_id, type, content)
+      end
+    end
+
+    def ignored_users
+      Models::Matrix::AccountData
+        .content_for(event_type: Models::Matrix::AccountData::IGNORED_USERS)
+        .to_h.fetch("ignored_users", {})
+    end
+
+    def ignore_user(user_id)
+      self.set_global_account_data(
+        Models::Matrix::AccountData::IGNORED_USERS,
+        { "ignored_users" => self.ignored_users.merge(user_id => {}) },
+      )
+    end
+
+    def unignore_user(user_id)
+      self.set_global_account_data(
+        Models::Matrix::AccountData::IGNORED_USERS,
+        { "ignored_users" => self.ignored_users.reject{|id, _| id.to_s == user_id} },
+      )
+    end
+
+    def rename_device(device_id, display_name)
+      self.with_client do |client, _credential|
+        client.devices.update_device(device_id, display_name: display_name)
+      end
+    end
+
+    def delete_device(device_id, auth: nil)
+      self.with_client do |client, _credential|
+        client.devices.delete_device(device_id, auth: auth)
+      end
+    end
+
+    def create_room(**payload)
+      self.with_client do |client, _credential|
+        client.create_room(**payload).id
+      end
+    end
+
+    def create_direct(user_id)
+      self.create_room(is_direct: true, preset: "trusted_private_chat", invite: [user_id]).tap do |room_id|
+        direct = Models::Matrix::AccountData.content_for(event_type: Models::Matrix::AccountData::DIRECT).to_h
+        rooms = Array(direct[user_id]) + [room_id]
+
+        self.set_global_account_data(Models::Matrix::AccountData::DIRECT, direct.merge(user_id => rooms.uniq))
+      end
+    end
+
+    PUSH_RULES = Models::Matrix::AccountData::PUSH_RULES
+
+    def push_rules
+      Models::Matrix::AccountData.content_for(event_type: PUSH_RULES).to_h
+    end
+
+    def set_push_rules(global:, keywords:, account:)
+      rules = self.push_rules
+      content = rules.merge("enabled" => account)
+
+      underride = {
+        "all"      => [],
+        "direct"   => ["m.rule.message"],
+        "mentions" => ["m.rule.message", "m.rule.encrypted"],
+      }.fetch(global, [])
+
+      content["global"] = (rules["global"] || {}).merge(
+        "content"   => keywords.map{|word| self.keyword_rule(word)},
+        "muted"     => underride,
+      )
+
+      self.set_global_account_data(PUSH_RULES, content)
+    end
+
+    def keyword_rule(word)
+      {
+        "rule_id"   => word,
+        "default"   => false,
+        "enabled"   => true,
+        "pattern"   => word,
+        "actions"   => ["notify", {"set_tweak" => "highlight"}],
+      }
+    end
+
+    def set_room_notification(room_id, mode)
+      rules = self.push_rules
+      rooms = Array((rules["global"] || {})["room"]).reject{|rule| rule["rule_id"].to_s == room_id}
+
+      if mode == "mute"
+        rooms += [{"rule_id" => room_id, "default" => false, "enabled" => true, "actions" => []}]
+      end
+
+      content = rules.merge("global" => (rules["global"] || {}).merge("room" => rooms))
+
+      self.set_global_account_data(PUSH_RULES, content)
+    end
+
     def set_state(room_id, type, content, state_key = "")
       self.with_room(room_id) do |_client, room, _credential|
         room.set_room_state_with_key(type, content, state_key)
