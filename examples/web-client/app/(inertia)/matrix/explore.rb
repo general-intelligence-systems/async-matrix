@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/explore/ (+ servers_popover, server_list)
 #
-# NOT IMPLEMENTED.
-#
 # The public room directory: /publicRooms against the homeserver and any
 # custom servers, with join/knock per row.
 # ── Fractal's widget tree ──────────────────────────────────────────────────

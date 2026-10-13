@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/general_page/deactivate_account_subpage.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # Deactivation, which is irreversible and needs the user id typed back to confirm.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #

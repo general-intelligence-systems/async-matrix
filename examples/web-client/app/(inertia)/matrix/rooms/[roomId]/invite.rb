@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/invite_subpage/
 #
-# NOT IMPLEMENTED.
-#
 # Invite people TO this room. Not to be confused with the invite you received,
 # which is a rendering of rooms/[roomId].rb rather than a route.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
@@ -101,7 +99,9 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.invite(room_id!, params["user_id"].to_s, reason: params["reason"])
+  end
 end
 
 __END__

@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/content.blp stack page "empty"
 #
-# NOT IMPLEMENTED.
-#
 # The empty state: no room selected. See the open question in the plan about
 # redirecting to the most recently active room instead.
 # ── Fractal's widget tree ──────────────────────────────────────────────────

@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/edit_details_subpage.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The room's name, topic and avatar, which are m.room.name, m.room.topic and m.room.avatar state events.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -60,7 +58,21 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  room_id = room_id!
+
+  act! do
+    unless params["name"].nil?
+      Matrix::RoomActions.set_name(room_id, params["name"].to_s)
+    end
+
+    unless params["topic"].nil?
+      Matrix::RoomActions.set_topic(room_id, params["topic"].to_s)
+    end
+
+    unless params["avatar_url"].nil?
+      Matrix::RoomActions.set_avatar(room_id, params["avatar_url"].to_s)
+    end
+  end
 end
 
 __END__

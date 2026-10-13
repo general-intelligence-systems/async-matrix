@@ -4,8 +4,6 @@
 #
 # Fractal: room_history/event_actions/properties_dialog.rs (partially)
 #
-# NOT IMPLEMENTED.
-#
 # One event: the permalink target, and the view-source screen. Only possible
 # now that matrix_events.raw exists -- the projection used to keep decrypted
 # content and discard the envelope.
@@ -112,6 +110,30 @@ get "/" do
     source:    MultiJson.dump(event.raw || event.content, pretty: true),
     unsigned:  MultiJson.dump(event.unsigned, pretty: true),
   )
+end
+
+post "/" do
+  room_id = room_id!
+  event_id = params["eventId"].to_s
+
+  act! do
+    case params["action"].to_s
+    when "redact"
+      Matrix::RoomActions.redact(room_id, event_id, reason: params["reason"])
+    when "react"
+      Matrix::RoomActions.react(room_id, event_id, params["key"].to_s)
+    when "report"
+      Matrix::RoomActions.report(room_id, event_id, reason: params["reason"])
+    when "reply"
+      Matrix::RoomActions.send_message(room_id, params["body"].to_s, reply_to: event_id)
+    when "edit"
+      Matrix::RoomActions.send_message(room_id, params["body"].to_s, edits: event_id)
+    when "receipt"
+      Matrix::RoomActions.send_receipt(room_id, event_id, thread_id: params["thread_id"])
+    else
+      halt(422, "matrix: unknown action\n")
+    end
+  end
 end
 
 __END__

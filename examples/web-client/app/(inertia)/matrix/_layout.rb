@@ -210,6 +210,30 @@
 # and the callback comes back with a token, and either way the answer from POST /login is the same
 # shape and lands in the one credential row.
 helpers do
+  def room_id!
+    params["roomId"].to_s.tap do |id|
+      if id.empty?
+        halt(404, "matrix: no room\n")
+      end
+    end
+  end
+
+  def act!
+    yield
+
+    back = params["return_to"].to_s
+
+    if back.empty?
+      redirect(request.path_info, 303)
+    else
+      redirect(back, 303)
+    end
+  rescue Matrix::RoomActions::Error => error
+    halt(409, "matrix: #{error.message}\n")
+  rescue Async::Matrix::RequestError => error
+    halt(error.status, "matrix: #{error.message}\n")
+  end
+
   # The device id is a crypto identity, so an existing one is reused rather than re-minted. See the
   # migration for why that matters.
   def matrix_device_id

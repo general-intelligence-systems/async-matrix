@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/permissions/members_subpage.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The members m.room.power_levels names, by level, which is who can act above the default.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -65,7 +63,13 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.set_power_level(
+      room_id!,
+      params["user_id"].to_s,
+      params["level"].to_s.empty? ? nil : params["level"],
+    )
+  end
 end
 
 __END__

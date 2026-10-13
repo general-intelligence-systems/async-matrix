@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/upgrade_dialog/
 #
-# NOT IMPLEMENTED.
-#
 # Upgrade the room to a newer version, which tombstones this one and creates
 # its successor (matrix_rooms.successor_room_id / predecessor_room_id).
 # ── Fractal's widget tree ──────────────────────────────────────────────────
@@ -70,7 +68,9 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.upgrade(room_id!, params.fetch("new_version", "11").to_s)
+  end
 end
 
 __END__

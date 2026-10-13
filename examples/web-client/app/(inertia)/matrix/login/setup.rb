@@ -4,8 +4,6 @@
 #
 # Fractal: login/session_setup_view.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The first screen after a session exists but before it is usable: the device has keys to publish and an identity to verify or bootstrap.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #

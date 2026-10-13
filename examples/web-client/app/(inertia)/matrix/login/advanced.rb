@@ -4,8 +4,6 @@
 #
 # Fractal: login/advanced_dialog.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # One switch: Auto-Discovery. On, the entry is a domain resolved through its well-known; off, it is
 # the homeserver URL as typed. Fractal titles the dialog "Homeserver Discovery" and it holds nothing
 # else.

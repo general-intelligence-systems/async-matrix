@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/addresses_subpage/
 #
-# NOT IMPLEMENTED.
-#
 # The canonical alias and alt_aliases, plus registering and releasing local
 # aliases.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
@@ -81,7 +79,13 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.set_canonical_alias(
+      room_id!,
+      params["canonical_alias"].to_s,
+      Array(params["alt_aliases"]),
+    )
+  end
 end
 
 __END__

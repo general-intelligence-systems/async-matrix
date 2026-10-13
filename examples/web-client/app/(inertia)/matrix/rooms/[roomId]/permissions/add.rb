@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/permissions/add_members_subpage.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # Picking members to raise above the default power level.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -61,7 +59,9 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.set_power_level(room_id!, params["user_id"].to_s, params.fetch("level", 50))
+  end
 end
 
 __END__

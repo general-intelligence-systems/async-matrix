@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/history_viewer/
 #
-# NOT IMPLEMENTED.
-#
 # Everything this room has sent that is a file: ?kind=media|files|audio for
 # Fractal's three history-viewer tabs.
 # ── Fractal's widget tree ──────────────────────────────────────────────────

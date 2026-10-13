@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/user_session/ + session/user_sessions_list/
 #
-# NOT IMPLEMENTED.
-#
 # Our own devices: current first, then the rest, with last-seen IP and time
 # and whether each is verified.
 # ── Fractal's widget tree ──────────────────────────────────────────────────

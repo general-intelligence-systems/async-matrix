@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/invite.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # An invitation you have received: who sent it, and accept or decline. Distinct from /invite, which is the subpage for inviting others.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -57,7 +55,16 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  room_id = room_id!
+
+  act! do
+    case params["action"].to_s
+    when "decline"
+      Matrix::RoomActions.leave(room_id)
+    else
+      Matrix::RoomActions.join(room_id)
+    end
+  end
 end
 
 __END__

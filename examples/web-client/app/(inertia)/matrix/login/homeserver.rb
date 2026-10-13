@@ -4,8 +4,6 @@
 #
 # Fractal: login/homeserver_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # Which homeserver to log in to, and what it supports: the well-known lookup and the login flows it advertises decide whether the next screen is a password form or the browser.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #

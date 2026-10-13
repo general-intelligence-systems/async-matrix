@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/members_page/ (+ members_list_view/)
 #
-# NOT IMPLEMENTED.
-#
 # The member list, ?membership=join|invite|ban|knock for Fractal's four
 # MembershipListKind tabs. Rows link to /matrix/users/:userId, which is NOT
 # under this route -- see that file.
@@ -149,6 +147,27 @@ get "/" do
     end,
     counts:     MEMBERSHIPS.to_h{|kind| [kind, room.members.where(membership: kind).count]},
   )
+end
+
+post "/" do
+  room_id = room_id!
+  user_id = params["user_id"].to_s
+  reason = params["reason"]
+
+  act! do
+    case params["action"].to_s
+    when "invite"
+      Matrix::RoomActions.invite(room_id, user_id, reason: reason)
+    when "kick"
+      Matrix::RoomActions.kick(room_id, user_id, reason: reason)
+    when "ban"
+      Matrix::RoomActions.ban(room_id, user_id, reason: reason)
+    when "unban"
+      Matrix::RoomActions.unban(room_id, user_id, reason: reason)
+    else
+      halt(422, "matrix: unknown action\n")
+    end
+  end
 end
 
 __END__

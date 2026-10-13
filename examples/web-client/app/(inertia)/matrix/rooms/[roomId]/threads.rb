@@ -4,8 +4,6 @@
 #
 # Fractal: nothing -- Fractal has no thread UI
 #
-# NOT IMPLEMENTED.
-#
 # The room's threads. NO FRACTAL EQUIVALENT: it has no thread support at all,
 # so this is ours. Reads matrix_events.rel_type and
 # matrix_thread_subscriptions.

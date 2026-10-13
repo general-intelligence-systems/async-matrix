@@ -4,8 +4,6 @@
 #
 # Fractal: nothing -- see threads.rb
 #
-# NOT IMPLEMENTED.
-#
 # One thread's timeline. Its own chunk list: matrix_timeline_chunks keys on
 # (room_id, thread_root_id), so a thread paginates independently of the main
 # timeline exactly as the SDK's LinkedChunkId::Thread does.

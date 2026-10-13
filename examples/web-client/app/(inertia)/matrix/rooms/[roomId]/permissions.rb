@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/permissions/ (session/room/permissions.rs)
 #
-# NOT IMPLEMENTED.
-#
 # m.room.power_levels, as the roles Fractal derives from it (Default, Custom,
 # Moderator, Administrator, Creator, Muted) plus the per-action thresholds.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
@@ -346,7 +344,13 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.set_power_level(
+      room_id!,
+      params["user_id"].to_s,
+      params["level"].to_s.empty? ? nil : params["level"],
+    )
+  end
 end
 
 __END__

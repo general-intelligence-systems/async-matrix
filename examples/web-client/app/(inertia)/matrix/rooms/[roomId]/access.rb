@@ -4,8 +4,6 @@
 #
 # Fractal: join_rule_subpage.blp + history_visibility_subpage.blp + guest access
 #
-# NOT IMPLEMENTED.
-#
 # Who can join and who can read history: m.room.join_rules (including the
 # restricted allow list), m.room.history_visibility, m.room.guest_access.
 # Three subpages in Fractal, three sections here.
@@ -102,7 +100,9 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.set_join_rule(room_id!, params["join_rule"].to_s)
+  end
 end
 
 __END__

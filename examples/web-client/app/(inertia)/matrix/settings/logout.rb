@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/general_page/log_out_subpage.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # What logging out costs when recovery is not set up: the room keys on this device go with it.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #

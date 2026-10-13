@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/history_visibility_subpage.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # m.room.history_visibility: how far back a new member can read. Separate from the join rule, which is /access.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -51,7 +49,9 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    Matrix::RoomActions.set_history_visibility(room_id!, params["history_visibility"].to_s)
+  end
 end
 
 __END__

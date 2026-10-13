@@ -4,8 +4,6 @@
 #
 # Fractal: login/method_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The login flows the homeserver advertises, as a choice: a password form when it supports m.login.password, the browser when it is OIDC.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #

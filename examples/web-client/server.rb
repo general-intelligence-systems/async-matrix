@@ -12,6 +12,7 @@ require "ratalada/contrib/router/file_based/sinatra_adapter"
 require_relative "config/sequel"
 require_relative "lib/matrix/homeserver"
 require_relative "lib/matrix/session"
+require_relative "lib/matrix/room_actions"
 
 RELOAD = "USR2"
 reloading = false

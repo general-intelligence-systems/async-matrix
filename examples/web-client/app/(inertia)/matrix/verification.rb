@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/content.blp stack page "verification" + verification_list.rs
 #
-# NOT IMPLEMENTED.
-#
 # Pending identity verification requests. A content-pane state in Fractal
 # because it is a single-window app; a route here so a request is linkable.
 # ── Fractal's widget tree ──────────────────────────────────────────────────

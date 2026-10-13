@@ -4,8 +4,6 @@
 #
 # Fractal: login/in_browser_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The holding screen while the OIDC flow runs elsewhere. Fractal opens a browser and waits on a loopback server; here the browser is already the client, so this is where the redirect to MAS is taken.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #

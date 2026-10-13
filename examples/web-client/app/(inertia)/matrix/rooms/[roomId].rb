@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/room_history/ | session_view/invite.blp | invite_request.blp
 #
-# NOT IMPLEMENTED.
-#
 # THE TIMELINE, and the three-way render Fractal does in one stack:
 # content.blp switches room-history | invite | invite-request on the room's
 # category, so this is one route with three renderings rather than three
@@ -577,7 +575,45 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  room_id = room_id!
+
+  act! do
+    case params["action"].to_s
+    when "", "send"
+      Matrix::RoomActions.send_message(
+        room_id,
+        params["body"].to_s,
+        reply_to: params["reply_to"],
+        edits:    params["edits"],
+      )
+    when "redact"
+      Matrix::RoomActions.redact(room_id, params["event_id"].to_s, reason: params["reason"])
+    when "react"
+      Matrix::RoomActions.react(room_id, params["event_id"].to_s, params["key"].to_s)
+    when "report"
+      Matrix::RoomActions.report(room_id, params["event_id"].to_s, reason: params["reason"])
+    when "cancel-send"
+      Matrix::RoomActions.abort!(room_id, params["transaction_id"].to_s)
+    when "typing"
+      Matrix::RoomActions.set_typing(room_id, params["typing"].to_s == "true")
+    when "receipt"
+      Matrix::RoomActions.send_receipt(room_id, params["event_id"].to_s, thread_id: params["thread_id"])
+    when "fully-read"
+      Matrix::RoomActions.set_fully_read(room_id, params["event_id"].to_s)
+    when "mark-unread"
+      Matrix::RoomActions.mark_unread(room_id, params["unread"].to_s == "true")
+    when "category"
+      Matrix::RoomActions.set_category(room_id, params["category"].to_s)
+    when "join"
+      Matrix::RoomActions.join(room_id)
+    when "leave"
+      Matrix::RoomActions.leave(room_id)
+    when "forget"
+      Matrix::RoomActions.forget(room_id)
+    else
+      halt(422, "matrix: unknown action\n")
+    end
+  end
 end
 
 __END__

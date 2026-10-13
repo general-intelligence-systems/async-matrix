@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/general_page.blp + edit_details_subpage.blp
 #
-# NOT IMPLEMENTED.
-#
 # Avatar, name, topic, member count -- editable in place when
 # Permissions#can_change_* allows it. Fractal splits view from edit because
 # its PreferencesWindow pushes a subpage; one page does both here, and the
@@ -181,7 +179,26 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  room_id = room_id!
+
+  act! do
+    case params["action"].to_s
+    when "encrypt"
+      Matrix::RoomActions.enable_encryption(room_id)
+    when "guest-access"
+      Matrix::RoomActions.set_guest_access(room_id, params["guest_access"].to_s)
+    when "leave"
+      Matrix::RoomActions.leave(room_id)
+    when "forget"
+      Matrix::RoomActions.forget(room_id)
+    when "category"
+      Matrix::RoomActions.set_category(room_id, params["category"].to_s)
+    when "mark-unread"
+      Matrix::RoomActions.mark_unread(room_id, params["unread"].to_s == "true")
+    else
+      halt(422, "matrix: unknown action\n")
+    end
+  end
 end
 
 __END__
