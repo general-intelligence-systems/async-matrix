@@ -49,7 +49,7 @@
           version = "0";
           src = ./.;
           fetcherVersion = 4;
-          hash = "sha256-XoHhvkVtj/9m9TC5iAS+Wm3CKkKg6DHKChtvYdRNCS0=";
+          hash = "sha256-vEjrgFOWWNsqm0PwGJHljWEJsbcdB2ABz3BFtqHrH7w=";
         };
 
       in
