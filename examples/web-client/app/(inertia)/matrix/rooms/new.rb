@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/create_room_dialog.blp
 #
-# NOT IMPLEMENTED.
-#
 # Create a room: name, topic, visibility, encryption. A dialog in Fractal, a
 # page here -- this router has no modal concept and the house pattern for a
 # form that commits is get + post on one route (see app/labels/new.rb).

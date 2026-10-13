@@ -59,7 +59,7 @@ def store_state(event, stripped)
   ).save(validate: false)
 end
 
-def store_event(event)
+def store_event(event, sealed: nil, error: nil)
   M::Event.dataset.where(event_id: event.event_id).delete
 
   relates = event.content.to_h[:"m.relates_to"] || {}
@@ -69,6 +69,7 @@ def store_event(event)
     state_key: event.is_a?(Events::StateEvent) ? event.state_key : nil,
     content: event.content.to_h, origin_server_ts: event.origin_server_ts || 0,
     relates_to_id: relates[:event_id], rel_type: relates[:rel_type],
+    session_id: sealed&.content&.session_id, raw: sealed&.to_h, decryption_error: error,
   ).save(validate: false)
 end
 
@@ -215,13 +216,80 @@ def apply_timeline(room, event, me)
       row.save_changes(validate: false)
     end
   in {content: Events::RoomEncrypted}
-    touch_latest(room, event)
+    read_encrypted(room, event, me)
   in {content: Events::Sticker}
     touch_latest(room, event)
   in {content: Events::Reaction}
     nil
   else
     nil
+  end
+end
+
+def read_encrypted(room, event, me)
+  opened = Matrix::Device.machine.decrypt(event, room_id: room.room_id)
+
+  case opened
+  in nil
+    store_event(event, sealed: event, error: unreadable_reason(room.room_id, event.content.session_id))
+    touch_latest(room, event)
+  else
+    apply_timeline(room, opened, me)
+    store_event(opened, sealed: event)
+    touch_latest(room, opened)
+  end
+rescue StandardError => error
+  Console.warn(self, "Could not read an event.", event_id: event.event_id, error: error)
+
+  store_event(event, sealed: event, error: error.message)
+  touch_latest(room, event)
+end
+
+def unreadable_reason(room_id, session_id)
+  withheld = M::WithheldKey.first(room_id: room_id, session_id: session_id)
+
+  case withheld
+  in nil
+    "the key for this message has not arrived"
+  else
+    "withheld: #{withheld.code}"
+  end
+end
+
+def read_deferred(registry, me)
+  taken = KEYS_MUTEX.synchronize{KEYS_TAKEN.dup.tap{KEYS_TAKEN.clear}}
+
+  taken.uniq.each do |room_id, session_id|
+    room = M::Room.first(room_id: room_id)
+
+    unless room.nil?
+      M::Event.where(room_id: room_id, session_id: session_id).exclude(decryption_error: nil).each do |row|
+        read_sealed(registry, room, row, me)
+      end
+
+      room.save_changes(validate: false)
+    end
+  end
+end
+
+def read_sealed(registry, room, row, me)
+  unless row.raw.nil?
+    event = registry.wrap(symbolize(row.raw), room_id: row.room_id)
+
+    if event.content.is_a?(Events::RoomEncrypted)
+      read_encrypted(room, event, me)
+    end
+  end
+end
+
+def symbolize(value)
+  case value
+  in Hash => hash
+    hash.to_h{|key, held| [key.to_sym, symbolize(held)]}
+  in Array => array
+    array.map{|held| symbolize(held)}
+  else
+    value
   end
 end
 
@@ -357,9 +425,9 @@ def apply_to_device(event)
     Matrix::Verification.requested!(content.transaction_id, event[:sender], content.to_h)
   in {content: Events::KeyVerificationReady => content}
     Matrix::Verification.ready!(content.transaction_id, content.to_h)
-  in {content: Events::KeyVerificationStartReciprocateV => content}
+  in {content: Events::KeyVerificationStartReciprocateV1 => content}
     Matrix::Verification.reciprocated!(content.transaction_id, content.to_h)
-  in {content: Events::KeyVerificationStartSasV | Events::KeyVerificationStart => content}
+  in {content: Events::KeyVerificationStartSasV1 | Events::KeyVerificationStart => content}
     accept_verification(content)
   in {content: Events::KeyVerificationAccept => content}
     Matrix::Verification.accepted!(content.transaction_id, content.to_h)
@@ -392,7 +460,13 @@ def accept_verification(content)
   end
 end
 
+KEYS_TAKEN = []
+
+KEYS_MUTEX = Mutex.new
+
 def store_inbound_session(content, sender, imported)
+  KEYS_MUTEX.synchronize{KEYS_TAKEN << [content.room_id, content.session_id]}
+
   upsert(M::MegolmInboundSession, {room_id: content.room_id, session_id: content.session_id}).set(
     sender_key: content.to_h[:sender_key] || sender,
     pickle: content.session_key,
@@ -486,7 +560,7 @@ def apply_devices(credential)
   end
 end
 
-def apply_batch(batch, me)
+def apply_batch(client, batch, me)
   registry = Events.registry(Matrix::Homeserver::VERSION)
 
   DB.transaction do
@@ -500,7 +574,18 @@ def apply_batch(batch, me)
     (batch.value.dig(:presence, :events) || []).each{|raw| apply_presence(registry.wrap(raw))}
     (batch.value.dig(:account_data, :events) || []).each{|raw| apply_global_account_data(registry.wrap(raw))}
 
-    batch.to_device.each{|raw| apply_to_device(registry.wrap(raw))}
+    machine = Matrix::Device.machine
+
+    batch.to_device.each do |raw|
+      begin
+        machine.each_device_event(raw){|event| apply_to_device(event)}
+      rescue StandardError => error
+        Console.warn(self, "Could not take a device message.", type: raw[:type], error: error)
+      end
+    end
+
+    read_deferred(registry, me)
+    Matrix::Device.persist!
 
     batch.changed_devices.each do |user_id|
       upsert(M::TrackedUser, {matrix_user_id: user_id}).set(dirty: true).save_changes(validate: false)
@@ -518,8 +603,10 @@ def apply_batch(batch, me)
     counts = batch.one_time_keys_count
 
     unless counts.empty?
-      M::DeviceState.first&.set(otk_count: counts[:signed_curve25519].to_i)&.save_changes(validate: false)
+      Matrix::Device.top_up_keys!(client, counts[:signed_curve25519].to_i)
     end
+
+    Matrix::Device.replace_fallback_key!(client, batch.value[:device_unused_fallback_key_types])
 
     M::KV.sync_token = batch.next_batch
   end
@@ -549,7 +636,7 @@ def sync_loop
           sync = client.sync(since: since, timeout: since.nil? ? 0 : SYNC_TIMEOUT)
 
           sync.each(retries: 8, timeout: SYNC_TIMEOUT) do |batch|
-            apply_batch(batch, credential.matrix_user_id)
+            apply_batch(client, batch, credential.matrix_user_id)
           end
         end
       else

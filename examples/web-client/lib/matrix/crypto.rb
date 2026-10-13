@@ -26,7 +26,9 @@ module Matrix
 
     BACKUP_SECRET = "m.megolm_backup.v1"
 
-    SECRETS = [MASTER, SELF_SIGNING, USER_SIGNING, BACKUP_SECRET].freeze
+    CROSS_SIGNING = [MASTER, SELF_SIGNING, USER_SIGNING].freeze
+
+    SECRETS = [*CROSS_SIGNING, BACKUP_SECRET].freeze
 
     BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2"
 
@@ -107,6 +109,23 @@ module Matrix
       }
     end
 
+    def prepare!(credential)
+      Device.adopted!(credential.device_id)
+      Device.describe_storage!
+
+      self.with_client do |client, _opened|
+        Device.publish_keys!(client)
+
+        unless Device.machine.identity.self_signing_key.nil?
+          self.sign_own_device!(client)
+        end
+      end
+    rescue StandardError => error
+      Console.warn(self, "Could not publish this session's keys.", error: error)
+
+      nil
+    end
+
     def bootstrap_identity!(auth: nil)
       machine = Device.machine
       identity = machine.create_cross_signing_keys
@@ -119,11 +138,7 @@ module Matrix
           auth:             auth,
         )
 
-        signatures = machine.sign_own_device
-
-        unless signatures.nil?
-          client.cross_signing.upload_cross_signing_signatures(signatures)
-        end
+        self.sign_own_device!(client, machine)
       end
 
       self.remember_identity!(identity)
@@ -131,6 +146,48 @@ module Matrix
       self.write_secrets!
 
       identity.master_key
+    end
+
+    def sign_own_device!(client = nil, machine = Device.machine)
+      signatures = machine.sign_own_device
+
+      if signatures.nil?
+        raise Error, "this session holds no self signing key, so it cannot sign itself"
+      end
+
+      payload = self.signed_device_keys(machine, signatures)
+
+      if client.nil?
+        answer = self.with_client{|opened, _credential| opened.cross_signing.upload_cross_signing_signatures(payload)}
+      else
+        answer = client.cross_signing.upload_cross_signing_signatures(payload)
+      end
+
+      unless answer.failures.empty?
+        raise Error, "the homeserver refused the signature: #{answer.failures}"
+      end
+
+      answer
+    end
+
+    def signed_device_keys(machine, signatures)
+      keys = machine.device_keys
+      user_id = machine.user_id
+      device_id = machine.device_id
+      written = signatures[user_id] || signatures[user_id.to_sym] || {}
+      added = written[device_id] || written[device_id.to_sym] || {}
+
+      {
+        user_id => {
+          device_id => keys.merge(
+            signatures: {user_id => self.stringified(keys[:signatures].to_h.values.first.to_h).merge(self.stringified(added))},
+          ),
+        },
+      }
+    end
+
+    def stringified(value)
+      value.to_h{|name, held| [name.to_s, held]}
     end
 
     def reset_identity!(auth: nil)

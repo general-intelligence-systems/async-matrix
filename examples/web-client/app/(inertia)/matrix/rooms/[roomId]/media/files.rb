@@ -4,8 +4,6 @@
 #
 # Fractal: room_details/history_viewer/file.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The room's m.file messages as a list. Fractal keeps three history viewers, one per kind; /media is the visual one.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -76,14 +74,22 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    case params["action"].to_s
+    in "redact"
+      Matrix::RoomActions.redact(room_id!, params["event_id"].to_s, params["reason"])
+    else
+      halt(400, "matrix: no such action\n")
+    end
+  end
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft, Paperclip } from "lucide-react"
+import { Head, Link, router } from "@inertiajs/react"
+import { ArrowLeft, Paperclip, Trash2 } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
@@ -147,6 +153,18 @@ export default function MatrixRoomMediaFiles({
                         {item.size ? ` · ${Math.ceil(item.size / 1024)} KB` : ""}
                       </ItemDescription>
                     </ItemContent>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        router.post(`/matrix/rooms/${encoded}/media/files`, {
+                          action: "redact",
+                          event_id: item.eventId,
+                        })
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
                   </Item>
                 ))}
               </CardContent>

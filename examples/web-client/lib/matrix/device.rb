@@ -11,9 +11,7 @@ module Matrix
 
     SESSION_DUMP = "megolm_sessions"
 
-    OTK_TARGET = 50
-
-    ATTEMPTS = 4
+    DEVICE = "olm_device"
 
     module Crypto
       module_function
@@ -79,19 +77,45 @@ module Matrix
     def machine
       credential = Models::Matrix::Credential.first
 
-      @machine ||= self.remember!(
-        Async::Matrix::E2EE::Machine.new(
-          user_id:   credential&.matrix_user_id.to_s,
-          device_id: credential&.device_id.to_s,
-          crypto:    self.crypto,
-          version:   Homeserver::VERSION,
+      @machine ||= self.adopt!(
+        self.remember!(
+          Async::Matrix::E2EE::Machine.new(
+            user_id:   credential&.matrix_user_id.to_s,
+            device_id: credential&.device_id.to_s,
+            crypto:    self.crypto,
+            version:   Homeserver::VERSION,
+          ),
         ),
       )
+    end
+
+    def adopt!(machine)
+      Models::Matrix::SecretsInbox.all.each do |row|
+        machine.secrets.accept(row.secret_name, row.secret)
+
+        if Matrix::Crypto::CROSS_SIGNING.include?(row.secret_name)
+          machine.accept_cross_signing_secret(row.secret_name, row.secret)
+        end
+      end
+
+      machine
     end
 
     def forget!
       @crypto = nil
       @machine = nil
+    end
+
+    def adopted!(device_id)
+      unless Models::Matrix::KV[DEVICE] == device_id
+        Models::Matrix::KV.unset!(OLM_DUMP)
+        Models::Matrix::KV.unset!(SESSION_DUMP)
+
+        Models::Matrix::KV.unset!(Models::Matrix::KV::SYNC_TOKEN)
+        Models::Matrix::KV.set!(DEVICE, device_id)
+
+        self.forget!
+      end
     end
 
     def state
@@ -109,47 +133,57 @@ module Matrix
 
     def publish_keys!(client)
       machine = self.machine
+      target = machine.crypto.one_time_key_target
 
-      answer = client.keys.upload_keys(device_keys: machine.device_keys)
+      machine.crypto.generate_one_time_keys(target)
+      machine.crypto.generate_fallback_key
 
-      self.persist!
+      answer = client.keys.upload_keys(
+        device_keys:   machine.device_keys,
+        one_time_keys: machine.signed_one_time_keys,
+        fallback_keys: machine.signed_fallback_key,
+      )
 
-      row = self.state
-      row.set(keys_published: true)
-      row.save_changes(validate: false)
-
-      self.publish_one_time_keys!(client)
+      self.published!(answer, keys_published: true)
 
       answer
     end
 
-    def publish_one_time_keys!(client, attempts: ATTEMPTS)
-      machine = self.machine
+    def replace_fallback_key!(client, listed)
+      unless listed.nil? || listed.include?("signed_curve25519")
+        machine = self.machine
 
-      machine.crypto.generate_one_time_keys(OTK_TARGET)
+        machine.crypto.generate_fallback_key
+        client.keys.upload_keys(fallback_keys: machine.signed_fallback_key)
+        self.persist!
 
-      answer = client.keys.upload_keys(one_time_keys: machine.signed_one_time_keys)
-
-      self.spent!
-
-      self.state.set(otk_count: answer.count("signed_curve25519")).save_changes(validate: false)
-
-      answer
-    rescue Async::Matrix::RequestError => error
-      if attempts > 1 && error.message.include?("already exists")
-        Console.warn(self, "The server holds a key under an ID this device just minted.", attempts: attempts)
-
-        self.spent!
-
-        self.publish_one_time_keys!(client, attempts: attempts - 1)
-      else
-        raise
+        Console.info(self, "Replaced the fallback key, which had been claimed.")
       end
     end
 
-    def spent!
+    def top_up_keys!(client, held)
+      machine = self.machine
+      target = machine.crypto.one_time_key_target
+
+      if held < target / 2
+        machine.crypto.generate_one_time_keys(target - held)
+
+        answer = client.keys.upload_keys(one_time_keys: machine.signed_one_time_keys)
+
+        Console.info(self, "Topped up the one time keys.", held: held, now: answer.count("signed_curve25519"))
+        self.published!(answer)
+
+        answer
+      end
+    end
+
+    def published!(answer, **fields)
       self.crypto.published_one_time_keys!
       self.persist!
+
+      row = self.state
+      row.set(otk_count: answer.count("signed_curve25519"), **fields)
+      row.save_changes(validate: false)
     end
 
     def published?

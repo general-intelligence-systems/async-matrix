@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/invite_request.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # Knocks waiting on a decision, which is what m.room.member with membership knock produces.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -63,7 +61,18 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    user_id = params["user_id"].to_s
+
+    case params["action"].to_s
+    in "invite"
+      Matrix::RoomActions.invite(room_id!, user_id)
+    in "kick"
+      Matrix::RoomActions.kick(room_id!, user_id, params["reason"])
+    else
+      halt(400, "matrix: no such action\n")
+    end
+  end
 end
 
 __END__
@@ -89,7 +98,7 @@ export default function MatrixRoomRequests({
 }) {
   const encoded = encodeURIComponent(roomId)
   const act = (action: string, userId: string) =>
-    router.post(`/matrix/rooms/${encoded}/members`, { action, user_id: userId }, { preserveScroll: true })
+    router.post(`/matrix/rooms/${encoded}/requests`, { action, user_id: userId })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

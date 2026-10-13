@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/user_session/
 #
-# NOT IMPLEMENTED.
-#
 # One of our devices: rename, verify, or sign out.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #

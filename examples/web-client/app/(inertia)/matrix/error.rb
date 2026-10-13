@@ -4,8 +4,6 @@
 #
 # Fractal: error_page.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # The window state Fractal shows when a session exists but cannot be opened. Here it is a page the layout redirects to, since Expo has no +error convention.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -79,12 +77,27 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  case params["action"].to_s
+  in "dismiss"
+    session.delete(:matrix_error)
+    redirect("/matrix", 303)
+  in "sign_out"
+    credential = Models::Matrix::Credential.first
+
+    unless credential.nil?
+      Matrix::Session.forget!(credential)
+    end
+
+    session.delete(:matrix_error)
+    redirect("/matrix/login", 303)
+  else
+    halt(400, "matrix: no such action\n")
+  end
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head } from "@inertiajs/react"
 import { TriangleAlert } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -107,10 +120,26 @@ export default function MatrixError({ message }: { message: string | null }) {
         </EmptyHeader>
 
         <div className="flex gap-2">
-          <Button render={<Link href="/matrix" />}>Try Again</Button>
-          <Button variant="outline" render={<Link href="/matrix/login" />}>
-            Log in again
-          </Button>
+          <Form action="/matrix/error" method="post">
+            {({ processing }) => (
+              <>
+                <input type="hidden" name="action" value="dismiss" />
+                <Button type="submit" disabled={processing}>
+                  Try Again
+                </Button>
+              </>
+            )}
+          </Form>
+          <Form action="/matrix/error" method="post">
+            {({ processing }) => (
+              <>
+                <input type="hidden" name="action" value="sign_out" />
+                <Button type="submit" variant="outline" disabled={processing}>
+                  Log in again
+                </Button>
+              </>
+            )}
+          </Form>
         </div>
       </Empty>
     </div>

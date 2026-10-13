@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/encryption_page/
 #
-# NOT IMPLEMENTED.
-#
 # Cross-signing and recovery: SessionSecurity's crypto_identity_state,
 # verification_state and recovery_state, over matrix_user_identities and
 # matrix_secrets_inbox.

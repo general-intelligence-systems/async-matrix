@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/create_direct_chat_dialog/
 #
-# NOT IMPLEMENTED.
-#
 # Start a DM: user search, then /createRoom with is_direct and the m.direct
 # account-data update.
 # ── Fractal's widget tree ──────────────────────────────────────────────────

@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/safety_page/ignored_users_subpage/
 #
-# NOT IMPLEMENTED.
-#
 # The m.ignored_user_list, as a list you can remove from.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -65,7 +63,14 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    case params["action"].to_s
+    in "unignore"
+      Matrix::RoomActions.unignore_user(params["user_id"].to_s)
+    else
+      halt(400, "matrix: no such action\n")
+    end
+  end
 end
 
 __END__
@@ -125,11 +130,10 @@ export default function MatrixSettingsIgnored({
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      router.post(
-                        "/matrix/settings/safety",
-                        { action: "unignore", user_id: user.userId },
-                        { preserveScroll: true },
-                      )
+                      router.post("/matrix/settings/safety/ignored", {
+                        action: "unignore",
+                        user_id: user.userId,
+                      })
                     }
                   >
                     Stop ignoring

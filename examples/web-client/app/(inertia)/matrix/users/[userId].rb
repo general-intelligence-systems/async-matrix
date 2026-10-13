@@ -4,8 +4,6 @@
 #
 # Fractal: components/dialogs/user_profile.blp -> session/user_sessions_list UserPage
 #
-# NOT IMPLEMENTED.
-#
 # One user, SESSION-SCOPED rather than room-scoped -- Fractal opens this from
 # six places (message row, reaction popover, read receipts, mention pill,
 # event properties, the session view) with no room argument. Reads

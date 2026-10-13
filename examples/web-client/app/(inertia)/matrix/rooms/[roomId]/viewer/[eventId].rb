@@ -4,8 +4,6 @@
 #
 # Fractal: session_view/media_viewer.{blp,rs}
 #
-# NOT IMPLEMENTED.
-#
 # One image or video at full size, reached from the timeline or from a history viewer.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
@@ -63,13 +61,20 @@ get "/" do
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  act! do
+    case params["action"].to_s
+    in "redact"
+      Matrix::RoomActions.redact(room_id!, params["eventId"].to_s, params["reason"])
+    else
+      halt(400, "matrix: no such action\n")
+    end
+  end
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft, Download } from "lucide-react"
+import { Head, Link, router } from "@inertiajs/react"
+import { ArrowLeft, Download, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ShellHeader } from "@/components/admin/slots"
@@ -118,6 +123,18 @@ export default function MatrixRoomViewer({
             <Download className="size-4" />
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={event.media ? undefined : "ms-auto"}
+          onClick={() =>
+            router.post(`/matrix/rooms/${encoded}/viewer/${encodeURIComponent(event.eventId)}`, {
+              action: "redact",
+            })
+          }
+        >
+          <Trash2 className="size-4" />
+        </Button>
       </ShellHeader>
 
       <div className="flex min-h-0 flex-1 items-center justify-center p-4">

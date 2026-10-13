@@ -118,6 +118,20 @@ module Matrix
         raise(Error, "no such verification")
     end
 
+    def known?(flow_id)
+      !Models::Matrix::VerificationFlow.first(flow_id: flow_id).nil?
+    end
+
+    def arriving(flow_id)
+      if self.known?(flow_id)
+        yield
+      else
+        Console.warn(self, "An event arrived for a verification this session does not know.", flow: flow_id)
+
+        nil
+      end
+    end
+
     def own_user_id
       Models::Matrix::Credential.first&.matrix_user_id.to_s
     end
@@ -150,6 +164,8 @@ module Matrix
       if devices.empty?
         raise Error, "that user has no sessions to verify"
       end
+
+      self.refresh_keys!(user_id)
 
       self.send!(REQUEST, user_id, devices, {
         from_device: self.own_device_id,
@@ -255,17 +271,19 @@ module Matrix
     end
 
     def accepted!(flow_id, content)
-      flow = self.flow!(flow_id)
+      self.arriving(flow_id) do
+        flow = self.flow!(flow_id)
 
-      flow.set(
-        key_agreement_protocol: content[:key_agreement_protocol],
-        hash_method: content[:hash_method],
-        message_authentication_code: content[:message_authentication_code],
-        commitment: content[:commitment],
-        state: Models::Matrix::VerificationFlow::ACCEPTED,
-      ).save_changes(validate: false)
+        flow.set(
+          key_agreement_protocol: content[:key_agreement_protocol],
+          hash_method: content[:hash],
+          message_authentication_code: content[:message_authentication_code],
+          commitment: content[:commitment],
+          state: Models::Matrix::VerificationFlow::ACCEPTED,
+        ).save_changes(validate: false)
 
-      self.send_key!(flow_id)
+        self.send_key!(flow_id)
+      end
     end
 
     def send_key!(flow_id)
@@ -281,10 +299,12 @@ module Matrix
     end
 
     def receive_key!(flow_id, their_key)
-      self.flow!(flow_id).set(their_key: their_key).save_changes(validate: false)
-      self.hold(flow_id, their_key: their_key)
+      self.arriving(flow_id) do
+        self.flow!(flow_id).set(their_key: their_key).save_changes(validate: false)
+        self.hold(flow_id, their_key: their_key)
 
-      self.establish!(flow_id)
+        self.establish!(flow_id)
+      end
     end
 
     def establish!(flow_id)
@@ -366,39 +386,94 @@ module Matrix
     end
 
     def receive_mac!(flow_id, content)
-      flow = self.flow!(flow_id)
-      held = self.live(flow_id)
-      established = held && held[:established]
+      self.arriving(flow_id) do
+        flow = self.flow!(flow_id)
+        held = self.live(flow_id)
+        established = held && held[:established]
 
-      if established.nil?
-        self.cancel!(flow_id, code: "m.invalid_message")
-      else
-        base = self.mac_info(flow, ours: false)
-        claimed = (content[:mac] || {}).to_h{|name, value| [name.to_s, value]}
+        if established.nil?
+          self.cancel!(flow_id, code: "m.invalid_message")
+        else
+          self.refresh_keys!(flow.other_user_id)
 
-        unless self.consistent?(established, claimed, content[:keys].to_s, base)
-          self.cancel!(flow_id, code: "m.key_mismatch")
+          base = self.mac_info(flow, ours: false)
+          claimed = (content[:mac] || {}).to_h{|name, value| [name.to_s, value]}
 
-          raise Error, "the keys that session sent are not the ones it signed"
+          believed = claimed.to_h{|name, _| [name, self.believed_key(flow, name)]}
+
+          unless self.consistent?(established, claimed, believed, content[:keys].to_s, base)
+            self.cancel!(flow_id, code: "m.key_mismatch")
+
+            raise Error, "the keys that session sent are not the ones it signed"
+          end
+
+          flow.set(their_keys: believed).save_changes(validate: false)
+          self.settle!(flow_id)
         end
-
-        flow.set(their_keys: claimed).save_changes(validate: false)
-        self.settle!(flow_id)
       end
     end
 
-    def consistent?(established, claimed, over, base)
+    def consistent?(established, claimed, believed, over, base)
       established.verify_mac(claimed.keys.sort.join(","), "#{base}KEY_IDS", over) &&
         claimed.all? do |name, value|
-          established.verify_mac(name.split(":", 2).last, "#{base}#{name}", value)
+          established.verify_mac(believed[name].to_s, "#{base}#{name}", value)
         end
     rescue StandardError
       false
     end
 
+    def refresh_keys!(user_id)
+      answer = Crypto.with_client do |client, _credential|
+        client.keys.query_keys({user_id => []})
+      end
+
+      answer.tap do |queried|
+        Device.machine.accept_queried_keys(queried)
+
+        queried.devices_of(user_id).each do |device_id, keys|
+          self.remember_device!(user_id, device_id.to_s, keys)
+        end
+
+        self.remember_master!(user_id, queried.master_keys[user_id.to_sym])
+      end
+    end
+
+    def remember_device!(user_id, device_id, keys)
+      row = Models::Matrix::Device.first(matrix_user_id: user_id, device_id: device_id) ||
+        Models::Matrix::Device.new(matrix_user_id: user_id, device_id: device_id)
+
+      row.set(
+        identity_key: keys.dig(:keys, :"curve25519:#{device_id}"),
+        fingerprint:  keys.dig(:keys, :"ed25519:#{device_id}"),
+      )
+      row.save_changes(validate: false)
+    end
+
+    def remember_master!(user_id, master)
+      unless master.nil?
+        row = Models::Matrix::UserIdentity.first(matrix_user_id: user_id) ||
+          Models::Matrix::UserIdentity.new(matrix_user_id: user_id, own: user_id == self.own_user_id)
+
+        row.set(master_key: master[:keys].to_h.values.first).save_changes(validate: false)
+      end
+    end
+
+    def believed_key(flow, name)
+      id = name.split(":", 2).last
+      device = Models::Matrix::Device.first(matrix_user_id: flow.other_user_id, device_id: id)
+
+      if device&.ed25519.to_s.empty?
+        id
+      else
+        device.ed25519
+      end
+    end
+
     def done!(flow_id)
-      self.flow!(flow_id)
-      self.settle!(flow_id)
+      self.arriving(flow_id) do
+        self.flow!(flow_id)
+        self.settle!(flow_id)
+      end
     end
 
     def settle!(flow_id)
@@ -417,8 +492,7 @@ module Matrix
         .where(matrix_user_id: flow.other_user_id, device_id: flow.other_device_id)
         .update(trust_state: Models::Matrix::Device::VERIFIED)
 
-      master = flow.their_keys.to_h.keys.map{|name| name.split(":", 2).last}
-      signatures = Device.machine.sign_verified(master)
+      signatures = Device.machine.sign_verified(flow.their_keys.to_h.values)
 
       unless signatures.empty?
         Crypto.with_client do |client, _credential|
@@ -599,22 +673,24 @@ module Matrix
     end
 
     def reciprocated!(flow_id, content)
-      flow = self.flow!(flow_id)
-      held = self.live(flow_id)
-      ours = held && held[:qr_secret]
-      theirs = Base64.urlsafe_decode64(content[:secret].to_s)
+      self.arriving(flow_id) do
+        flow = self.flow!(flow_id)
+        held = self.live(flow_id)
+        ours = held && held[:qr_secret]
+        theirs = Base64.urlsafe_decode64(content[:secret].to_s)
 
-      if ours.nil? || !OpenSSL.secure_compare(ours, theirs)
-        self.cancel!(flow_id, code: "m.key_mismatch")
+        if ours.nil? || !OpenSSL.secure_compare(ours, theirs)
+          self.cancel!(flow_id, code: "m.key_mismatch")
 
-        raise Error, "that session did not scan this code"
+          raise Error, "that session did not scan this code"
+        end
+
+        flow.set(
+          state: Models::Matrix::VerificationFlow::CONFIRMED,
+          verification_method: RECIPROCATE,
+          other_device_id: content[:from_device] || flow.other_device_id,
+        ).save_changes(validate: false)
       end
-
-      flow.set(
-        state: Models::Matrix::VerificationFlow::CONFIRMED,
-        verification_method: RECIPROCATE,
-        other_device_id: content[:from_device] || flow.other_device_id,
-      ).save_changes(validate: false)
     end
 
     def confirm_qr!(flow_id)

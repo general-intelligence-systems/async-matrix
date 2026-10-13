@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/mod + notifications_page.blp
 #
-# NOT IMPLEMENTED.
-#
 # Push rules: the global setting (All | DirectAndMentions | MentionsOnly),
 # keywords, and the per-room overrides in matrix_rooms.notification_mode.
 # ── Fractal's widget tree ──────────────────────────────────────────────────

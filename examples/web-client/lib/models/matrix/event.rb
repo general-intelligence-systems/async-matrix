@@ -137,21 +137,21 @@ module Models
 
       private
 
-        def presence(value)
-          if value.to_s.empty?
-            nil
-          else
-            value
-          end
+      def presence(value)
+        if value.to_s.empty?
+          nil
+        else
+          value
         end
+      end
 
-        def truncate(string, length)
-          if string.length <= length
-            string
-          else
-            "#{string[0, length - 3]}..."
-          end
+      def truncate(string, length)
+        if string.length <= length
+          string
+        else
+          "#{string[0, length - 3]}..."
         end
+      end
     end
   end
 end

@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/general_page/
 #
-# NOT IMPLEMENTED.
-#
 # The account: display name, avatar, and the homeserver/device this app is
 # logged in as (matrix_credentials).
 # ── Fractal's widget tree ──────────────────────────────────────────────────

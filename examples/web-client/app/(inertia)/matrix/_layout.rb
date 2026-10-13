@@ -291,17 +291,22 @@ helpers do
   end
 
   def store_session(base_url, answer)
-    credential = Models::Matrix::Credential.first || Models::Matrix::Credential.new
+    existing = Models::Matrix::Credential.first || Models::Matrix::Credential.new
 
-    credential.set(
-      homeserver_url: answer["well_known"]&.dig("m.homeserver", "base_url") || base_url,
-      matrix_user_id: answer["user_id"],
-      device_id:      answer["device_id"],
-      access_token:   answer["access_token"],
-      refresh_token:  answer["refresh_token"],
-      expires_at:     answer["expires_in_ms"] ? (Time.now.to_i * 1000) + answer["expires_in_ms"].to_i : nil,
-    )
-    credential.save_changes
+    existing.tap do |credential|
+      credential.set(
+        homeserver_url: answer["well_known"]&.dig("m.homeserver", "base_url") || base_url,
+        matrix_user_id: answer["user_id"],
+        device_id:      answer["device_id"],
+        access_token:   answer["access_token"],
+        refresh_token:  answer["refresh_token"],
+        expires_at:     answer["expires_in_ms"] ? (Time.now.to_i * 1000) + answer["expires_in_ms"].to_i : nil,
+      )
+      credential.save_changes
+
+      # A session which has not published its keys cannot be sent to, so this is part of signing in.
+      Matrix::Crypto.prepare!(credential)
+    end
   end
 end
 
@@ -337,8 +342,7 @@ end
 SECTIONS = [
   ["invited",      "Invites",      ->(rooms){rooms.where(membership: "invite")}],
   ["favorite",     "Favourites",   ->(rooms){rooms.joined.where(favourite: true)}],
-  ["normal",       "Rooms",        ->(rooms){
-    rooms.joined.where(favourite: false, low_priority: false)
+  ["normal",       "Rooms",        ->(rooms){rooms.joined.where(favourite: false, low_priority: false)
   }],
   ["low-priority", "Low priority", ->(rooms){rooms.joined.where(low_priority: true)}],
   ["left",         "Left",         ->(rooms){rooms.where(membership: "leave")}],

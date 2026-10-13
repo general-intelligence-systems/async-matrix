@@ -10,7 +10,7 @@ export function usePoll(active: boolean, only: string[] = [], interval = 2000) {
     }
 
     const timer = window.setInterval(() => {
-      router.reload({ only, preserveScroll: true, preserveState: true })
+      router.reload({ only })
     }, interval)
 
     return () => window.clearInterval(timer)

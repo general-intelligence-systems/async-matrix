@@ -4,8 +4,6 @@
 #
 # Fractal: account_settings/safety_page/ (+ ignored_users_subpage/)
 #
-# NOT IMPLEMENTED.
-#
 # The ignored user list, which lives in m.ignored_user_list -- so
 # matrix_account_data, which is why it was unreachable before.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
