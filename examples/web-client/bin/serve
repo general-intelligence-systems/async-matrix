@@ -27,6 +27,13 @@
 #      DATABASE_URL
 #              Overrides both, with a Sequel connection string.
 #
+#      RUBY_FIBER_VM_STACK_SIZE, RUBY_FIBER_MACHINE_STACK_SIZE
+#              Set here before the VM starts, because the router is one Sinatra app per route
+#              file chained as middleware and an unmatched request walks the whole chain. Ruby's
+#              defaults (128K and 256K) run out part way down a tree this size, which surfaces
+#              as SystemStackError on the deeper routes rather than as a 404. Export either to
+#              override.
+#
 # SEE ALSO
 #      bin/dev, bin/vite, config/sequel.rb
 #
@@ -36,5 +43,8 @@ set -o errexit
 set -o nounset
 
 cd "$(dirname "$0")/.."
+
+export RUBY_FIBER_VM_STACK_SIZE="${RUBY_FIBER_VM_STACK_SIZE:-2097152}"
+export RUBY_FIBER_MACHINE_STACK_SIZE="${RUBY_FIBER_MACHINE_STACK_SIZE:-16777216}"
 
 exec bundle exec ruby server.rb

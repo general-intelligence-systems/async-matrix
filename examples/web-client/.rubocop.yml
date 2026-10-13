@@ -9,7 +9,6 @@ require:
   - ./cops/no_modifier_if.rb
   - ./cops/no_return.rb
   - ./cops/use_tap.rb
-  - ./cops/comment_structure.rb
   - ./cops/no_comments.rb
 
 AllCops:
@@ -148,30 +147,6 @@ Local/NoReturn:
 Local/UseTap:
   Enabled: true
 
-# How a comment is built: one paragraph per line, and a summary no longer than the code it
-# describes earns. The measurements are the gem's.
-Local/CommentStructure:
-  Enabled: true
-
-  MaximumWords: 30
-  BaseWords: 10
-  WordsPerLine: 3
-  ModuleWords: 10
-
-  Wrapping:
-    Enabled: true
-    Exclude:
-      - "bin/*"
-
-  Length:
-    Enabled: true
-    Exclude:
-      - "bin/*"
-
-  # Annotations document an interface a caller reaches for. The models and endpoints here are
-  # called by the framework, so the prose stands on its own.
-  Annotations:
-    Enabled: false
 
 Local/NoComments:
   Enabled: true

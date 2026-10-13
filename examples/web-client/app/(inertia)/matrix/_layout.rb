@@ -200,6 +200,20 @@
 #
 # `normal` is the default section: joined, and neither tagged. The partition is
 # total, so a room appears in exactly one.
+# Fractal's window is a four-state stack -- Loading, Login, Session, Error (window.rs WindowPage) -- and
+# which one shows is decided by whether a usable session exists, not by where you navigated.
+#
+# This is that decision. Everything under /matrix needs a device whose tokens still work, so without
+# one the only reachable screen is the login flow itself. A layout's `before` is class-level Sinatra
+# DSL and reaches only the files below it, which is why it sits here and not in the root layout.
+PUBLIC = %r{\A/matrix/(login|callback|error)(/|\z)}
+
+before do
+  unless PUBLIC.match?(request.path_info) || Models::Matrix::Credential.first&.usable?
+    redirect("/matrix/login", 303)
+  end
+end
+
 SECTIONS = [
   ["invited",      "Invites",      ->(rooms){rooms.where(membership: "invite")}],
   ["favorite",     "Favourites",   ->(rooms){rooms.joined.where(favourite: true)}],
