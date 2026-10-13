@@ -162,11 +162,13 @@ get "/" do
       homeserver:  credential&.homeserver_url,
       displayName: profile&.display_name,
       avatarUrl:   profile&.avatar_url,
+      manageUrl:   Matrix::Session.oauth_client(credential)&.fetch("manage", nil),
     },
     device:  {
       syncing:       !Models::Matrix::KV.sync_token.nil?,
       keysPublished: state&.keys_published || false,
       otkCount:      state&.otk_count.to_i,
+      sessionCount:  Models::Matrix::Device.where(matrix_user_id: credential&.matrix_user_id).count,
     },
   )
 end
@@ -210,6 +212,7 @@ export default function MatrixSettings({
     homeserver: string | null
     displayName: string | null
     avatarUrl: string | null
+  manageUrl: string | null
   }
   device: { syncing: boolean; keysPublished: boolean; otkCount: number }
 }) {
@@ -255,7 +258,7 @@ export default function MatrixSettings({
 
               <Form action="/matrix/settings" method="post" className="flex flex-col gap-3">
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="display_name">Display name</Label>
+                  <Label htmlFor="display_name">Name</Label>
                   <Input
                     id="display_name"
                     name="display_name"
@@ -266,12 +269,54 @@ export default function MatrixSettings({
                   Save
                 </Button>
               </Form>
+
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Matrix User ID</span>
+                <code className="truncate font-mono text-xs">{account.userId ?? "—"}</code>
+              </div>
+
+              <Item render={<Link href="/matrix/settings/devices" />}>
+                <ItemContent>
+                  <ItemTitle>Sessions</ItemTitle>
+                  <ItemDescription>{device.sessionCount} known</ItemDescription>
+                </ItemContent>
+              </Item>
+            </CardContent>
+          </Card>
+
+          {/* Fractal's General page puts these four in one group of ButtonRows. Manage Account
+              opens the account management URL the homeserver advertises, so it is only there
+              when there is one. */}
+          <Card>
+            <CardContent className="flex flex-col gap-1 pt-6">
+              <Item render={<Link href="/matrix/settings/password" />}>
+                <ItemContent>
+                  <ItemTitle>Change Password</ItemTitle>
+                </ItemContent>
+              </Item>
+              {account.manageUrl && (
+                <Item render={<a href={account.manageUrl} target="_blank" rel="noreferrer" />}>
+                  <ItemContent>
+                    <ItemTitle>Manage Account</ItemTitle>
+                  </ItemContent>
+                </Item>
+              )}
+              <Item render={<Link href="/matrix/settings/logout" />}>
+                <ItemContent>
+                  <ItemTitle>Log Out</ItemTitle>
+                </ItemContent>
+              </Item>
+              <Item render={<Link href="/matrix/settings/deactivate" />}>
+                <ItemContent>
+                  <ItemTitle className="text-destructive">Deactivate Account</ItemTitle>
+                </ItemContent>
+              </Item>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">This device</CardTitle>
+              <CardTitle className="text-sm">Advanced Information</CardTitle>
               <CardDescription>
                 The server-side device this app syncs and sends as.
               </CardDescription>
@@ -282,7 +327,7 @@ export default function MatrixSettings({
                 <code className="truncate font-mono text-xs">{account.homeserver ?? "—"}</code>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Device ID</span>
+                <span className="text-muted-foreground">Local Session ID</span>
                 <code className="truncate font-mono text-xs">{account.deviceId ?? "—"}</code>
               </div>
               <div className="flex items-center justify-between gap-4">

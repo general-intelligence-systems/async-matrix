@@ -61,6 +61,9 @@ get "/" do
 
   render(
     "matrix/settings/notifications",
+    account:   Models::Matrix::AccountData
+      .content_for(event_type: Models::Matrix::AccountData::PUSH_RULES).to_h.fetch("enabled", true),
+    session:   Models::Matrix::DeviceState.first&.keys_published || false,
     global:    "all",
     # The content rules a person added, as opposed to the server's own, which
     # are the ones whose rule_id starts with a dot.
@@ -94,6 +97,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -107,9 +111,9 @@ import { ShellHeader } from "@/components/admin/slots"
 
 // NotificationsGlobalSetting, Fractal's three.
 const GLOBAL = [
-  { value: "all", label: "All messages", hint: "Every message in every room." },
-  { value: "direct", label: "Direct chats and mentions", hint: "Quiet in group rooms." },
-  { value: "mentions", label: "Mentions and keywords only", hint: "Nothing else gets through." },
+  { value: "all", label: "All messages in all rooms" },
+  { value: "direct", label: "All messages in direct chats, and mentions and keywords in all rooms" },
+  { value: "mentions", label: "Only mentions and keywords in all rooms" },
 ]
 
 // NotificationsRoomSetting, Fractal's four.
@@ -121,10 +125,14 @@ const ROOM_MODES = [
 ]
 
 export default function MatrixSettingsNotifications({
+  account,
+  session,
   global,
   keywords,
   overrides,
 }: {
+  account: boolean
+  session: boolean
   global: string
   keywords: string[]
   overrides: { roomId: string; title: string; mode: string }[]
@@ -142,9 +150,28 @@ export default function MatrixSettingsNotifications({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
+          {/* Fractal's first group is two switches with no group title: the account-wide toggle
+              is a push rule, the session one is local to this device. */}
+          <Card>
+            <CardContent className="flex flex-col gap-4 pt-6">
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="account_enabled" className="font-normal">
+                  Enable for This Account
+                </Label>
+                <Switch id="account_enabled" defaultChecked={account} />
+              </div>
+              <div className="flex items-center justify-between gap-4 border-t pt-4">
+                <Label htmlFor="session_enabled" className="font-normal">
+                  Enable for This Session
+                </Label>
+                <Switch id="session_enabled" defaultChecked={session} />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">What to notify about</CardTitle>
+              <CardTitle className="text-sm">Global</CardTitle>
               <CardDescription>The default for every room without its own setting.</CardDescription>
             </CardHeader>
             <CardContent>

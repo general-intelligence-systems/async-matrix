@@ -156,6 +156,7 @@ module Matrix
             "verifier"  => verifier.verifier,
             "device_id" => device_id,
             "issuer"    => server.metadata.issuer,
+            "manage"    => server.metadata.account_management_uri,
             "redirect"  => redirect_uri,
           }
         ensure

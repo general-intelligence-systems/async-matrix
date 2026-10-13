@@ -128,14 +128,14 @@ export default function MatrixRoomAddresses({
         <Link href={`/matrix/rooms/${encoded}/about`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Addresses</h1>
+        <h1 className="truncate text-sm font-medium">Edit Room Addresses</h1>
       </ShellHeader>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Published addresses</CardTitle>
+              <CardTitle className="text-sm">Public Addresses</CardTitle>
               <CardDescription>
                 The starred one is the canonical address, which is how the room names itself.
               </CardDescription>
@@ -178,7 +178,7 @@ export default function MatrixRoomAddresses({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Add an address</CardTitle>
+              <CardTitle className="text-sm">Add Public Address</CardTitle>
               <CardDescription>
                 The local part only. The server suffix is added for you.
               </CardDescription>

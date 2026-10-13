@@ -54,7 +54,7 @@ get "/" do
 
     # The registered client outlives the flow: renewing and revoking an OAuth token both name the
     # client which was issued it, where a native session asks with the refresh token alone.
-    Matrix::Session.remember_oauth_client!(base_url, pending["client_id"], pending["issuer"])
+    Matrix::Session.remember_oauth_client!(base_url, pending["client_id"], pending["issuer"], pending["manage"])
 
     store_session(base_url, answer)
 

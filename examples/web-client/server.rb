@@ -419,6 +419,23 @@ def apply_room!(registry, room_id, payload, membership, me)
   room.save_changes(validate: false)
 end
 
+def apply_devices(credential)
+  rows = Matrix::Session.devices(credential)
+
+  unless rows.nil?
+    rows.each do |device|
+      row = upsert(M::Device, {matrix_user_id: credential.matrix_user_id, device_id: device[:device_id].to_s})
+
+      row.set(
+        display_name: device[:display_name],
+        last_seen_ts: device[:last_seen_ts],
+        last_seen_ip: device[:last_seen_ip],
+      )
+      row.save_changes(validate: false)
+    end
+  end
+end
+
 def apply_batch(batch, me)
   registry = Events.registry(Matrix::Homeserver::VERSION)
 
@@ -437,6 +454,10 @@ def apply_batch(batch, me)
 
     batch.changed_devices.each do |user_id|
       upsert(M::TrackedUser, {matrix_user_id: user_id}).set(dirty: true).save_changes(validate: false)
+    end
+
+    if batch.changed_devices.map(&:to_s).include?(me)
+      apply_devices(M::Credential.first)
     end
 
     batch.left_devices.each do |user_id|
@@ -472,6 +493,8 @@ def sync_loop
           since = M::KV.sync_token
 
           Console.info(self, "Starting sync.", user_id: credential.matrix_user_id, resumed: !since.nil?)
+
+          apply_devices(credential)
 
           sync = client.sync(since: since, timeout: since.nil? ? 0 : SYNC_TIMEOUT)
 

@@ -195,7 +195,7 @@ export default function MatrixEvent({
         <Link href={`/matrix/rooms/${encoded}`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Event</h1>
+        <h1 className="truncate text-sm font-medium">Event Properties</h1>
         <Badge variant="secondary" size="sm" className="ms-auto font-mono">
           {event.type}
         </Badge>
@@ -205,7 +205,7 @@ export default function MatrixEvent({
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Event</CardTitle>
+              <CardTitle className="text-sm">Event Properties</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="mb-3 flex items-center gap-2">
@@ -230,7 +230,8 @@ export default function MatrixEvent({
               )}
 
               <Field label="Event ID" value={event.eventId} />
-              <Field label="Room" value={roomId} />
+              <Field label="Room ID" value={roomId} />
+              <Field label="Sender ID" value={event.sender} />
               <Field label="Timestamp" value={new Date(event.ts).toLocaleString()} />
               {event.stateKey !== null && <Field label="State key" value={event.stateKey || '""'} />}
               {event.edited && <Field label="Edited" value="yes" />}
@@ -243,7 +244,7 @@ export default function MatrixEvent({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Source</CardTitle>
+              <CardTitle className="text-sm">View Source</CardTitle>
             </CardHeader>
             <CardContent>
               <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 font-mono text-xs">

@@ -544,6 +544,7 @@ get "/" do
       direct:      room.direct,
       membership:  room.membership,
       memberCount: room.joined_member_count.to_i,
+      canSend:     room.power_level_of(me).to_i >= (room.power_levels["events_default"] || 0).to_i,
       # Who invited us: the sender of our own m.room.member event, which is the
       # only place an invite carries it.
       invitedBy:   Models::Matrix::RoomState.first(
@@ -575,6 +576,12 @@ get "/" do
     # Who we are, so the view can align our own messages to the end the way
     # Message's align="end" expects.
     selfId: me,
+    can:    {
+      send:        room.power_level_of(me).to_i >= (room.power_levels["events_default"] || 0).to_i,
+      redactOwn:   room.power_level_of(me).to_i >= (room.power_levels.dig("events", "m.room.redaction") || 0).to_i,
+      redactOther: room.power_level_of(me).to_i >= (room.power_levels["redact"] || 50).to_i,
+      joined:      room.membership == "join",
+    },
   )
 end
 
@@ -636,10 +643,12 @@ end
 __END__
 
 import { Form, Head, Link, router } from "@inertiajs/react"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import {
   ArrowLeft,
   Lock,
+  MoreHorizontal,
+  X,
   Paperclip,
   Send,
   Settings2,
@@ -650,6 +659,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/reui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import {
   InputGroup,
@@ -686,10 +702,18 @@ type Room = {
   direct: boolean
   membership: string
   memberCount: number
+  canSend: boolean
   invitedBy: string | null
 }
 
 type Reaction = { key: string; count: number; mine: boolean }
+
+type Permissions = {
+  send: boolean
+  redactOwn: boolean
+  redactOther: boolean
+  joined: boolean
+}
 
 type Event = {
   eventId: string
@@ -699,6 +723,7 @@ type Event = {
   senderAvatar: string | null
   body: string | null
   msgtype: string | null
+  transactionId?: string | null
   media: string | null
   mimetype: string | null
   size: number | null
@@ -786,9 +811,12 @@ function MessageRow({
   event: Event
   own: boolean
   showHeader: boolean
+  roomId: string
+  can: Permissions
+  onCompose: (mode: "reply" | "edit", event: Event) => void
 }) {
   return (
-    <Message align={own ? "end" : "start"}>
+    <Message align={own ? "end" : "start"} className="group">
       {/* The avatar slot is held even when the header is hidden, so a run of
           messages from one sender stays aligned with the first. */}
       <MessageAvatar className={cn(!showHeader && "invisible")}>
@@ -862,13 +890,162 @@ function MessageRow({
             <TooltipContent>{new Date(event.ts).toLocaleString()}</TooltipContent>
           </Tooltip>
           {event.edited && <span className="ml-1">(edited)</span>}
+          <EventMenu
+            event={event}
+            roomId={roomId}
+            own={own}
+            canRedactOwn={can.redactOwn}
+            canRedactOther={can.redactOther}
+            canSend={can.send}
+            joined={can.joined}
+            onCompose={onCompose}
+          />
         </MessageFooter>
       </MessageContent>
     </Message>
   )
 }
 
-function Timeline({ events, selfId }: { events: Event[]; selfId: string }) {
+// Fractal's per-event context menu (event_actions/context_menu.blp), with the visibility rules
+// from event_actions/group.rs. Its "Forward" and "Select" items are omitted: the blueprint lists
+// them but group.rs installs no handler, so GTK never shows them either.
+//
+// `pending` is an event with no event id yet -- still in the send queue -- and the only thing which
+// can be done to one is discard it.
+function EventMenu({
+  event,
+  roomId,
+  own,
+  canRedactOwn,
+  canRedactOther,
+  canSend,
+  joined,
+  onCompose,
+}: {
+  event: Event
+  roomId: string
+  own: boolean
+  canRedactOwn: boolean
+  canRedactOther: boolean
+  canSend: boolean
+  joined: boolean
+  onCompose: (mode: "reply" | "edit", event: Event) => void
+}) {
+  const encoded = encodeURIComponent(roomId)
+  const pending = !event.eventId
+  const act = (body: Record<string, unknown>) =>
+    router.post(`/matrix/rooms/${encoded}`, body, { preserveScroll: true })
+
+  const text = event.msgtype === "m.text" || event.msgtype === "m.emote" ||
+    event.msgtype === "m.notice" || event.msgtype === "m.location"
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="More Options"
+        render={
+          <Button variant="ghost" size="icon-xs" className="opacity-0 group-hover:opacity-100">
+            <MoreHorizontal className="size-3.5" />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align={own ? "end" : "start"}>
+        {pending ? (
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => act({ action: "cancel-send", transaction_id: event.transactionId })}
+          >
+            Discard
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem onClick={() => act({ action: "react", event_id: event.eventId, key: "👍" })}>
+              React
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCompose("reply", event)}>
+              Reply
+            </DropdownMenuItem>
+            {own && canSend && text && (
+              <DropdownMenuItem onClick={() => onCompose("edit", event)}>
+                Edit
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            {text && (
+              <DropdownMenuItem onClick={() => navigator.clipboard?.writeText(event.body ?? "")}>
+                Copy Text
+              </DropdownMenuItem>
+            )}
+            {event.media && event.msgtype === "m.image" && (
+              <DropdownMenuItem render={<a href={event.media} download={event.body ?? undefined} />}>
+                Save Image
+              </DropdownMenuItem>
+            )}
+            {event.media && event.msgtype === "m.video" && (
+              <DropdownMenuItem render={<a href={event.media} download={event.body ?? undefined} />}>
+                Save Video
+              </DropdownMenuItem>
+            )}
+            {event.media && event.msgtype === "m.audio" && (
+              <DropdownMenuItem render={<a href={event.media} download={event.body ?? undefined} />}>
+                Save Audio
+              </DropdownMenuItem>
+            )}
+            {event.media && event.msgtype === "m.file" && (
+              <DropdownMenuItem render={<a href={event.media} download={event.body ?? undefined} />}>
+                Save File
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={() =>
+                navigator.clipboard?.writeText(`https://matrix.to/#/${roomId}/${event.eventId}`)
+              }
+            >
+              Copy Message Link
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              render={
+                <Link href={`/matrix/rooms/${encoded}/events/${encodeURIComponent(event.eventId)}`} />
+              }
+            >
+              Properties
+            </DropdownMenuItem>
+            {joined && (
+              <DropdownMenuItem onClick={() => act({ action: "report", event_id: event.eventId })}>
+                Report…
+              </DropdownMenuItem>
+            )}
+            {((own && canRedactOwn) || canRedactOther) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => act({ action: "redact", event_id: event.eventId })}
+                >
+                  Remove
+                </DropdownMenuItem>
+              </>
+            )}
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function Timeline({
+  events,
+  selfId,
+  roomId,
+  can,
+  onCompose,
+}: {
+  events: Event[]
+  selfId: string
+  roomId: string
+  can: Permissions
+  onCompose: (mode: "reply" | "edit", event: Event) => void
+}) {
   if (events.length === 0) {
     return (
       <Empty className="flex-1">
@@ -922,6 +1099,9 @@ function Timeline({ events, selfId }: { events: Event[]; selfId: string }) {
                     event={event}
                     own={event.sender === selfId}
                     showHeader={!sameSender || newDay}
+                    roomId={roomId}
+                    can={can}
+                    onCompose={onCompose}
                   />
                 </MessageGroup>
               )
@@ -978,13 +1158,16 @@ export default function MatrixRoom({
   room,
   events,
   selfId,
+  can,
 }: {
   room: Room
   events: Event[]
   selfId: string
+  can: Permissions
 }) {
   const encoded = encodeURIComponent(room.roomId)
   const attachment = useRef<HTMLInputElement>(null)
+  const [composing, setComposing] = useState<{ mode: "reply" | "edit"; event: Event } | null>(null)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1022,9 +1205,52 @@ export default function MatrixRoom({
                 <span className="ml-1 tabular-nums">{room.memberCount}</span>
               )}
             </Button>
-          <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/matrix/rooms/${encoded}/about`} />}>
-              <Settings2 className="size-4" />
-            </Button>
+          {/* Fractal's Room Menu, with its items and order. Leave and Forget are a Form rather
+              than a Link because they act, and Forget only appears once the room has been left. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Room Menu"
+              render={
+                <Button variant="ghost" size="sm">
+                  <Settings2 className="size-4" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem render={<Link href={`/matrix/rooms/${encoded}/about`} />}>
+                Room Details
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href={`/matrix/rooms/${encoded}/invite`} />}>
+                Invite New Members…
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {room.membership === "leave" ? (
+                <DropdownMenuItem
+                  onClick={() =>
+                    router.post(`/matrix/rooms/${encoded}`, { action: "join" }, { preserveScroll: true })
+                  }
+                >
+                  Rejoin Room
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() =>
+                    router.post(`/matrix/rooms/${encoded}`, { action: "leave" }, { preserveScroll: true })
+                  }
+                >
+                  Leave Room
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() =>
+                  router.post(`/matrix/rooms/${encoded}`, { action: "forget" })
+                }
+              >
+                Forget Room
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </ShellHeader>
 
@@ -1034,12 +1260,42 @@ export default function MatrixRoom({
         <KnockPrompt room={room} />
       ) : (
         <>
-          <Timeline events={events} selfId={selfId} />
+          <Timeline
+            events={events}
+            selfId={selfId}
+            roomId={room.roomId}
+            can={can}
+            onCompose={(mode, event) => setComposing({ mode, event })}
+          />
 
           {/* MessageToolbar. Enter sends, shift+Enter is a newline, and the paperclip posts the
               file on its own as multipart -- an attachment is an upload then a message, so it
               cannot ride along with the text. */}
+          {room.canSend === false ? (
+            <div className="shrink-0 border-t p-3">
+              <p className="mx-auto max-w-3xl text-center text-sm text-muted-foreground">
+                You don’t have permission to send messages to this room
+              </p>
+            </div>
+          ) : (
           <div className="shrink-0 border-t p-3">
+            {composing && (
+              <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-md border px-3 py-1.5 text-xs">
+                <span className="font-medium">
+                  {composing.mode === "reply" ? "Replying to" : "Editing"}
+                </span>
+                <span className="truncate text-muted-foreground">{composing.event.body}</span>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="ms-auto"
+                  aria-label="Cancel"
+                  onClick={() => setComposing(null)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
+            )}
             <Form
               action={`/matrix/rooms/${encoded}`}
               method="post"
@@ -1049,9 +1305,16 @@ export default function MatrixRoom({
               {({ processing, submit }) => (
                 <InputGroup>
                   <input type="hidden" name="action" value="send" />
+                  {composing?.mode === "reply" && (
+                    <input type="hidden" name="reply_to" value={composing.event.eventId} />
+                  )}
+                  {composing?.mode === "edit" && (
+                    <input type="hidden" name="edits" value={composing.event.eventId} />
+                  )}
                   <InputGroupTextarea
                     name="body"
                     placeholder={`Message ${room.title}`}
+                    aria-label="Message Composer"
                     rows={1}
                     className="max-h-40"
                     disabled={processing}
@@ -1066,7 +1329,7 @@ export default function MatrixRoom({
                     <InputGroupButton
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Attach"
+                      aria-label="Send a File"
                       type="button"
                       disabled={processing}
                       onClick={() => attachment.current?.click()}
@@ -1082,7 +1345,7 @@ export default function MatrixRoom({
                     <InputGroupButton
                       size="icon-xs"
                       className="ms-auto"
-                      aria-label="Send"
+                      aria-label="Send Message"
                       type="submit"
                       disabled={processing}
                     >
@@ -1109,6 +1372,7 @@ export default function MatrixRoom({
               }}
             />
           </div>
+          )}
         </>
       )}
     </div>

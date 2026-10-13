@@ -10,10 +10,10 @@ module Matrix
 
     module_function
 
-    def remember_oauth_client!(homeserver_url, client_id, issuer)
+    def remember_oauth_client!(homeserver_url, client_id, issuer, manage = nil)
       Models::Matrix::KV.set!(
         OAUTH_CLIENT,
-        { "client_id" => client_id, "issuer" => issuer },
+        { "client_id" => client_id, "issuer" => issuer, "manage" => manage },
         homeserver_url,
       )
     end

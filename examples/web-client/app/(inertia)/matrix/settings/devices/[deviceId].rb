@@ -70,6 +70,8 @@ get "/" do
       fingerprint: device.fingerprint,
       trust:       device.trust_state,
       firstSeen:   device.first_seen_at,
+      lastSeenTs:  device.last_seen_ts,
+      lastSeenIp:  device.last_seen_ip,
     },
   )
 end
@@ -103,6 +105,8 @@ export default function MatrixSettingsDevice({
     fingerprint: string | null
     trust: string
     firstSeen: number | null
+    lastSeenTs: number | null
+    lastSeenIp: string | null
   }
 }) {
   const encoded = encodeURIComponent(device.deviceId)
@@ -139,7 +143,7 @@ export default function MatrixSettingsDevice({
                 className="flex flex-col gap-3"
               >
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="display_name">Display name</Label>
+                  <Label htmlFor="display_name">Public Name</Label>
                   <Input
                     id="display_name"
                     name="display_name"
@@ -164,7 +168,7 @@ export default function MatrixSettingsDevice({
             </CardHeader>
             <CardContent className="flex flex-col gap-2 text-sm">
               <div className="flex items-baseline justify-between gap-4">
-                <span className="shrink-0 text-muted-foreground">Device ID</span>
+                <span className="shrink-0 text-muted-foreground">Matrix Session ID</span>
                 <code className="truncate font-mono text-xs">{device.deviceId}</code>
               </div>
               <div className="flex items-baseline justify-between gap-4">
@@ -174,6 +178,18 @@ export default function MatrixSettingsDevice({
               <div className="flex items-baseline justify-between gap-4">
                 <span className="shrink-0 text-muted-foreground">Identity key</span>
                 <code className="truncate font-mono text-xs">{device.identityKey ?? "—"}</code>
+              </div>
+              {/* Both come from GET /devices, which is the only place the homeserver reports
+                  them, so they are blank until that has been fetched at least once. */}
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="shrink-0 text-muted-foreground">Last Seen</span>
+                <span className="truncate text-xs">
+                  {device.lastSeenTs ? new Date(device.lastSeenTs).toLocaleString() : "—"}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="shrink-0 text-muted-foreground">Last Location</span>
+                <code className="truncate font-mono text-xs">{device.lastSeenIp ?? "—"}</code>
               </div>
             </CardContent>
           </Card>

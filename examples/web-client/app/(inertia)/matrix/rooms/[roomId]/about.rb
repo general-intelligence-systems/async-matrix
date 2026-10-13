@@ -169,6 +169,10 @@ get "/" do
       predecessor:    room.predecessor_room_id,
       successor:      room.successor_room_id,
       tombstoned:     room.tombstoned,
+      joinRule:          room.join_rule,
+      guestAccess:       room.guest_access,
+      historyVisibility: room.history_visibility,
+      notificationMode:  room.notification_mode,
     },
     can:  {
       name:   room.can_send_state?("m.room.name", me),
@@ -214,6 +218,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { ShellHeader } from "@/components/admin/slots"
@@ -236,6 +242,13 @@ type Room = {
 
 const initial = (name: string) => name.replace(/^[#!@]/, "").charAt(0).toUpperCase()
 
+const NOTIFICATIONS = [
+  { value: "global", label: "Use Global Setting" },
+  { value: "all", label: "All Messages" },
+  { value: "mentions", label: "Only Mentions and Keywords" },
+  { value: "mute", label: "Disable Notifications" },
+]
+
 export default function MatrixRoomAbout({
   room,
   can,
@@ -254,7 +267,7 @@ export default function MatrixRoomAbout({
         <Link href={`/matrix/rooms/${encoded}`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Room details</h1>
+        <h1 className="truncate text-sm font-medium">Room Details</h1>
       </ShellHeader>
 
       <ScrollArea className="min-h-0 flex-1">
@@ -284,7 +297,7 @@ export default function MatrixRoomAbout({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Details</CardTitle>
+              <CardTitle className="text-sm">Edit Room Details</CardTitle>
             </CardHeader>
             <CardContent>
               <Form action={`/matrix/rooms/${encoded}/about`} method="post" className="flex flex-col gap-4">
@@ -315,53 +328,111 @@ export default function MatrixRoomAbout({
             </CardContent>
           </Card>
 
+          {/* Fractal's general_page is five groups: the history viewers, Notifications, Public
+              Addresses, Access and Visibility, Advanced Information. Members and Permissions are
+              reached from the header and the Access group respectively, not from a "Room" list. */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Room</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-1">
-              <Item render={<Link href={`/matrix/rooms/${encoded}/members`} />}>
-                  <ItemContent>
-                    <ItemTitle>Members</ItemTitle>
-                    <ItemDescription>{room.memberCount} joined</ItemDescription>
-                  </ItemContent>
-                  <Users className="size-4 text-muted-foreground" />
-                </Item>
-              <Item render={<Link href={`/matrix/rooms/${encoded}/addresses`} />}>
-                  <ItemContent>
-                    <ItemTitle>Addresses</ItemTitle>
-                    <ItemDescription>{room.canonicalAlias ?? "No published address"}</ItemDescription>
-                  </ItemContent>
-                  <Hash className="size-4 text-muted-foreground" />
-                </Item>
-              <Item render={<Link href={`/matrix/rooms/${encoded}/access`} />}>
-                  <ItemContent>
-                    <ItemTitle>Access</ItemTitle>
-                    <ItemDescription>Who can join and read history</ItemDescription>
-                  </ItemContent>
-                </Item>
-              <Item render={<Link href={`/matrix/rooms/${encoded}/permissions`} />}>
-                  <ItemContent>
-                    <ItemTitle>Permissions</ItemTitle>
-                    <ItemDescription>Power levels per action</ItemDescription>
-                  </ItemContent>
-                </Item>
+            <CardContent className="flex flex-col gap-1 pt-6">
               <Item render={<Link href={`/matrix/rooms/${encoded}/media`} />}>
-                  <ItemContent>
-                    <ItemTitle>Media</ItemTitle>
-                    <ItemDescription>Files sent in this room</ItemDescription>
-                  </ItemContent>
-                </Item>
+                <ItemContent>
+                  <ItemTitle>Media</ItemTitle>
+                </ItemContent>
+              </Item>
+              <Item render={<Link href={`/matrix/rooms/${encoded}/media/files`} />}>
+                <ItemContent>
+                  <ItemTitle>Files</ItemTitle>
+                </ItemContent>
+              </Item>
+              <Item render={<Link href={`/matrix/rooms/${encoded}/media/audio`} />}>
+                <ItemContent>
+                  <ItemTitle>Audio</ItemTitle>
+                </ItemContent>
+              </Item>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Advanced</CardTitle>
+              <CardTitle className="text-sm">Notifications</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup defaultValue={room.notificationMode ?? "global"} className="gap-3">
+                {NOTIFICATIONS.map((option) => (
+                  <div key={option.value} className="flex items-start gap-2">
+                    <RadioGroupItem value={option.value} id={`n-${option.value}`} className="mt-0.5" />
+                    <Label htmlFor={`n-${option.value}`} className="font-normal">
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Public Addresses</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1">
+              <Item render={<Link href={`/matrix/rooms/${encoded}/addresses`} />}>
+                <ItemContent>
+                  <ItemTitle>{room.canonicalAlias ?? "No published address"}</ItemTitle>
+                </ItemContent>
+                <Hash className="size-4 text-muted-foreground" />
+              </Item>
+              <Item render={<Link href={`/matrix/rooms/${encoded}/members`} />}>
+                <ItemContent>
+                  <ItemTitle>Copy Room Link</ItemTitle>
+                  <ItemDescription>{room.memberCount} joined</ItemDescription>
+                </ItemContent>
+                <Users className="size-4 text-muted-foreground" />
+              </Item>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Access and Visibility</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1">
+              <Item render={<Link href={`/matrix/rooms/${encoded}/access`} />}>
+                <ItemContent>
+                  <ItemTitle>Who Can Join</ItemTitle>
+                  <ItemDescription>{room.joinRule ?? "—"}</ItemDescription>
+                </ItemContent>
+              </Item>
+              <div className="flex items-center justify-between gap-4 px-2 py-1.5">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="guests" className="font-normal">
+                    Allow Guests
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Guests are Matrix users without a registered account
+                  </span>
+                </div>
+                <Switch id="guests" defaultChecked={room.guestAccess === "can_join"} />
+              </div>
+              <Item render={<Link href={`/matrix/rooms/${encoded}/visibility`} />}>
+                <ItemContent>
+                  <ItemTitle>Who Can Read History</ItemTitle>
+                  <ItemDescription>{room.historyVisibility ?? "—"}</ItemDescription>
+                </ItemContent>
+              </Item>
+              <Item render={<Link href={`/matrix/rooms/${encoded}/permissions`} />}>
+                <ItemContent>
+                  <ItemTitle>Permissions</ItemTitle>
+                </ItemContent>
+              </Item>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Advanced Information</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-2 text-sm">
               <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Internal ID</span>
+                <span className="text-muted-foreground">Matrix Room ID</span>
                 <code className="truncate font-mono text-xs">{room.roomId}</code>
               </div>
               <div className="flex items-center justify-between gap-4">

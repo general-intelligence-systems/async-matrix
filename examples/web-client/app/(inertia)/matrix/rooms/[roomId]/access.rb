@@ -121,17 +121,15 @@ import { ShellHeader } from "@/components/admin/slots"
 // The spec's five join rules. knock_restricted is omitted: it needs a space
 // list to mean anything and the UI for that belongs with `restricted`.
 const JOIN_RULES = [
-  { value: "public", label: "Anyone", hint: "Anybody who finds the room can join." },
-  { value: "knock", label: "Ask to join", hint: "People request access and a moderator decides." },
-  { value: "restricted", label: "Space members", hint: "Members of a chosen space can join." },
-  { value: "invite", label: "Invite only", hint: "Only people invited can join." },
+  { value: "invite", label: "Only Invited Users" },
+  { value: "public", label: "Any Registered User" },
 ]
 
 const HISTORY = [
-  { value: "world_readable", label: "Anyone", hint: "Even people who never joined." },
-  { value: "shared", label: "Members", hint: "Everything, to anyone who joins." },
-  { value: "invited", label: "From their invite", hint: "Only after they were invited." },
-  { value: "joined", label: "From when they joined", hint: "Nothing from before." },
+  { value: "world_readable", label: "Anyone, even if they are not in the room" },
+  { value: "shared", label: "Members only, since this option was selected" },
+  { value: "invited", label: "Members only, since they were invited" },
+  { value: "joined", label: "Members only, since they joined the room" },
 ]
 
 function Choice({
@@ -140,7 +138,7 @@ function Choice({
   value,
 }: {
   name: string
-  options: { value: string; label: string; hint: string }[]
+  options: { value: string; label: string; hint?: string }[]
   value: string
 }) {
   return (
@@ -152,7 +150,9 @@ function Choice({
             <Label htmlFor={`${name}-${option.value}`} className="font-normal">
               {option.label}
             </Label>
-            <span className="text-xs text-muted-foreground">{option.hint}</span>
+            {option.hint && (
+              <span className="text-xs text-muted-foreground">{option.hint}</span>
+            )}
           </div>
         </div>
       ))}
@@ -185,7 +185,7 @@ export default function MatrixRoomAccess({
         <Link href={`/matrix/rooms/${encoded}/about`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Access</h1>
+        <h1 className="truncate text-sm font-medium">Who Can Join</h1>
       </ShellHeader>
 
       <ScrollArea className="min-h-0 flex-1">
@@ -196,7 +196,7 @@ export default function MatrixRoomAccess({
         >
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Who can join</CardTitle>
+              <CardTitle className="text-sm">Who Can Join</CardTitle>
               <CardDescription>m.room.join_rules</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -215,12 +215,21 @@ export default function MatrixRoomAccess({
                   </ul>
                 </div>
               )}
+
+              {/* Fractal keeps knocking as a switch beside the two rules rather than a third
+                  rule, because m.room.join_rules spells it as its own value. */}
+              <div className="flex items-center justify-between gap-4 border-t pt-4">
+                <Label htmlFor="knock" className="font-normal">
+                  Allow Invite Requests
+                </Label>
+                <Switch id="knock" name="knock" value="true" defaultChecked={joinRule === "knock"} />
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Who can read history</CardTitle>
+              <CardTitle className="text-sm">Who Can Read History</CardTitle>
               <CardDescription>m.room.history_visibility</CardDescription>
             </CardHeader>
             <CardContent>
@@ -230,7 +239,7 @@ export default function MatrixRoomAccess({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Guests</CardTitle>
+              <CardTitle className="text-sm">Allow Guests</CardTitle>
               <CardDescription>m.room.guest_access</CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-between gap-4">

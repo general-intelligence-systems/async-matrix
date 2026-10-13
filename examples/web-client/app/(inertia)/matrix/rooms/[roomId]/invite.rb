@@ -159,7 +159,7 @@ export default function MatrixRoomInvite({
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Who to invite</CardTitle>
+              <CardTitle className="text-sm">Search</CardTitle>
               <CardDescription>Full Matrix IDs, like @alice:example.org.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">

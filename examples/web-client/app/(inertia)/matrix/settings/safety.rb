@@ -98,9 +98,13 @@ get "/" do
 
   render(
     "matrix/settings/safety",
-    ignored:       ignored["ignored_users"].to_h.keys.sort,
-    mediaPreviews: previews["media_previews"] || "private",
-    inviteAvatars: (previews["invite_avatars"] || "on") == "on",
+    ignored:        ignored["ignored_users"].to_h.keys.sort,
+    mediaPreviews:  previews["media_previews"] || "private",
+    inviteAvatars:  (previews["invite_avatars"] || "on") == "on",
+    readReceipts:   Models::Matrix::AccountData
+      .content_for(event_type: "m.read_receipts").to_h.fetch("enabled", true),
+    typingNotices:  Models::Matrix::AccountData
+      .content_for(event_type: "m.typing_notifications").to_h.fetch("enabled", true),
   )
 end
 
@@ -123,19 +127,23 @@ import { Switch } from "@/components/ui/switch"
 import { ShellHeader } from "@/components/admin/slots"
 
 const PREVIEWS = [
-  { value: "on", label: "Always", hint: "Show media in every room." },
-  { value: "private", label: "Private rooms only", hint: "Hide it in public rooms." },
-  { value: "off", label: "Never", hint: "Never load media without asking." },
+  { value: "on", label: "Show in all rooms" },
+  { value: "private", label: "Show only in private rooms" },
+  { value: "off", label: "Hide in all rooms" },
 ]
 
 export default function MatrixSettingsSafety({
   ignored,
   mediaPreviews,
   inviteAvatars,
+  readReceipts,
+  typingNotices,
 }: {
   ignored: string[]
   mediaPreviews: string
   inviteAvatars: boolean
+  readReceipts: boolean
+  typingNotices: boolean
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -152,7 +160,7 @@ export default function MatrixSettingsSafety({
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Ignored users</CardTitle>
+              <CardTitle className="text-sm">Ignored Users</CardTitle>
               <CardDescription>
                 {/* Ignoring hides history too, not just new messages -- the
                     server stops sending their events entirely. */}
@@ -192,9 +200,44 @@ export default function MatrixSettingsSafety({
             </CardContent>
           </Card>
 
+          {/* Fractal's Privacy group, with its subtitles verbatim: both are about what other
+              people in a room can observe about you. */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Media previews</CardTitle>
+              <CardTitle className="text-sm">Privacy</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="read_receipts" className="font-normal">
+                    Send Read Receipts
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Allow other members of the rooms you participate in to track which messages you
+                    have seen
+                  </span>
+                </div>
+                <Switch id="read_receipts" defaultChecked={readReceipts} />
+              </div>
+
+              <div className="flex items-center justify-between gap-4 border-t pt-4">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="typing_notices" className="font-normal">
+                    Send Typing Notifications
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Allow other members of the rooms you participate in to see when you are typing a
+                    message
+                  </span>
+                </div>
+                <Switch id="typing_notices" defaultChecked={typingNotices} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Media Previews</CardTitle>
               <CardDescription>
                 Loading media tells the sender's server you opened the room.
               </CardDescription>
@@ -217,10 +260,10 @@ export default function MatrixSettingsSafety({
               <div className="flex items-center justify-between gap-4 border-t pt-4">
                 <div className="flex flex-col gap-0.5">
                   <Label htmlFor="invite_avatars" className="font-normal">
-                    Show avatars on invites
+                    Show Avatars for Invites
                   </Label>
                   <span className="text-xs text-muted-foreground">
-                    An invite from a stranger can carry an image.
+                    Display the avatars of the room and the inviter
                   </span>
                 </div>
                 <Switch id="invite_avatars" defaultChecked={inviteAvatars} />

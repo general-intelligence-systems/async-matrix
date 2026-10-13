@@ -95,7 +95,7 @@ export default function MatrixRoomsRoomidEdit({roomId, roomTitle}: {
         <Link href={`/matrix/rooms/${encodeURIComponent(roomId)}/about`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Edit details</h1>
+        <h1 className="truncate text-sm font-medium">Edit Room Details</h1>
       </ShellHeader>
 
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">

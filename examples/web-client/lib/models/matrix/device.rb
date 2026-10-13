@@ -78,6 +78,8 @@ create_table?(:matrix_devices) do
   # Whether we have already told this device why we withheld a key, so
   # we do not tell it again on every message.
   column      :withheld_code_sent, :boolean, default: false, null: false
+  column      :last_seen_ts, :bigint
+  column      :last_seen_ip, TEXT
   column      :first_seen_at, :bigint
   column      :created_at, TIMESTAMP, null: false
   column      :updated_at, TIMESTAMP, null: false

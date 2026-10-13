@@ -309,6 +309,7 @@ import { ArrowLeft, KeyRound, ShieldAlert, ShieldCheck } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
 import { Badge } from "@/components/reui/badge"
 import { Button } from "@/components/ui/button"
+import { Item, ItemContent, ItemTitle } from "@/components/ui/item"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -364,7 +365,7 @@ export default function MatrixSettingsEncryption({
                 ) : (
                   <ShieldAlert className="size-4 text-muted-foreground" />
                 )}
-                Cross-signing
+                Crypto Identity
               </CardTitle>
               <CardDescription>
                 How other people's clients know a device is really yours.
@@ -395,7 +396,7 @@ export default function MatrixSettingsEncryption({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <KeyRound className="size-4" />
-                Recovery
+                Account Recovery
               </CardTitle>
               <CardDescription>
                 {/* Losing this loses every message ever encrypted to this
@@ -421,24 +422,31 @@ export default function MatrixSettingsEncryption({
                   </Button>
                 )}
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Key backup</CardTitle>
-              <CardDescription>
-                Room keys stored on the server so history survives losing this device.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-muted-foreground">Backed up</span>
+              <div className="flex items-center justify-between gap-4 border-t pt-3 text-sm">
+                <span className="text-muted-foreground">Room keys backed up</span>
                 <span className="tabular-nums">
                   {backedUp} / {total}
                 </span>
               </div>
               <Progress value={percent} />
+            </CardContent>
+          </Card>
+
+          {/* Fractal has no separate backup group: the backup is what Account Recovery sets up,
+              so its progress is reported there and this group is the two key transfer rows. */}
+          <Card>
+            <CardContent className="flex flex-col gap-1 pt-6">
+              <Item render={<Link href="/matrix/settings/encryption/keys?action=export" />}>
+                <ItemContent>
+                  <ItemTitle>Export Room Encryption Keys</ItemTitle>
+                </ItemContent>
+              </Item>
+              <Item render={<Link href="/matrix/settings/encryption/keys?action=import" />}>
+                <ItemContent>
+                  <ItemTitle>Import Room Encryption Keys</ItemTitle>
+                </ItemContent>
+              </Item>
             </CardContent>
           </Card>
         </div>

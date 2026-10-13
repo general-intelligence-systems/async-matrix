@@ -162,7 +162,7 @@ export default function MatrixSettingsDevices({
         <Link href="/matrix/settings" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="text-sm font-medium">Devices</h1>
+        <h1 className="text-sm font-medium">Sessions</h1>
       </ShellHeader>
 
       <ScrollArea className="min-h-0 flex-1">
@@ -192,7 +192,7 @@ export default function MatrixSettingsDevices({
               {current && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-sm">Current session</CardTitle>
+                    <CardTitle className="text-sm">Current Session</CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-col gap-1">
                     {devices
@@ -204,7 +204,7 @@ export default function MatrixSettingsDevices({
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Other sessions</CardTitle>
+                  <CardTitle className="text-sm">Other Active Sessions</CardTitle>
                   <CardDescription>
                     Everywhere else this account is signed in.
                   </CardDescription>

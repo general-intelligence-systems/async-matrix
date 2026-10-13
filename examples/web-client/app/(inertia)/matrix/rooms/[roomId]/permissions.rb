@@ -277,38 +277,26 @@
 # m.room.power_levels as an access matrix. The actions are the spec's, plus
 # whatever the room has put under `events`.
 
-# The actions the view draws a row for, and the spec's default when
-# m.room.power_levels names no level of its own. `nil` means it falls back to
+# Fractal's two groups, in its order and with its labels. `nil` means the level falls back to
 # state_default, which is itself one of the rows.
 ACTIONS = [
-  ["invite",              "Invite people",           0],
-  ["kick",                "Remove people",           50],
-  ["ban",                 "Ban people",              50],
-  ["redact",              "Delete others' messages", 50],
-  ["events_default",      "Send messages",           0],
-  ["state_default",       "Change settings",         50],
-  ["m.room.name",         "Change the name",         nil],
-  ["m.room.topic",        "Change the topic",        nil],
-  ["m.room.avatar",       "Change the avatar",       nil],
-  ["m.room.power_levels", "Change permissions",      nil],
-  ["m.room.tombstone",    "Upgrade the room",        100],
-].freeze
-
-# The actions the view draws a row for, and the spec's default when
-# m.room.power_levels names no level of its own. `nil` means it falls back to
-# state_default, which is itself one of the rows.
-ACTIONS = [
-  ["invite",              "Invite people",           0],
-  ["kick",                "Remove people",           50],
-  ["ban",                 "Ban people",              50],
-  ["redact",              "Delete others' messages", 50],
-  ["events_default",      "Send messages",           0],
-  ["state_default",       "Change settings",         50],
-  ["m.room.name",         "Change the name",         nil],
-  ["m.room.topic",        "Change the topic",        nil],
-  ["m.room.avatar",       "Change the avatar",       nil],
-  ["m.room.power_levels", "Change permissions",      nil],
-  ["m.room.tombstone",    "Upgrade the room",        100],
+  ["room",   "events_default",              "Send Messages",                        0],
+  ["room",   "m.room.redaction",            "Remove Own Messages",                  nil],
+  ["room",   "redact",                      "Remove Messages of Other Members",     50],
+  ["room",   "notifications.room",          "Notify Entire Room",                   50],
+  ["room",   "state_default",               "Change Room Settings",                 50],
+  ["room",   "m.room.name",                 "Change Room Name",                     nil],
+  ["room",   "m.room.topic",                "Change Room Description",              nil],
+  ["room",   "m.room.avatar",               "Change Room Avatar",                   nil],
+  ["room",   "m.room.canonical_alias",      "Change Addresses",                     nil],
+  ["room",   "m.room.history_visibility",   "Change Who Can Read History",          nil],
+  ["room",   "m.room.encryption",           "Enable Encryption",                    nil],
+  ["room",   "m.room.power_levels",         "Change Permissions",                   nil],
+  ["room",   "m.room.server_acl",           "Change Server Access Control List",    nil],
+  ["room",   "m.room.tombstone",            "Upgrade Room",                         100],
+  ["member", "invite",                      "Invite",                               0],
+  ["member", "kick",                        "Kick",                                 50],
+  ["member", "ban",                         "Ban",                                  50],
 ].freeze
 
 get "/" do
@@ -320,14 +308,16 @@ get "/" do
     "matrix/rooms/[roomId]/permissions",
     roomId:     room.room_id,
     roomTitle:  room.title,
-    actions:    ACTIONS.map do |key, label, default|
+    actions:    ACTIONS.map do |group, key, label, default|
       if default.nil?
         level = levels.dig("events", key) || state_default
+      elsif key.include?(".")
+        level = levels.dig(*key.split(".")) || default
       else
         level = levels[key] || default
       end
 
-      { key: key, label: label, level: level.to_i }
+      { group: group, key: key, label: label, level: level.to_i }
     end,
     default:    (levels["users_default"] || 0).to_i,
     # Anyone with an explicit entry, which is the list worth showing -- the
@@ -372,7 +362,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ShellHeader } from "@/components/admin/slots"
 
-type Action = { key: string; label: string; level: number }
+type Action = { group: string; key: string; label: string; level: number }
 type Privileged = { memberId: string; level: number; role: string; creator: boolean }
 
 // The three named rungs. Anything else is Custom and shows its number.
@@ -415,7 +405,7 @@ export default function MatrixRoomPermissions({
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">What each level may do</CardTitle>
+              <CardTitle className="text-sm">Room Actions</CardTitle>
               <CardDescription>
                 The level a member needs before the action is allowed. Everyone starts at{" "}
                 {usersDefault}.
@@ -430,7 +420,7 @@ export default function MatrixRoomPermissions({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {actions.map((action) => {
+                  {actions.filter((a) => a.group === "room").map((action) => {
                     const rung = rungFor(action.level)
                     return (
                       <TableRow key={action.key}>
@@ -467,7 +457,59 @@ export default function MatrixRoomPermissions({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Members with a level set</CardTitle>
+              <CardTitle className="text-sm">Member Actions</CardTitle>
+              <CardDescription>
+                The level a member needs before the action is allowed. Everyone starts at{" "}
+                {usersDefault}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Action</TableHead>
+                    <TableHead className="w-44">Required level</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {actions.filter((a) => a.group === "member").map((action) => {
+                    const rung = rungFor(action.level)
+                    return (
+                      <TableRow key={action.key}>
+                        <TableCell>
+                          <span>{action.label}</span>
+                          <code className="ml-2 font-mono text-xs text-muted-foreground">
+                            {action.key}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <Select defaultValue={rung}>
+                            <SelectTrigger size="sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {RUNGS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                              {rung === "custom" && (
+                                <SelectItem value="custom">Custom ({action.level})</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Members With Assigned Power Levels</CardTitle>
               <CardDescription>
                 Everyone else is at the default. The room creator cannot be demoted.
               </CardDescription>
