@@ -6,6 +6,7 @@
 require "console"
 require "json"
 
+require_relative "../error"
 require_relative "../events"
 require_relative "backup"
 require_relative "canonical_json"
@@ -69,6 +70,45 @@ module Async
 
           # What a key released, which is yielded after the device messages which carried it.
           @released = []
+        end
+
+        # The state this device holds, which is written for this device and no other.
+        #
+        # @parameter pickle_key [String] a 32 byte key.
+        # @returns [String] the state.
+        def dump(pickle_key)
+          ::JSON.dump(
+            user_id: @user_id,
+            device_id: @device_id,
+            crypto: @crypto.dump(pickle_key),
+          )
+        end
+
+        # Restore a device from what it wrote, which must be the device asking.
+        #
+        # @parameter dumped [String] what {#dump} wrote.
+        # @parameter pickle_key [String] the 32 byte key it was written with.
+        # @parameter user_id [String] the user restoring it.
+        # @parameter device_id [String] the device restoring it.
+        # @parameter crypto [Class] the implementation which wrote it, since only the caller knows which it encrypts with.
+        # @parameter options [Hash] what else to build it with, as the constructor takes.
+        # @returns [Machine] that device.
+        # @raises [MismatchedAccountError] if the state belongs to another user or device.
+        def self.load(dumped, pickle_key, user_id:, device_id:, crypto:, **options)
+          value = ::JSON.parse(dumped, symbolize_names: true)
+          written = [value[:user_id], value[:device_id]]
+
+          # A device which took on another's state would acknowledge what it never read, so this is refused rather than resumed.
+          unless written == [user_id, device_id]
+            raise MismatchedAccountError.new(written, [user_id, device_id])
+          end
+
+          self.new(
+            user_id: user_id,
+            device_id: device_id,
+            crypto: crypto.load(value[:crypto], pickle_key),
+            **options,
+          )
         end
 
         # @attribute [String] the user this device encrypts as.

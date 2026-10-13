@@ -13,6 +13,26 @@ module Async
     class InvalidKeyError < Error
     end
 
+    # Raised when stored state belongs to another device.
+    #
+    # Its cursor acknowledges what that device read, so resuming another's state loses what was addressed to it.
+    class MismatchedAccountError < Error
+      # @parameter expected [Array(String, String)] the user and device the state was written by.
+      # @parameter got [Array(String, String)] the user and device which asked for it.
+      def initialize(expected, got)
+        super("This state belongs to #{expected.join(":")}, not #{got.join(":")}!")
+
+        @expected = expected
+        @got = got
+      end
+
+      # @attribute [Array(String, String)] the user and device the state was written by.
+      attr :expected
+
+      # @attribute [Array(String, String)] the user and device which asked for it.
+      attr :got
+    end
+
     # Represents a Matrix API error, which is reported with a non-2xx status and a body of the form `{"errcode": "M_FORBIDDEN", "error": "..."}`.
     class RequestError < Error
       # @parameter status [Integer] the HTTP status code of the response.

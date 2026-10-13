@@ -6,6 +6,30 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-10-13
+
+### Added
+
+- **`E2EE::Machine#dump` and `E2EE::Machine.load`**, which carry the device a machine encrypts as
+  alongside its key material. `load` takes the `user_id` and `device_id` restoring the state and
+  raises `MismatchedAccountError` where they are not the ones which wrote it, so a device cannot
+  take on another's state. The implementation which wrote it is named by `crypto:`, since only the
+  caller knows which it encrypts with.
+
+- **`Async::Matrix::MismatchedAccountError`**, carrying `#expected` and `#got` as the user and
+  device each side names. This mirrors `CryptoStoreError::MismatchedAccount` in matrix-rust-sdk,
+  where building an `OlmMachine` over a store belonging to another device is an error rather than a
+  resumption.
+
+  A device's state is its own, and so is the sync cursor which acknowledges what it has read. A
+  client which resumes one device from another's state acknowledges to-device messages this device
+  never received, and a room key lost that way is lost for good — the messages it would have read
+  stay unreadable. Refusing to restore is what makes that unrepresentable.
+
+- **Cases for to-device delivery**, in `test/async/matrix/api/client_server/to_device.rb`: a
+  message is delivered to the device it was addressed to and not to the account's other device, and
+  it is delivered once, against the cursor of the device it was sent to.
+
 ## [4.0.0] - 2026-10-12
 
 ### Added
@@ -441,7 +465,8 @@ server-side API.
   Socketry ecosystem, with schema-driven event validation, an OpenAPI-backed
   client, media support, and mautrix-compatible configuration.
 
-[Unreleased]: https://github.com/general-intelligence-systems/async-matrix/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/general-intelligence-systems/async-matrix/compare/v4.0.1...HEAD
+[4.0.1]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v4.0.1
 [4.0.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v4.0.0
 [3.0.1]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v3.0.1
 [3.0.0]: https://github.com/general-intelligence-systems/async-matrix/releases/tag/v3.0.0

@@ -10,6 +10,49 @@ require "async/matrix/e2ee_context"
 describe Async::Matrix::E2EE::Machine do
   include Async::Matrix::E2EEContext
 
+  # A pickle key is a key rather than a passphrase, so it is exactly 32 bytes.
+  let(:pickle_key) {"0" * 32}
+
+  # Ported from matrix-rust-sdk, where an `OlmMachine` built over a store whose account belongs to another device is `CryptoStoreError::MismatchedAccount` rather than a resumption.
+  with ".load" do
+    it "restores the device which dumped it" do
+      restored = Async::Matrix::E2EE::Machine.load(machine.dump(pickle_key), pickle_key, user_id: machine.user_id, device_id: machine.device_id, crypto: crypto.class)
+
+      expect(restored.user_id).to be == machine.user_id
+      expect(restored.device_id).to be == machine.device_id
+      expect(restored.crypto.identity_keys).to be == crypto.identity_keys
+    end
+
+    # A device's state is its own, and the to-device cursor is part of it: another device resuming this one would acknowledge messages it never read, and a room key lost that way is lost for good.
+    it "refuses a dump which belongs to another device" do
+      dumped = machine.dump(pickle_key)
+
+      expect do
+        Async::Matrix::E2EE::Machine.load(dumped, pickle_key, user_id: machine.user_id, device_id: "OTHERDEVICE", crypto: crypto.class)
+      end.to raise_exception(Async::Matrix::MismatchedAccountError)
+    end
+
+    it "refuses a dump which belongs to another user" do
+      dumped = machine.dump(pickle_key)
+
+      expect do
+        Async::Matrix::E2EE::Machine.load(dumped, pickle_key, user_id: other_user_id, device_id: machine.device_id, crypto: crypto.class)
+      end.to raise_exception(Async::Matrix::MismatchedAccountError)
+    end
+
+    # Which device it was, and which asked for it, so a client can say what it found rather than only that it was wrong.
+    it "says which device the dump belongs to" do
+      dumped = machine.dump(pickle_key)
+
+      begin
+        Async::Matrix::E2EE::Machine.load(dumped, pickle_key, user_id: machine.user_id, device_id: "OTHERDEVICE", crypto: crypto.class)
+      rescue Async::Matrix::MismatchedAccountError => error
+        expect(error.expected).to be == [machine.user_id, machine.device_id]
+        expect(error.got).to be == [machine.user_id, "OTHERDEVICE"]
+      end
+    end
+  end
+
   with "#user_id" do
     it "is whoever the access token belongs to" do
       expect(machine.user_id).to be == user_id
