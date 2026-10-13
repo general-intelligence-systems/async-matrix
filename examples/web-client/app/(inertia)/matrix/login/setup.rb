@@ -42,43 +42,70 @@
 #
 
 get "/" do
-  render("matrix/login/setup")
-end
+  credential = Models::Matrix::Credential.first
 
-post "/" do
-  halt(501, "matrix: not implemented\n")
+  unless credential&.usable?
+    redirect("/matrix/login", 303)
+  end
+
+  state = Models::Matrix::DeviceState.first
+
+  render(
+    "matrix/login/setup",
+    account: {
+      userId:   credential.matrix_user_id,
+      deviceId: credential.device_id,
+    },
+    device:  {
+      keysPublished: state&.keys_published || false,
+    },
+  )
 end
 
 __END__
 
 import { Head, Link } from "@inertiajs/react"
-import { ArrowLeft } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
-import { ShellHeader } from "@/components/admin/slots"
+import { Button } from "@/components/ui/button"
 
-export default function MatrixLoginSetup({}: {
-
+export default function MatrixLoginSetup({
+  account,
+  device,
+}: {
+  account: { userId: string; deviceId: string }
+  device: { keysPublished: boolean }
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Session setup"} />
+      <Head title="Session Setup" />
 
-      <ShellHeader>
-        <Link href={"/matrix/login"} className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" />
-        </Link>
-        <h1 className="truncate text-sm font-medium">Session setup</h1>
-      </ShellHeader>
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-6 p-6 pt-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>login/session_setup_view.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h1 className="text-xl font-semibold tracking-tight">Session Setup</h1>
+          <p className="text-sm text-muted-foreground">Fetching Account Data…</p>
+        </div>
+
+        <dl className="w-full space-y-1 text-xs text-muted-foreground">
+          <div className="flex justify-between gap-4">
+            <dt>User</dt>
+            <dd className="font-mono">{account.userId}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt>Device</dt>
+            <dd className="font-mono">{account.deviceId}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt>Keys published</dt>
+            <dd className="font-mono">{String(device.keysPublished)}</dd>
+          </div>
+        </dl>
+
+        <Button render={<Link href="/matrix" />} className="w-full">
+          Continue
+        </Button>
       </div>
     </div>
   )

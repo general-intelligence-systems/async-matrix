@@ -206,6 +206,37 @@
 # This is that decision. Everything under /matrix needs a device whose tokens still work, so without
 # one the only reachable screen is the login flow itself. A layout's `before` is class-level Sinatra
 # DSL and reaches only the files below it, which is why it sits here and not in the root layout.
+# What the login flow needs from both sides of the browser trip: the method page posts a password
+# and the callback comes back with a token, and either way the answer from POST /login is the same
+# shape and lands in the one credential row.
+helpers do
+  # The device id is a crypto identity, so an existing one is reused rather than re-minted. See the
+  # migration for why that matters.
+  def matrix_device_id
+    existing = Models::Matrix::Credential.first&.device_id.to_s
+
+    if existing.empty?
+      Models::Matrix::Credential.generate_device_id
+    else
+      existing
+    end
+  end
+
+  def store_session(base_url, answer)
+    credential = Models::Matrix::Credential.first || Models::Matrix::Credential.new
+
+    credential.set(
+      homeserver_url: answer["well_known"]&.dig("m.homeserver", "base_url") || base_url,
+      matrix_user_id: answer["user_id"],
+      device_id:      answer["device_id"],
+      access_token:   answer["access_token"],
+      refresh_token:  answer["refresh_token"],
+      expires_at:     answer["expires_in_ms"] ? (Time.now.to_i * 1000) + answer["expires_in_ms"].to_i : nil,
+    )
+    credential.save_changes
+  end
+end
+
 PUBLIC = %r{\A/matrix/(login|callback|error)(/|\z)}
 
 before do

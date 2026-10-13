@@ -48,43 +48,137 @@
 #
 
 get "/" do
-  render("matrix/login/homeserver")
+  render(
+    "matrix/login/homeserver",
+    autodiscovery: session.fetch(:matrix_autodiscovery, true),
+    value:         session[:matrix_homeserver_input].to_s,
+    error:         session.delete(:matrix_homeserver_error),
+  )
 end
 
+# Resolve first, then move on: the method page needs the base URL and the flows, and a domain that
+# does not answer is this page's error rather than the next page's empty state.
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  autodiscovery = params["autodiscovery"].to_s != "false"
+  input = params["homeserver"].to_s.strip
+
+  session[:matrix_autodiscovery] = autodiscovery
+  session[:matrix_homeserver_input] = input
+
+  base_url = Matrix::Homeserver.resolve(input, autodiscovery: autodiscovery)
+
+  if base_url.nil?
+    if autodiscovery
+      session[:matrix_homeserver_error] = "that is not a domain name"
+    else
+      session[:matrix_homeserver_error] = "that is not an http or https URL"
+    end
+
+    redirect("/matrix/login/homeserver", 303)
+  end
+
+  flows = Matrix::Homeserver.flows(base_url)
+
+  if flows.empty?
+    session[:matrix_homeserver_error] = "no Matrix homeserver answered at #{base_url}"
+    redirect("/matrix/login/homeserver", 303)
+  end
+
+  session[:matrix_base_url] = base_url
+  session[:matrix_flows] = flows
+
+  if autodiscovery
+    session[:matrix_domain] = input
+  else
+    session[:matrix_domain] = nil
+  end
+
+  redirect("/matrix/login/method", 303)
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixLoginHomeserver({}: {
-
+export default function MatrixLoginHomeserver({
+  autodiscovery,
+  value,
+  error,
+}: {
+  autodiscovery: boolean
+  value: string
+  error: string | null
 }) {
+  // Fractal swaps the entry's own title and help text on the auto-discovery setting, because a
+  // domain and a URL are different things to be asked for (homeserver_page.rs update_text).
+  const label = autodiscovery ? "Domain Name" : "Homeserver URL"
+  const help = autodiscovery
+    ? "The domain of your Matrix homeserver, for example gnome.org"
+    : "The URL of your Matrix homeserver, for example https://gnome.modular.im"
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Homeserver"} />
+      <Head title="Homeserver" />
 
       <ShellHeader>
-        <Link href={"/matrix/login"} className="text-muted-foreground hover:text-foreground">
+        <Link href="/matrix/login" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
         <h1 className="truncate text-sm font-medium">Homeserver</h1>
       </ShellHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>login/homeserver_page.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+      <div className="mx-auto flex w-full max-w-md flex-col gap-6 p-6">
+        <h2 className="text-xl font-semibold tracking-tight">Homeserver</h2>
+
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTitle>Could not reach it</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <Form action="/matrix/login/homeserver" method="post" className="flex flex-col gap-4">
+          {({ processing }) => (
+            <>
+              <input type="hidden" name="autodiscovery" value={String(autodiscovery)} />
+
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="homeserver">{label}</FieldLabel>
+                  <Input
+                    id="homeserver"
+                    name="homeserver"
+                    defaultValue={value}
+                    autoFocus
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder={autodiscovery ? "gnome.org" : "https://gnome.modular.im"}
+                  />
+                  <FieldDescription>{help}</FieldDescription>
+                </Field>
+              </FieldGroup>
+
+              <Button type="submit" disabled={processing} className="self-center">
+                Next
+              </Button>
+            </>
+          )}
+        </Form>
+
+        <Button
+          variant="ghost"
+          render={<Link href="/matrix/login/advanced" />}
+          className="self-center"
+        >
+          Advanced…
+        </Button>
       </div>
     </div>
   )

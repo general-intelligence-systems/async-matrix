@@ -6,7 +6,9 @@
 #
 # NOT IMPLEMENTED.
 #
-# The sliding-sync proxy and any override the homeserver's well-known did not supply.
+# One switch: Auto-Discovery. On, the entry is a domain resolved through its well-known; off, it is
+# the homeserver URL as typed. Fractal titles the dialog "Homeserver Discovery" and it holds nothing
+# else.
 # ── Fractal's widget tree ──────────────────────────────────────────────────
 #
 # COMPONENT NAMES ONLY, extracted from the Blueprint sources named below --
@@ -36,15 +38,21 @@
 get "/" do
   render_modal(
     background:       "matrix/login/homeserver",
-    background_props: {},
+    background_props: {
+      autodiscovery: session.fetch(:matrix_autodiscovery, true),
+      value:         session[:matrix_homeserver_input].to_s,
+      error:         nil,
+    },
     component:        "matrix/login/advanced",
-    props:            {},
+    props:            { autodiscovery: session.fetch(:matrix_autodiscovery, true) },
     url:              "/matrix/login/homeserver",
   )
 end
 
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  session[:matrix_autodiscovery] = params["autodiscovery"].to_s == "true"
+
+  redirect("/matrix/login/homeserver", 303)
 end
 
 __END__
@@ -59,30 +67,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 
-export default function MatrixLoginAdvanced() {
+export default function MatrixLoginAdvanced({ autodiscovery }: { autodiscovery: boolean }) {
   return (
     <>
-      <Head title="Advanced homeserver settings" />
+      <Head title="Homeserver Discovery" />
 
       <Form action="/matrix/login/advanced" method="post" className="contents">
         {({ processing }) => (
           <>
             <DialogHeader>
-              <DialogTitle>Advanced</DialogTitle>
+              <DialogTitle>Homeserver Discovery</DialogTitle>
               <DialogDescription>
-                Overrides for what the homeserver's well-known did not supply.
+                Whether the homeserver entry is a domain to look up or a URL to use as given.
               </DialogDescription>
             </DialogHeader>
 
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="sliding_sync_url">Sliding sync proxy</FieldLabel>
-                <Input id="sliding_sync_url" name="sliding_sync_url" placeholder="https://" />
-              </Field>
-            </FieldGroup>
+            <Field orientation="horizontal">
+              <FieldLabel htmlFor="autodiscovery">Auto-Discovery</FieldLabel>
+              <Switch id="autodiscovery" name="autodiscovery" value="true" defaultChecked={autodiscovery} />
+              <FieldDescription>
+                Looks the domain up in its .well-known/matrix/client.
+              </FieldDescription>
+            </Field>
 
             <DialogFooter className="gap-2">
               <Button type="submit" disabled={processing}>

@@ -10,6 +10,7 @@ require "ratalada/contrib/inertia"
 require "ratalada/contrib/router/file_based/sinatra_adapter"
 
 require_relative "config/sequel"
+require_relative "lib/matrix/homeserver"
 
 RELOAD = "USR2"
 reloading = false

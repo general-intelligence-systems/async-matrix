@@ -53,43 +53,171 @@
 #
 
 get "/" do
-  render("matrix/login/method")
+  base_url = session[:matrix_base_url].to_s
+
+  if base_url.empty?
+    redirect("/matrix/login/homeserver", 303)
+  end
+
+  flows = Array(session[:matrix_flows])
+
+  render(
+    "matrix/login/method",
+    homeserver:   base_url,
+    domain:       session[:matrix_domain],
+    supportsSso:  flows.include?("m.login.sso"),
+    supportsPassword: flows.include?("m.login.password"),
+    providers:    Matrix::Homeserver.identity_providers(base_url).map do |provider|
+      { id: provider["id"], name: provider["name"] }
+    end,
+    error: session.delete(:matrix_method_error),
+  )
 end
 
+# m.login.password, which is the form on this page. SSO leaves for the browser instead, so it is
+# the in-browser page's POST and not this one's.
 post "/" do
-  halt(501, "matrix: not implemented\n")
+  base_url = session[:matrix_base_url].to_s
+
+  if base_url.empty?
+    redirect("/matrix/login/homeserver", 303)
+  end
+
+  answer = Matrix::Homeserver.password_login(
+    base_url,
+    params["username"].to_s,
+    params["password"].to_s,
+    matrix_device_id,
+  )
+
+  if answer.nil?
+    session[:matrix_method_error] = "the homeserver rejected that username and password"
+    redirect("/matrix/login/method", 303)
+  end
+
+  store_session(base_url, answer)
+
+  redirect("/matrix/login/setup", 303)
 end
 
 __END__
 
-import { Head, Link } from "@inertiajs/react"
+import { Form, Head, Link } from "@inertiajs/react"
 import { ArrowLeft } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert"
+import { Button } from "@/components/ui/button"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { ShellHeader } from "@/components/admin/slots"
 
-export default function MatrixLoginMethod({}: {
-
+export default function MatrixLoginMethod({
+  homeserver,
+  domain,
+  supportsSso,
+  supportsPassword,
+  providers,
+  error,
+}: {
+  homeserver: string
+  domain: string | null
+  supportsSso: boolean
+  supportsPassword: boolean
+  providers: { id: string; name: string }[]
+  error: string | null
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Head title={"Log in method"} />
+      <Head title="Log In" />
 
       <ShellHeader>
-        <Link href={"/matrix/login"} className="text-muted-foreground hover:text-foreground">
+        <Link
+          href="/matrix/login/homeserver"
+          className="text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="size-4" />
         </Link>
-        <h1 className="truncate text-sm font-medium">Log in method</h1>
+        <h1 className="truncate text-sm font-medium">Log In</h1>
       </ShellHeader>
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <Alert>
-          <AlertTitle>Not implemented</AlertTitle>
-          <AlertDescription>
-            Scaffolded from Fractal's <code>login/method_page.blp</code>. The widget tree to rebuild is in the
-            route file.
-          </AlertDescription>
-        </Alert>
+      <div className="mx-auto flex w-full max-w-md flex-col gap-6 p-6">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {domain ? `Log in to ${domain}` : "Log in"}
+          </h2>
+          <p className="font-mono text-xs text-muted-foreground">
+            {homeserver.replace(/\/$/, "")}
+          </p>
+        </div>
+
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTitle>Could not sign in</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {supportsPassword ? (
+          <Form action="/matrix/login/method" method="post" className="flex flex-col gap-4">
+            {({ processing }) => (
+              <>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="username">Matrix Username</FieldLabel>
+                    <Input
+                      id="username"
+                      name="username"
+                      autoFocus
+                      autoCapitalize="none"
+                      spellCheck={false}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="password">Password</FieldLabel>
+                    <Input id="password" name="password" type="password" />
+                  </Field>
+                </FieldGroup>
+
+                <Button type="submit" disabled={processing} className="self-center">
+                  Next
+                </Button>
+              </>
+            )}
+          </Form>
+        ) : (
+          <Alert>
+            <AlertTitle>No password login</AlertTitle>
+            <AlertDescription>
+              This homeserver does not advertise m.login.password.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Fractal shows the SSO button only when the homeserver advertises the flow
+            (method_page.rs: sso_button.set_visible(data.supports_sso)). */}
+        {supportsSso ? (
+          <div className="flex flex-col gap-2 border-t pt-4">
+            {providers.length ? (
+              providers.map((provider) => (
+                <Button
+                  key={provider.id}
+                  variant="outline"
+                  render={
+                    <Link
+                      href={`/matrix/login/browser?provider=${encodeURIComponent(provider.id)}`}
+                    />
+                  }
+                >
+                  Login via {provider.name}
+                </Button>
+              ))
+            ) : (
+              <Button variant="outline" render={<Link href="/matrix/login/browser" />}>
+                Login via SSO
+              </Button>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   )
