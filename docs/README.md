@@ -36,7 +36,11 @@ which `lucideIconsPlugin` in `lib/source.ts` resolves for the sidebar.
 | `app/docs`                | The docs layout and the catch-all page route.                   |
 | `app/api/search/route.ts` | The search index, exported once at build time by `staticGET`.    |
 
-The content is written here rather than generated from `readme.md` and `guides/`, so a change to
-either has to be made in both places. Two things do differ by necessity: the `{ruby ...}` link
-syntax the guides use is `decode`'s, not MDX's, so it is written as plain inline code here, and
-MDX reads a bare `{` as an expression, so braces in prose belong inside backticks.
+The content is written here rather than generated from `README.md`, so a change to either has to be
+made in both places. One thing differs by necessity: MDX reads a bare `{` as an expression, so
+braces in prose belong inside backticks.
+
+These pages are also the source of `context/`, the agent context the gem ships: `bin/update-context`
+converts each one to markdown, in the order `content/docs/meta.json` gives, with the front matter
+becoming its entry in `context/index.yaml`. A component it does not understand is an error rather
+than something it drops, so a new one has to be taught to it - `<Cards>` is the one it knows.

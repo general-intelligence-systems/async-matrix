@@ -429,8 +429,9 @@ npm install
 npm run dev     # http://localhost:3000
 ```
 
-Its pages are MDX in `docs/content/docs`, written there rather than generated from this file and
-`guides/`, so a change to either has to be made in both places. See `docs/README.md`.
+Its pages are MDX in `docs/content/docs`, written there rather than generated from this file, so a
+change to either has to be made in both places. They are also where `context/` comes from, which
+`bin/update-context` generates: the agent context this gem ships. See `docs/README.md`.
 
 ## Testing
 

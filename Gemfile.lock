@@ -6,6 +6,7 @@ PATH
       base64 (~> 0.3)
       console (~> 1.29)
       gem_kit (~> 0.2)
+      json_schemer (~> 2.5)
       vodozemac (~> 0.1)
 
 GEM
@@ -162,7 +163,6 @@ DEPENDENCIES
   benchmark-ips
   decode
   gem_kit-release
-  json_schemer
   lefthook (~> 2.2)
   memory_profiler
   rubocop

@@ -1,4 +1,17 @@
 node_modules
+.env
 
 # One SQLite database per Matrix session, created on boot by config/sequel.rb.
-sessions/
+# The -wal and -shm beside each one are SQLite's own.
+/sessions
+
+# Vite build output — one dir per environment, from config/vite.json.
+/public/vite
+/public/vite-dev
+/public/vite-test
+
+# vite_ruby's build cache.
+/tmp
+
+# overmind's socket, from bin/dev.
+/.overmind.sock

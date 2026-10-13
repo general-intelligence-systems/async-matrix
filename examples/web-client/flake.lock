@@ -1,32 +1,11 @@
 {
   "nodes": {
-    "krew-nix": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "systems": "systems"
-      },
-      "locked": {
-        "lastModified": 1791556547,
-        "narHash": "sha256-6BqrA9QhFcdf27rQ35G7Z0qpFq9tqp+Ti5cqkGZ1iQE=",
-        "owner": "n-at-han-k",
-        "repo": "krew.nix",
-        "rev": "bef69ee5ac694e918db8d7d351866c9a14966eee",
-        "type": "github"
-      },
-      "original": {
-        "owner": "n-at-han-k",
-        "repo": "krew.nix",
-        "type": "github"
-      }
-    },
     "mine": {
       "inputs": {
         "nixpkgs": [
           "nixpkgs"
         ],
-        "systems": "systems_2"
+        "systems": "systems"
       },
       "locked": {
         "lastModified": 1790613442,
@@ -57,7 +36,6 @@
     },
     "root": {
       "inputs": {
-        "krew-nix": "krew-nix",
         "mine": "mine",
         "nixpkgs": "nixpkgs",
         "utils": "utils"
@@ -93,24 +71,9 @@
         "type": "github"
       }
     },
-    "systems_3": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
     "utils": {
       "inputs": {
-        "systems": "systems_3"
+        "systems": "systems_2"
       },
       "locked": {
         "lastModified": 1731533236,

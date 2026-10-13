@@ -1,0 +1,20 @@
+{
+  "all": {
+    "sourceCodeDir": "frontend",
+    "watchAdditionalPaths": []
+  },
+  "development": {
+    "autoBuild": true,
+    "publicOutputDir": "vite-dev",
+    "port": 3037,
+    "host": "127.0.0.1"
+  },
+  "test": {
+    "autoBuild": true,
+    "publicOutputDir": "vite-test"
+  },
+  "production": {
+    "autoBuild": false,
+    "publicOutputDir": "vite"
+  }
+}

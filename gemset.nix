@@ -32,7 +32,7 @@
     version = "0.105.0";
   };
   async-matrix = {
-    dependencies = ["async-rest" "base64" "console" "gem_kit" "vodozemac"];
+    dependencies = ["async-rest" "base64" "console" "gem_kit" "json_schemer" "vodozemac"];
     groups = ["default"];
     platforms = [];
     source = {

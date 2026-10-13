@@ -21,10 +21,6 @@ group :lint do
   gem "decode"
 end
 
-group :maintenance do
-  gem "json_schemer"
-end
-
 group :release do
   gem "gem_kit-release"
 end

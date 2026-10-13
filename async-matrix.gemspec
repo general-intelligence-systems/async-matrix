@@ -48,5 +48,8 @@ Gem::Specification.new do |spec|
   # GemKit::Deprecate declares a deprecation as a dated promise: the replacement, and the version the old name stops existing in.
   spec.add_dependency "gem_kit", "~> 0.2"
 
+  # What Schema checks a document against. The schemas this gem ships say which fields an operation requires at a version, and bin/update-spec already reads the specification's own OpenAPI through this.
+  spec.add_dependency "json_schemer", "~> 2.5"
+
   spec.add_development_dependency "lefthook", "~> 2.2"
 end

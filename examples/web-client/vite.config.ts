@@ -7,11 +7,6 @@ import tailwindcss from "@tailwindcss/vite"
 
 const APP = resolve(import.meta.dirname, "app")
 
-// bin/emails (the renderer lib/emails.rb talks to) loads `virtual:emails`, and
-// every mailer's template is the __END__ block of its lib/mailers/*.rb -- same
-// trick as the pages above, different directory.
-const MAILERS = resolve(import.meta.dirname, "lib/mailers")
-
 // Everything after __END__ in a .rb file: the page or email template it carries.
 const endBlock = (file: string) => {
   const source = readFileSync(file, "utf8")
@@ -93,65 +88,8 @@ function rubyPages(): Plugin {
   }
 }
 
-function rubyEmails(): Plugin {
-  const template = (name: string) => endBlock(resolve(MAILERS, `${name}.rb`))
-
-  return {
-    name: "ruby-emails",
-
-    // The renderer, on the dev server that already exists. react-email-rails
-    // ships a `serve()` that speaks over its own stdin and stdout, so whoever
-    // wants a render has to spawn it -- which meant every ruby process booting
-    // a second, private Vite just to load the templates. This one is the same
-    // protocol (a JSON request, a JSON response) against the Vite already
-    // running the app, so lib/emails.rb is an HTTP call and nothing else needs
-    // starting, supervising or restarting.
-    configureServer(server) {
-      server.middlewares.use("/__emails", (request, response, next) => {
-        if (request.method !== "POST") return next()
-
-        const chunks: Buffer[] = []
-        request.on("data", (chunk) => chunks.push(chunk))
-        request.on("end", async () => {
-          response.setHeader("content-type", "application/json")
-          try {
-            const { renderEmail } = await server.ssrLoadModule("react-email-rails/runtime")
-            const registry = (await server.ssrLoadModule("virtual:emails")).default
-            const rendered = await renderEmail(JSON.parse(Buffer.concat(chunks).toString()), registry)
-            response.end(JSON.stringify({ ok: true, ...rendered }))
-          } catch (error) {
-            response.end(JSON.stringify({ ok: false, error: (error as Error)?.message ?? "render failed" }))
-          }
-        })
-      })
-    },
-
-    resolveId: (id) => (id.startsWith("virtual:email") ? `\0${id}` : null),
-    load(id) {
-      if (id === "\0virtual:emails") {
-        const entries = globSync("*.rb", { cwd: MAILERS })
-          .map((file) => file.slice(0, -3))
-          .filter((name) => template(name) !== null)
-          .map((name) => `  ${JSON.stringify(name)}: () => import("virtual:email/${name}.tsx"),`)
-          .join("\n")
-        return `export default {\n${entries}\n}\n`
-      }
-      if (id.startsWith("\0virtual:email/")) {
-        const name = id.slice("\0virtual:email/".length, -".tsx".length)
-        const tsx = template(name)
-        return tsx && transformWithOxc(tsx, `${name}.tsx`, { lang: "tsx" })
-      }
-      return null
-    },
-  }
-}
-
 export default defineConfig({
-  plugins: [RubyPlugin(), react(), tailwindcss(), rubyPages(), rubyEmails()],
-  // Vite rejects Host headers it doesn't recognise, and nginx on macmini serves
-  // this app as controller.local -- without it every request through that name
-  // comes back "host not permitted".
-  server: { allowedHosts: ["controller.local"] },
+  plugins: [RubyPlugin(), react(), tailwindcss(), rubyPages()],
   resolve: {
     alias: { "@": resolve(import.meta.dirname, "frontend") },
   },
