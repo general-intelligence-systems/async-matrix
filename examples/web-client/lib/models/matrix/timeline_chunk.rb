@@ -86,9 +86,18 @@ create_table?(:matrix_timeline_chunks) do
   # Not the primary key: chunk ids are assigned per timeline and the
   # linked list refers to them, so they have to survive independently
   # of the row id.
-  column      :chunk_id, :integer, null: false
-  column      :previous_chunk_id, :integer
-  column      :next_chunk_id, :integer
+  #
+  # TEXT, BECAUSE A CHUNK ID IS A /sync `prev_batch` TOKEN. That is the only
+  # value anything assigns -- server.rb's apply_room passes it as chunk_id and
+  # prev_token both -- and a token is "s1027_84817_0_467_520_..." rather than a
+  # number. Declared :integer this still worked here, because SQLite's column
+  # affinity is a preference and not a constraint: handed a string it cannot
+  # convert, it stores the string. Any database that enforces the declared type
+  # rejects the insert outright (Postgres: `invalid input syntax for type
+  # integer`), so the declaration was only ever true of SQLite.
+  column      :chunk_id, TEXT, null: false
+  column      :previous_chunk_id, TEXT
+  column      :next_chunk_id, TEXT
   # "event" or "gap". The SDK spells these 'E' and 'G' in a CHECK
   # constraint; spelled out here because nothing about this table is
   # hot enough to care and 'G' reads as nothing at all.

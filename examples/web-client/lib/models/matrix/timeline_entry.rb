@@ -41,7 +41,9 @@ create_table?(:matrix_timeline_entries) do
   primary_key :id, type: :Bignum, serial: true
   column      :room_id, TEXT, null: false
   column      :thread_root_id, TEXT, default: "", null: false
-  column      :chunk_id, :integer, null: false
+  # TEXT for the same reason as matrix_timeline_chunks.chunk_id, which this
+  # refers to: a chunk id is a prev_batch token, not a number.
+  column      :chunk_id, TEXT, null: false
   column      :event_id, TEXT, null: false
   column      :position, :integer, null: false
   column      :created_at, TIMESTAMP, null: false
